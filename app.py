@@ -1,3 +1,4 @@
+import os
 from flask import Flask
 import sqlite3
 
@@ -17,4 +18,6 @@ def hello():
     return "Construction AI is Live!"
 
 if __name__ == "__main__":
-    app.run()
+    # دریافت پورت از Render، اگر نبود روی ۵۰۰۰ اجرا کن
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
