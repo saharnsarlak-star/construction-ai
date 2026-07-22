@@ -1,0 +1,418 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  api,
+  type AnalysisOut,
+  type CountryCode,
+  type DocumentCategory,
+  type LanguageCode,
+  type ProjectOut,
+} from "./api";
+import { countryOptions, languageOptions, t } from "./i18n";
+import "./App.css";
+
+const uploadCategories: { key: DocumentCategory; labelKey: string }[] = [
+  { key: "tender", labelKey: "tenderDocs" },
+  { key: "drawing", labelKey: "drawings" },
+  { key: "schedule", labelKey: "schedule" },
+  { key: "standard", labelKey: "standards" },
+];
+
+function App() {
+  const [uiLang, setUiLang] = useState<LanguageCode>(() => {
+    return (localStorage.getItem("ui_lang") as LanguageCode) || "fa";
+  });
+  const [projects, setProjects] = useState<ProjectOut[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [project, setProject] = useState<ProjectOut | null>(null);
+  const [analysis, setAnalysis] = useState<AnalysisOut | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const [name, setName] = useState("");
+  const [country, setCountry] = useState<CountryCode>("IR");
+  const [reportLang, setReportLang] = useState<LanguageCode>("fa");
+  const [description, setDescription] = useState("");
+
+  const dir = uiLang === "fa" ? "rtl" : "ltr";
+
+  useEffect(() => {
+    localStorage.setItem("ui_lang", uiLang);
+    document.documentElement.lang = uiLang;
+    document.documentElement.dir = dir;
+  }, [uiLang, dir]);
+
+  useEffect(() => {
+    void refreshProjects();
+  }, []);
+
+  useEffect(() => {
+    if (selectedId == null) {
+      setProject(null);
+      setAnalysis(null);
+      return;
+    }
+    void loadProject(selectedId);
+  }, [selectedId]);
+
+  async function refreshProjects() {
+    try {
+      const list = await api.listProjects();
+      setProjects(list);
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function loadProject(id: number) {
+    setError(null);
+    try {
+      const p = await api.getProject(id);
+      setProject(p);
+      setReportLang(p.report_language);
+      try {
+        const a = await api.latestAnalysis(id);
+        setAnalysis(a);
+      } catch {
+        setAnalysis(null);
+      }
+    } catch (e) {
+      setError(String(e));
+    }
+  }
+
+  async function createProject() {
+    if (!name.trim()) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const p = await api.createProject({
+        name: name.trim(),
+        country,
+        ui_language: uiLang,
+        report_language: reportLang,
+        description: description.trim() || undefined,
+      });
+      setName("");
+      setDescription("");
+      await refreshProjects();
+      setSelectedId(p.id);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveLanguages() {
+    if (!project) return;
+    setBusy(true);
+    try {
+      const updated = await api.updateProject(project.id, {
+        ui_language: uiLang,
+        report_language: reportLang,
+      });
+      setProject(updated);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onUpload(category: DocumentCategory, files: FileList | null) {
+    if (!project || !files?.length) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.uploadDocuments(project.id, category, files);
+      await loadProject(project.id);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteDoc(docId: number) {
+    if (!project) return;
+    setBusy(true);
+    try {
+      await api.deleteDocument(project.id, docId);
+      await loadProject(project.id);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onReextract(docId: number) {
+    if (!project) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.reextractDocument(project.id, docId);
+      await loadProject(project.id);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runAnalysis() {
+    if (!project) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const a = await api.analyze(project.id, reportLang);
+      setAnalysis(a);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const docsByCategory = useMemo(() => {
+    const map: Record<DocumentCategory, ProjectOut["documents"]> = {
+      tender: [],
+      drawing: [],
+      schedule: [],
+      standard: [],
+    };
+    project?.documents.forEach((d) => map[d.category].push(d));
+    return map;
+  }, [project]);
+
+  return (
+    <div className="app-shell" dir={dir}>
+      <header className="hero">
+        <div className="hero-inner">
+          <p className="eyebrow">{t(uiLang, "audience")}</p>
+          <h1>{t(uiLang, "appName")}</h1>
+          <p className="tagline">{t(uiLang, "tagline")}</p>
+          <div className="lang-bar">
+            <label>
+              {t(uiLang, "uiLanguage")}
+              <select
+                value={uiLang}
+                onChange={(e) => setUiLang(e.target.value as LanguageCode)}
+              >
+                {languageOptions.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+      </header>
+
+      <main className="layout">
+        {error && <div className="error-banner">{error}</div>}
+
+        {!selectedId && (
+          <section className="panel">
+            <h2>{t(uiLang, "newProject")}</h2>
+            <div className="form-grid">
+              <label>
+                {t(uiLang, "projectName")}
+                <input value={name} onChange={(e) => setName(e.target.value)} />
+              </label>
+              <label>
+                {t(uiLang, "country")}
+                <select
+                  value={country}
+                  onChange={(e) => setCountry(e.target.value as CountryCode)}
+                >
+                  {countryOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {t(uiLang, "reportLanguage")}
+                <select
+                  value={reportLang}
+                  onChange={(e) => setReportLang(e.target.value as LanguageCode)}
+                >
+                  {languageOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="full">
+                {t(uiLang, "description")}
+                <textarea
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  rows={3}
+                />
+              </label>
+            </div>
+            <button className="primary" disabled={busy} onClick={() => void createProject()}>
+              {t(uiLang, "create")}
+            </button>
+
+            <h2 className="mt">{t(uiLang, "projects")}</h2>
+            {projects.length === 0 ? (
+              <p className="muted">{t(uiLang, "empty")}</p>
+            ) : (
+              <ul className="project-list">
+                {projects.map((p) => (
+                  <li key={p.id}>
+                    <div>
+                      <strong>{p.name}</strong>
+                      <span>
+                        {p.country} · {p.documents.length} {t(uiLang, "files")}
+                      </span>
+                    </div>
+                    <button onClick={() => setSelectedId(p.id)}>{t(uiLang, "open")}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        {selectedId && project && (
+          <section className="panel">
+            <div className="row-between">
+              <button className="ghost" onClick={() => setSelectedId(null)}>
+                {t(uiLang, "back")}
+              </button>
+              <div className="meta">
+                <strong>{project.name}</strong>
+                <span>{project.country}</span>
+              </div>
+            </div>
+
+            <div className="form-grid compact">
+              <label>
+                {t(uiLang, "reportLanguage")}
+                <select
+                  value={reportLang}
+                  onChange={(e) => setReportLang(e.target.value as LanguageCode)}
+                >
+                  {languageOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="actions">
+                <button disabled={busy} onClick={() => void saveLanguages()}>
+                  {t(uiLang, "saveLanguages")}
+                </button>
+                <button className="primary" disabled={busy} onClick={() => void runAnalysis()}>
+                  {busy ? t(uiLang, "analyzing") : t(uiLang, "analyze")}
+                </button>
+              </div>
+            </div>
+
+            <div className="upload-grid">
+              {uploadCategories.map((cat) => (
+                <article key={cat.key} className="upload-card">
+                  <h3>{t(uiLang, cat.labelKey)}</h3>
+                  <label className="file-btn">
+                    {t(uiLang, "upload")}
+                    <input
+                      type="file"
+                      multiple
+                      onChange={(e) => {
+                        void onUpload(cat.key, e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  {docsByCategory[cat.key].length === 0 ? (
+                    <p className="muted">{t(uiLang, "noFiles")}</p>
+                  ) : (
+                    <ul className="file-list">
+                      {docsByCategory[cat.key].map((d) => (
+                        <li key={d.id}>
+                          <div className="file-meta">
+                            <span title={d.original_name}>{d.original_name}</span>
+                            <small className={d.has_text ? "tag ok" : "tag warn"}>
+                              {d.has_text ? t(uiLang, "textOk") : t(uiLang, "textMissing")}
+                              {d.ocr_applied ? ` · ${t(uiLang, "ocrUsed")}` : ""}
+                            </small>
+                          </div>
+                          <div className="file-actions">
+                            {!d.has_text && (
+                              <button
+                                className="linkish"
+                                disabled={busy}
+                                onClick={() => void onReextract(d.id)}
+                              >
+                                {t(uiLang, "reextract")}
+                              </button>
+                            )}
+                            <button className="linkish" onClick={() => void onDeleteDoc(d.id)}>
+                              {t(uiLang, "delete")}
+                            </button>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
+              ))}
+            </div>
+
+            {analysis && (
+              <div className="report">
+                <div className="score-row">
+                  <div>
+                    <h2>{t(uiLang, "summary")}</h2>
+                    <p>{analysis.summary}</p>
+                  </div>
+                  <div className="score">
+                    <span>{t(uiLang, "readiness")}</span>
+                    <strong>{analysis.readiness_score}%</strong>
+                    <small>
+                      {t(uiLang, "high")}: {analysis.counts.high || 0} · {t(uiLang, "medium")}:{" "}
+                      {analysis.counts.medium || 0} · {t(uiLang, "low")}: {analysis.counts.low || 0}
+                    </small>
+                  </div>
+                </div>
+
+                <h2>{t(uiLang, "findings")}</h2>
+                <div className="findings">
+                  {analysis.findings.map((f) => (
+                    <article key={f.id} className={`finding sev-${f.severity}`}>
+                      <header>
+                        <span className="badge">{t(uiLang, f.severity)}</span>
+                        <code>{f.code}</code>
+                      </header>
+                      <h3>{f.title}</h3>
+                      <p>{f.description}</p>
+                      <p>
+                        <strong>{t(uiLang, "recommendation")}:</strong> {f.recommendation}
+                      </p>
+                      {f.evidence && (
+                        <p className="evidence">
+                          <strong>{t(uiLang, "evidence")}:</strong> {f.evidence}
+                        </p>
+                      )}
+                    </article>
+                  ))}
+                </div>
+                <p className="disclaimer">{t(uiLang, "disclaimer")}</p>
+              </div>
+            )}
+          </section>
+        )}
+      </main>
+    </div>
+  );
+}
+
+export default App;
