@@ -1,0 +1,3 @@
+# Optional heavy OCR stack (install later if needed)
+numpy==2.2.2
+rapidocr-onnxruntime==1.4.4
