@@ -54,8 +54,9 @@ class Project(Base):
         Enum(CountryCode, values_callable=_enum_values, native_enum=False),
         default=CountryCode.IR,
     )
-    project_type: Mapped[str] = mapped_column(
+    project_type: Mapped[str | None] = mapped_column(
         String(64),
+        nullable=True,
         default=ProjectType.INFRASTRUCTURE.value,
         server_default="infrastructure",
     )

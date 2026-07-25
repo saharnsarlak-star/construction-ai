@@ -41,3 +41,34 @@ async def health_detail() -> dict:
         "storage": storage_mode(),
         "database": "postgres" if "postgresql" in settings.database_url else "sqlite",
     }
+
+
+@app.get("/api/health/db")
+async def health_db() -> dict:
+    """Diagnose projects table columns (for Railway/Supabase schema drift)."""
+    from sqlalchemy import text
+
+    from app.database import SessionLocal
+
+    try:
+        async with SessionLocal() as session:
+            cols = (
+                await session.execute(
+                    text(
+                        """
+                        select column_name, data_type
+                        from information_schema.columns
+                        where table_schema = 'public' and table_name = 'projects'
+                        order by ordinal_position
+                        """
+                    )
+                )
+            ).all()
+            count = (await session.execute(text("select count(*) from projects"))).scalar()
+        return {
+            "status": "ok",
+            "projects_count": count,
+            "columns": [{"name": c[0], "type": c[1]} for c in cols],
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"status": "error", "error": str(exc)}

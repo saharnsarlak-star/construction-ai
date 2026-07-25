@@ -65,8 +65,14 @@ def _project_out(project: Project) -> ProjectOut:
 
 @router.get("", response_model=list[ProjectOut])
 async def list_projects(db: AsyncSession = Depends(get_db)) -> list[ProjectOut]:
-    result = await db.execute(select(Project).options(selectinload(Project.documents)).order_by(Project.id.desc()))
-    return [_project_out(p) for p in result.scalars().all()]
+    try:
+        result = await db.execute(
+            select(Project).options(selectinload(Project.documents)).order_by(Project.id.desc())
+        )
+        return [_project_out(p) for p in result.scalars().all()]
+    except Exception as exc:  # noqa: BLE001
+        # Surface DB/schema errors to the client so CORS+500 is diagnosable.
+        raise HTTPException(status_code=500, detail=f"list_projects failed: {exc}") from exc
 
 
 @router.post("", response_model=ProjectOut)
