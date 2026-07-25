@@ -41,11 +41,19 @@ def _doc_out(doc: Document) -> DocumentOut:
 
 
 def _project_out(project: Project) -> ProjectOut:
+    raw_type = getattr(project, "project_type", None) or ProjectType.INFRASTRUCTURE.value
+    if isinstance(raw_type, ProjectType):
+        ptype = raw_type
+    else:
+        try:
+            ptype = ProjectType(str(raw_type))
+        except ValueError:
+            ptype = ProjectType.INFRASTRUCTURE
     return ProjectOut(
         id=project.id,
         name=project.name,
         country=project.country,
-        project_type=getattr(project, "project_type", None) or ProjectType.INFRASTRUCTURE,
+        project_type=ptype,
         country_profile_code=getattr(project, "country_profile_code", None),
         ui_language=project.ui_language,
         report_language=project.report_language,
@@ -66,6 +74,9 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
     data = payload.model_dump()
     profile = get_country_profile(payload.country)
     data["country_profile_code"] = profile.code
+    # DB column is varchar
+    if hasattr(data.get("project_type"), "value"):
+        data["project_type"] = data["project_type"].value
     project = Project(**data)
     db.add(project)
     await db.commit()
@@ -87,6 +98,12 @@ async def update_project(
 ) -> ProjectOut:
     project = await _get_project(db, project_id)
     for key, value in payload.model_dump(exclude_unset=True).items():
+        if key == "project_type" and hasattr(value, "value"):
+            value = value.value
+        if key == "country" and value is not None:
+            setattr(project, key, value)
+            project.country_profile_code = get_country_profile(value).code
+            continue
         setattr(project, key, value)
     await db.commit()
     project = await _get_project(db, project_id)
@@ -224,11 +241,22 @@ async def analyze_project(
         }
         for d in project.documents
     ]
+    raw_type = getattr(project, "project_type", None)
+    if isinstance(raw_type, ProjectType):
+        ptype = raw_type
+    elif raw_type:
+        try:
+            ptype = ProjectType(str(raw_type))
+        except ValueError:
+            ptype = ProjectType.INFRASTRUCTURE
+    else:
+        ptype = ProjectType.INFRASTRUCTURE
+
     result = analyze_project_documents(
         country=project.country,
         report_language=report_language,
         documents=docs_payload,
-        project_type=getattr(project, "project_type", None),
+        project_type=ptype,
     )
 
     analysis = Analysis(

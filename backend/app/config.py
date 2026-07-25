@@ -1,8 +1,8 @@
 from pathlib import Path
-from typing import Any
+from typing import Annotated, Any
 
 from pydantic import field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 _BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     storage_dir: Path = _BASE_DIR / "storage"
     # 0 = بدون سقف حجم (فقط محدودیت فضای دیسک سیستم)
     max_upload_mb: int = 0
-    cors_origins: list[str] = [
+    # Railway sets CORS_ORIGINS as comma-separated text — do not JSON-decode it.
+    cors_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]
@@ -58,7 +59,14 @@ class Settings(BaseSettings):
             if not raw:
                 return []
             if raw.startswith("["):
-                return value
+                import json
+
+                try:
+                    parsed = json.loads(raw)
+                    if isinstance(parsed, list):
+                        return [str(part).strip() for part in parsed if str(part).strip()]
+                except json.JSONDecodeError:
+                    pass
             return [part.strip() for part in raw.split(",") if part.strip()]
         return value
 
