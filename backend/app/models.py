@@ -32,6 +32,13 @@ class DocumentCategory(str, enum.Enum):
     STANDARD = "standard"
 
 
+class ProjectType(str, enum.Enum):
+    RESIDENTIAL = "residential"
+    HOSPITAL = "hospital"
+    INDUSTRIAL = "industrial"
+    INFRASTRUCTURE = "infrastructure"
+
+
 class RiskSeverity(str, enum.Enum):
     HIGH = "high"
     MEDIUM = "medium"
@@ -47,6 +54,11 @@ class Project(Base):
         Enum(CountryCode, values_callable=_enum_values, native_enum=False),
         default=CountryCode.IR,
     )
+    project_type: Mapped[ProjectType] = mapped_column(
+        Enum(ProjectType, values_callable=_enum_values, native_enum=False),
+        default=ProjectType.INFRASTRUCTURE,
+    )
+    country_profile_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
     ui_language: Mapped[LanguageCode] = mapped_column(
         Enum(LanguageCode, values_callable=_enum_values, native_enum=False),
         default=LanguageCode.FA,

@@ -38,8 +38,12 @@ npm run dev
 
 ## فایل‌های مهم اتصال ابری
 
-- `supabase/schema.sql` — ساخت جداول در Supabase  
+- `supabase/schema.sql` — اسکیمای MVP فعلی (پروژه‌های زنده)  
+- `supabase/schema_additive_country_logic.sql` — افزودن `project_type` + پروفایل کشور (بدون شکستن MVP)  
+- `supabase/schema_ctkm.sql` — مدل کامل CTKM (مرحله بعد؛ فعلاً Run نکنید مگر مهاجرت کامل)  
 - `backend/.env.example` — متغیرهای بک‌اند  
 - `frontend/.env.example` — آدرس API برای Vercel  
 - `backend/Dockerfile` — دیپلوی Railway  
 - `frontend/vercel.json` — دیپلوی Vercel  
+
+منطق تحلیل کشورمحور در کد بک‌اند: `backend/app/knowledge/` (پروفایل، قالب سند، قواعد با override، پرامپت AI).

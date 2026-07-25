@@ -6,8 +6,9 @@ import {
   type DocumentCategory,
   type LanguageCode,
   type ProjectOut,
+  type ProjectType,
 } from "./api";
-import { countryOptions, languageOptions, t } from "./i18n";
+import { countryOptions, languageOptions, projectTypeOptions, t } from "./i18n";
 import "./App.css";
 
 const uploadCategories: { key: DocumentCategory; labelKey: string }[] = [
@@ -30,6 +31,7 @@ function App() {
 
   const [name, setName] = useState("");
   const [country, setCountry] = useState<CountryCode>("IR");
+  const [projectType, setProjectType] = useState<ProjectType>("infrastructure");
   const [reportLang, setReportLang] = useState<LanguageCode>("fa");
   const [description, setDescription] = useState("");
 
@@ -88,6 +90,7 @@ function App() {
       const p = await api.createProject({
         name: name.trim(),
         country,
+        project_type: projectType,
         ui_language: uiLang,
         report_language: reportLang,
         description: description.trim() || undefined,
@@ -235,6 +238,19 @@ function App() {
                 </select>
               </label>
               <label>
+                {t(uiLang, "projectType")}
+                <select
+                  value={projectType}
+                  onChange={(e) => setProjectType(e.target.value as ProjectType)}
+                >
+                  {projectTypeOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {t(uiLang, o.labelKey)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
                 {t(uiLang, "reportLanguage")}
                 <select
                   value={reportLang}
@@ -270,7 +286,8 @@ function App() {
                     <div>
                       <strong>{p.name}</strong>
                       <span>
-                        {p.country} · {p.documents.length} {t(uiLang, "files")}
+                        {p.country} · {p.project_type || "infrastructure"} · {p.documents.length}{" "}
+                        {t(uiLang, "files")}
                       </span>
                     </div>
                     <button onClick={() => setSelectedId(p.id)}>{t(uiLang, "open")}</button>
@@ -289,7 +306,10 @@ function App() {
               </button>
               <div className="meta">
                 <strong>{project.name}</strong>
-                <span>{project.country}</span>
+                <span>
+                  {project.country} · {project.project_type || "infrastructure"}
+                  {project.country_profile_code ? ` · ${project.country_profile_code}` : ""}
+                </span>
               </div>
             </div>
 

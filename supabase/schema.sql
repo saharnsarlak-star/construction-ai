@@ -1,3 +1,5 @@
+-- LEGACY MVP schema (kept for existing Railway app compatibility).
+-- New CTKM model: see schema_ctkm.sql (+ optional schema_ctkm_migrate_from_mvp.sql).
 -- Run this once in Supabase: SQL Editor → New query → Paste → Run
 
 create extension if not exists "pgcrypto";

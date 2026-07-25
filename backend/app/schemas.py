@@ -3,12 +3,13 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from app.models import CountryCode, DocumentCategory, LanguageCode, RiskSeverity
+from app.models import CountryCode, DocumentCategory, LanguageCode, ProjectType, RiskSeverity
 
 
 class ProjectCreate(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     country: CountryCode = CountryCode.IR
+    project_type: ProjectType = ProjectType.INFRASTRUCTURE
     ui_language: LanguageCode = LanguageCode.FA
     report_language: LanguageCode = LanguageCode.FA
     description: str | None = None
@@ -17,6 +18,7 @@ class ProjectCreate(BaseModel):
 class ProjectUpdate(BaseModel):
     name: str | None = None
     country: CountryCode | None = None
+    project_type: ProjectType | None = None
     ui_language: LanguageCode | None = None
     report_language: LanguageCode | None = None
     description: str | None = None
@@ -39,6 +41,8 @@ class ProjectOut(BaseModel):
     id: int
     name: str
     country: CountryCode
+    project_type: ProjectType = ProjectType.INFRASTRUCTURE
+    country_profile_code: str | None = None
     ui_language: LanguageCode
     report_language: LanguageCode
     description: str | None

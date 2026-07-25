@@ -8,7 +8,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
-from app.models import Analysis, Document, DocumentCategory, Finding, Project
+from app.models import Analysis, Document, DocumentCategory, Finding, Project, ProjectType
 from app.schemas import (
     AnalysisOut,
     AnalyzeRequest,
@@ -21,6 +21,7 @@ from app.schemas import (
 from app.services.analyzer import analyze_project_documents
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
 from app.services import storage as file_storage
+from app.knowledge.country_profiles import get_country_profile
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -44,6 +45,8 @@ def _project_out(project: Project) -> ProjectOut:
         id=project.id,
         name=project.name,
         country=project.country,
+        project_type=getattr(project, "project_type", None) or ProjectType.INFRASTRUCTURE,
+        country_profile_code=getattr(project, "country_profile_code", None),
         ui_language=project.ui_language,
         report_language=project.report_language,
         description=project.description,
@@ -60,7 +63,10 @@ async def list_projects(db: AsyncSession = Depends(get_db)) -> list[ProjectOut]:
 
 @router.post("", response_model=ProjectOut)
 async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db)) -> ProjectOut:
-    project = Project(**payload.model_dump())
+    data = payload.model_dump()
+    profile = get_country_profile(payload.country)
+    data["country_profile_code"] = profile.code
+    project = Project(**data)
     db.add(project)
     await db.commit()
     await db.refresh(project)
@@ -222,6 +228,7 @@ async def analyze_project(
         country=project.country,
         report_language=report_language,
         documents=docs_payload,
+        project_type=getattr(project, "project_type", None),
     )
 
     analysis = Analysis(
@@ -230,7 +237,11 @@ async def analyze_project(
         summary=result["summary"],
         report_language=report_language,
         result_json=json.dumps(
-            {"readiness_score": result["readiness_score"], "counts": result["counts"]},
+            {
+                "readiness_score": result["readiness_score"],
+                "counts": result["counts"],
+                "engine": result.get("engine"),
+            },
             ensure_ascii=False,
         ),
     )

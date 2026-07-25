@@ -1,5 +1,6 @@
 export type LanguageCode = "fa" | "en" | "de" | "fr";
 export type CountryCode = "IR" | "DE" | "CA" | "EU";
+export type ProjectType = "residential" | "hospital" | "industrial" | "infrastructure";
 export type DocumentCategory = "tender" | "drawing" | "schedule" | "standard";
 export type RiskSeverity = "high" | "medium" | "low";
 
@@ -18,6 +19,8 @@ export interface ProjectOut {
   id: number;
   name: string;
   country: CountryCode;
+  project_type?: ProjectType;
+  country_profile_code?: string | null;
   ui_language: LanguageCode;
   report_language: LanguageCode;
   description: string | null;
@@ -66,6 +69,7 @@ export const api = {
   createProject: (body: {
     name: string;
     country: CountryCode;
+    project_type: ProjectType;
     ui_language: LanguageCode;
     report_language: LanguageCode;
     description?: string;
@@ -81,6 +85,7 @@ export const api = {
     body: Partial<{
       name: string;
       country: CountryCode;
+      project_type: ProjectType;
       ui_language: LanguageCode;
       report_language: LanguageCode;
       description: string;
