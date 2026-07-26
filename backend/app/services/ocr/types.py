@@ -68,20 +68,33 @@ class DocumentExtractionResult:
     provider: str = "none"
     phase: str = ExtractionPhase.COMPLETED.value
     error: str | None = None
+    extraction_method: str | None = None
+    confidence_score: float | None = None
+    structured: dict[str, Any] | None = None
+    notes: list[str] = field(default_factory=list)
 
     def to_meta(self) -> dict[str, Any]:
+        extraction: dict[str, Any] = {
+            "phase": self.phase,
+            "pdfKind": self.pdf_kind,
+            "pageCount": self.page_count,
+            "ocrPageCount": self.ocr_page_count,
+            "failedPages": self.failed_pages,
+            "needsManualReview": self.needs_manual_review,
+            "provider": self.provider,
+            "error": self.error,
+            "progressPercent": 100 if self.phase == ExtractionPhase.COMPLETED.value else 0,
+        }
+        if self.extraction_method:
+            extraction["method"] = self.extraction_method
+        if self.confidence_score is not None:
+            extraction["confidenceScore"] = round(float(self.confidence_score), 2)
+        if self.structured is not None:
+            extraction["structured"] = self.structured
+        if self.notes:
+            extraction["notes"] = self.notes
         return {
-            "extraction": {
-                "phase": self.phase,
-                "pdfKind": self.pdf_kind,
-                "pageCount": self.page_count,
-                "ocrPageCount": self.ocr_page_count,
-                "failedPages": self.failed_pages,
-                "needsManualReview": self.needs_manual_review,
-                "provider": self.provider,
-                "error": self.error,
-                "progressPercent": 100 if self.phase == ExtractionPhase.COMPLETED.value else 0,
-            },
+            "extraction": extraction,
             "pages": [p.to_json() for p in self.pages],
         }
 

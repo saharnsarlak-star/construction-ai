@@ -254,7 +254,7 @@ export function BulkFileList({
                 </div>
               </label>
               <div className="file-actions">
-                {showReextract && !d.has_text && category !== "drawing" && onReextract && (
+                {showReextract && !d.has_text && onReextract && (
                   <button
                     type="button"
                     className="linkish"

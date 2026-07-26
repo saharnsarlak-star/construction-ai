@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   api,
   FILE_ACCEPT,
+  FILE_ACCEPT_BY_CATEGORY,
   UPLOAD_CHUNK_SIZE,
   type AnalysisOut,
   type CountryCode,
@@ -11,7 +12,7 @@ import {
   type ProjectStandardOut,
   type ProjectType,
 } from "./api";
-import { countryOptions, languageOptions, projectTypeOptions, t } from "./i18n";
+import { countryOptions, displayImpact, languageOptions, projectTypeOptions, t } from "./i18n";
 import { BulkFileList } from "./BulkFileList";
 import "./App.css";
 
@@ -64,10 +65,13 @@ function App() {
   const [name, setName] = useState("");
   const [country, setCountry] = useState<CountryCode>("IR");
   const [projectType, setProjectType] = useState<ProjectType>("office");
-  const [reportLang, setReportLang] = useState<LanguageCode>("fa");
   const [description, setDescription] = useState("");
 
   const dir = uiLang === "fa" ? "rtl" : "ltr";
+
+  function setAppLang(lang: LanguageCode) {
+    setUiLang(lang);
+  }
 
   useEffect(() => {
     localStorage.setItem("ui_lang", uiLang);
@@ -135,7 +139,8 @@ function App() {
     try {
       const p = await api.getProject(id);
       setProject(p);
-      setReportLang(p.report_language);
+      // One language drives both UI and analysis for this project.
+      setAppLang(p.report_language || p.ui_language);
       void loadStandards(id);
       try {
         const a = await api.latestAnalysis(id);
@@ -193,7 +198,7 @@ function App() {
         country,
         project_type: projectType,
         ui_language: uiLang,
-        report_language: reportLang,
+        report_language: uiLang,
         description: description.trim() || undefined,
       });
       setName("");
@@ -207,15 +212,18 @@ function App() {
     }
   }
 
-  async function saveLanguages() {
+  async function saveLanguages(nextLang?: LanguageCode) {
     if (!project) return;
+    const lang = nextLang ?? uiLang;
     setBusy(true);
     try {
       const updated = await api.updateProject(project.id, {
-        ui_language: uiLang,
-        report_language: reportLang,
+        ui_language: lang,
+        report_language: lang,
       });
       setProject(updated);
+      setAppLang(lang);
+      void loadStandards(project.id);
     } catch (e) {
       setError(String(e));
     } finally {
@@ -361,7 +369,7 @@ function App() {
     setBusy(true);
     setError(null);
     try {
-      const a = await api.analyze(project.id, reportLang);
+      const a = await api.analyze(project.id, uiLang);
       setAnalysis(a);
     } catch (e) {
       setError(String(e));
@@ -390,10 +398,14 @@ function App() {
           <p className="tagline">{t(uiLang, "tagline")}</p>
           <div className="lang-bar">
             <label>
-              {t(uiLang, "uiLanguage")}
+              {t(uiLang, "appLanguage")}
               <select
                 value={uiLang}
-                onChange={(e) => setUiLang(e.target.value as LanguageCode)}
+                onChange={(e) => {
+                  const lang = e.target.value as LanguageCode;
+                  setAppLang(lang);
+                  if (project) void saveLanguages(lang);
+                }}
               >
                 {languageOptions.map((o) => (
                   <option key={o.value} value={o.value}>
@@ -402,6 +414,7 @@ function App() {
                 ))}
               </select>
             </label>
+            <p className="muted lang-hint">{t(uiLang, "languageHint")}</p>
           </div>
         </div>
       </header>
@@ -447,19 +460,6 @@ function App() {
                   {projectTypeOptions.map((o) => (
                     <option key={o.value} value={o.value}>
                       {t(uiLang, o.labelKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                {t(uiLang, "reportLanguage")}
-                <select
-                  value={reportLang}
-                  onChange={(e) => setReportLang(e.target.value as LanguageCode)}
-                >
-                  {languageOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
                     </option>
                   ))}
                 </select>
@@ -516,10 +516,10 @@ function App() {
 
             <div className="form-grid compact">
               <label>
-                {t(uiLang, "reportLanguage")}
+                {t(uiLang, "appLanguage")}
                 <select
-                  value={reportLang}
-                  onChange={(e) => setReportLang(e.target.value as LanguageCode)}
+                  value={uiLang}
+                  onChange={(e) => void saveLanguages(e.target.value as LanguageCode)}
                 >
                   {languageOptions.map((o) => (
                     <option key={o.value} value={o.value}>
@@ -529,14 +529,12 @@ function App() {
                 </select>
               </label>
               <div className="actions">
-                <button disabled={busy} onClick={() => void saveLanguages()}>
-                  {t(uiLang, "saveLanguages")}
-                </button>
                 <button className="primary" disabled={busy} onClick={() => void runAnalysis()}>
                   {busy ? t(uiLang, "analyzing") : t(uiLang, "analyze")}
                 </button>
               </div>
             </div>
+            <p className="muted upload-hint">{t(uiLang, "languageHint")}</p>
 
             {uploadProgress && (
               <p className="upload-progress" role="status">
@@ -679,6 +677,7 @@ function App() {
                 </ul>
               )}
               <p className="muted upload-hint">{t(uiLang, "standardsCustomHint")}</p>
+              <p className="format-line">{t(uiLang, "formatsStandard")}</p>
               <label className={`file-btn${busy ? " disabled" : ""}`}>
                 {busy && uploadProgress?.category === "standard"
                   ? t(uiLang, "uploading")
@@ -686,7 +685,7 @@ function App() {
                 <input
                   type="file"
                   multiple
-                  accept={FILE_ACCEPT}
+                  accept={FILE_ACCEPT_BY_CATEGORY.standard}
                   disabled={busy}
                   onChange={(e) => {
                     queueFiles("standard", e.target.files);
@@ -732,6 +731,16 @@ function App() {
                         ? t(uiLang, "drawingsNoTextHint")
                         : t(uiLang, "uploadHint")}
                   </p>
+                  <p className="format-line">
+                    {t(
+                      uiLang,
+                      cat.key === "drawing"
+                        ? "formatsDrawing"
+                        : cat.key === "schedule"
+                          ? "formatsSchedule"
+                          : "formatsTender",
+                    )}
+                  </p>
                   <label className={`file-btn${busy ? " disabled" : ""}`}>
                     {busy && uploadProgress?.category === cat.key
                       ? t(uiLang, "uploading")
@@ -739,7 +748,7 @@ function App() {
                     <input
                       type="file"
                       multiple
-                      accept={FILE_ACCEPT}
+                      accept={FILE_ACCEPT_BY_CATEGORY[cat.key] || FILE_ACCEPT}
                       disabled={busy}
                       onChange={(e) => {
                         queueFiles(cat.key, e.target.files);
@@ -753,7 +762,7 @@ function App() {
                     files={docsByCategory[cat.key]}
                     emptyLabel={t(uiLang, "noFiles")}
                     busy={busy}
-                    showReextract={cat.key !== "drawing"}
+                    showReextract
                     onDeleteOne={(id) => onDeleteDoc(id)}
                     onBulkDelete={onBulkDeleteFiles}
                     onReextract={(id) => void onReextract(id)}
@@ -860,7 +869,8 @@ function App() {
                               </p>
                               {f.estimated_impact && (
                                 <p className="muted">
-                                  <strong>{t(uiLang, "estimatedImpact")}:</strong> {f.estimated_impact}
+                                  <strong>{t(uiLang, "estimatedImpact")}:</strong>{" "}
+                                  {displayImpact(f.estimated_impact, uiLang)}
                                 </p>
                               )}
                               {f.data_completeness_caveat && (

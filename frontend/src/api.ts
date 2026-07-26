@@ -124,7 +124,16 @@ const API_BASE =
 export const UPLOAD_CHUNK_SIZE = 4;
 
 const FILE_ACCEPT =
-  ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.dwg,.dxf";
+  ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.dwg,.dxf,.rvt,.rfa,.rte,.rft,.ifc,.x81,.x82,.x83,.x84,.x85,.x86,.d81,.d82,.d83,.d84,.d85,.d86";
+
+/** Per-category accept lists so the file picker surfaces the right formats. */
+export const FILE_ACCEPT_BY_CATEGORY: Record<DocumentCategory, string> = {
+  tender:
+    ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.x81,.x82,.x83,.x84,.x85,.x86,.d81,.d82,.d83,.d84,.d85,.d86",
+  drawing: ".pdf,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.dwg,.dxf,.rvt,.rfa,.rte,.rft,.ifc",
+  schedule: ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt",
+  standard: ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt",
+};
 
 export { FILE_ACCEPT };
 

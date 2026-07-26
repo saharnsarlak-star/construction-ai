@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
-from app.models import Analysis, Document, DocumentCategory, Finding, Project, ProjectStandard, ProjectType
+from app.models import Analysis, Document, DocumentCategory, Finding, LanguageCode, Project, ProjectStandard, ProjectType
 from app.schemas import (
     AnalysisOut,
     AnalyzeRequest,
@@ -123,6 +123,10 @@ async def list_projects(db: AsyncSession = Depends(get_db)) -> list[ProjectOut]:
 @router.post("", response_model=ProjectOut)
 async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db)) -> ProjectOut:
     data = payload.model_dump()
+    # One app language: keep UI and report language identical.
+    lang = data.get("report_language") or data.get("ui_language") or LanguageCode.FA
+    data["ui_language"] = lang
+    data["report_language"] = lang
     profile = get_country_profile(payload.country)
     data["country_profile_code"] = profile.code
     # DB column is varchar
@@ -132,7 +136,8 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
     db.add(project)
     await db.commit()
     await db.refresh(project)
-    await ensure_project_standards(db, project, lang=payload.ui_language.value)
+    lang_value = lang.value if hasattr(lang, "value") else str(lang)
+    await ensure_project_standards(db, project, lang=lang_value)
     # Reload with selectinload so async relationship access is safe.
     project = await _get_project(db, project.id)
     return _project_out(project)
@@ -150,7 +155,18 @@ async def update_project(
 ) -> ProjectOut:
     project = await _get_project(db, project_id)
     country_or_type_changed = False
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    language_changed = False
+    updates = payload.model_dump(exclude_unset=True)
+    # Keep UI + report language identical whenever either is sent.
+    if "ui_language" in updates or "report_language" in updates:
+        lang = updates.get("report_language") or updates.get("ui_language")
+        updates["ui_language"] = lang
+        updates["report_language"] = lang
+        if lang is not None and (
+            project.ui_language != lang or project.report_language != lang
+        ):
+            language_changed = True
+    for key, value in updates.items():
         if key == "project_type" and hasattr(value, "value"):
             value = value.value
         if key in {"country", "project_type"} and value is not None and getattr(project, key, None) != value:
@@ -162,8 +178,13 @@ async def update_project(
         setattr(project, key, value)
     await db.commit()
     project = await _get_project(db, project_id)
-    if country_or_type_changed:
-        await ensure_project_standards(db, project, lang=project.ui_language.value)
+    if country_or_type_changed or language_changed:
+        lang_value = (
+            project.report_language.value
+            if hasattr(project.report_language, "value")
+            else str(project.report_language)
+        )
+        await ensure_project_standards(db, project, lang=lang_value)
     return _project_out(project)
 
 
@@ -175,7 +196,7 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)) ->
     return {"ok": True}
 
 
-def _standard_out(row: ProjectStandard) -> ProjectStandardOut:
+def _standard_out(row: ProjectStandard, lang: str = "fa") -> ProjectStandardOut:
     std = get_standard(row.standard_code)
     sclass = row.standard_class or (std.standard_class if std else "technical")
     if sclass == "contractual":
@@ -184,9 +205,10 @@ def _standard_out(row: ProjectStandard) -> ProjectStandardOut:
         check_target = "contract+technical"
     else:
         check_target = "drawings+boq+specifications"
+    title = std.title_for(lang) if std else (row.title or row.standard_code)
     return ProjectStandardOut(
         standard_code=row.standard_code,
-        title=row.title or (std.title_en if std else row.standard_code),
+        title=title,
         standard_class=sclass,
         publisher=std.publisher if std else "",
         applicability_level=row.applicability_level or "optional",
@@ -196,12 +218,18 @@ def _standard_out(row: ProjectStandard) -> ProjectStandardOut:
     )
 
 
+def _project_lang(project: Project) -> str:
+    lang = project.report_language or project.ui_language
+    return lang.value if hasattr(lang, "value") else str(lang)
+
+
 @router.get("/{project_id}/standards", response_model=list[ProjectStandardOut])
 async def list_project_standards(
     project_id: int, db: AsyncSession = Depends(get_db)
 ) -> list[ProjectStandardOut]:
     project = await _get_project_meta(db, project_id)
-    rows = await list_or_seed_project_standards(db, project, lang=project.ui_language.value)
+    lang = _project_lang(project)
+    rows = await list_or_seed_project_standards(db, project, lang=lang)
     rows_sorted = sorted(
         rows,
         key=lambda r: (
@@ -210,7 +238,7 @@ async def list_project_standards(
             r.standard_code,
         ),
     )
-    return [_standard_out(r) for r in rows_sorted]
+    return [_standard_out(r, lang) for r in rows_sorted]
 
 
 @router.put("/{project_id}/standards", response_model=list[ProjectStandardOut])
@@ -220,7 +248,8 @@ async def update_project_standards(
     db: AsyncSession = Depends(get_db),
 ) -> list[ProjectStandardOut]:
     """Fast path: toggle without loading project documents (avoids multi-second hangs)."""
-    await _get_project_meta(db, project_id)
+    project = await _get_project_meta(db, project_id)
+    lang = _project_lang(project)
     # Prefer single-item toggle path used by the UI
     if len(payload.items) == 1:
         item = payload.items[0]
@@ -231,10 +260,9 @@ async def update_project_standards(
             is_selected=item.is_selected,
         )
         if row is not None:
-            return [_standard_out(row)]
+            return [_standard_out(row, lang)]
     # Fallback: seed then toggle
-    project = await _get_project_meta(db, project_id)
-    rows = await list_or_seed_project_standards(db, project, lang=project.ui_language.value)
+    rows = await list_or_seed_project_standards(db, project, lang=lang)
     by_code = {r.standard_code: r for r in rows}
     for item in payload.items:
         row = by_code.get(item.standard_code)
@@ -249,7 +277,7 @@ async def update_project_standards(
         row = by_code.get(item.standard_code)
         if row is not None:
             await db.refresh(row)
-            out.append(_standard_out(row))
+            out.append(_standard_out(row, lang))
     return out
 
 
@@ -511,22 +539,31 @@ async def analyze_project(
 
     project = await _get_project(db, project_id)
     report_language = (payload.report_language if payload and payload.report_language else None) or project.report_language
+    # Keep project languages in sync with the language used for this analysis.
+    if project.ui_language != report_language or project.report_language != report_language:
+        project.ui_language = report_language
+        project.report_language = report_language
+        await db.commit()
+        await db.refresh(project)
 
     # Before analysis: OCR any tender/schedule/standard that still lacks usable text.
-    # Drawings are skipped (CAD packages); they must not block analysis.
+    # Drawings: run CAD extract (DWG/DXF/Revit) when still empty — do not OCR CAD binaries.
     refreshed = 0
     for doc in project.documents:
-        if refreshed >= 8:
+        if refreshed >= 12:
             break
-        if doc.category == DocumentCategory.DRAWING:
-            continue
         if has_usable_text(doc.extracted_text or ""):
             continue
         try:
             path = await file_storage.open_for_read(doc.stored_path)
-            text = await asyncio.to_thread(
-                extract_text_from_file, path, allow_ocr=True
-            )
+            if doc.category == DocumentCategory.DRAWING:
+                text = await asyncio.to_thread(
+                    extract_text_from_file, path, allow_ocr=False, treat_as_drawing=True
+                )
+            else:
+                text = await asyncio.to_thread(
+                    extract_text_from_file, path, allow_ocr=True
+                )
             doc.extracted_text = text
             refreshed += 1
         except Exception:  # noqa: BLE001
@@ -558,18 +595,24 @@ async def analyze_project(
 
     result = await db.execute(select(ProjectStandard).where(ProjectStandard.project_id == project.id))
     std_rows = list(result.scalars().all())
-    if not std_rows:
-        std_rows = await ensure_project_standards(db, project, lang=project.ui_language.value)
-    selected_standards = [
-        {
-            "code": r.standard_code,
-            "title": r.title or r.standard_code,
-            "standard_class": r.standard_class or "technical",
-            "is_selected": bool(r.is_selected),
-        }
-        for r in std_rows
-        if r.is_selected
-    ]
+    report_lang_value = (
+        report_language.value if hasattr(report_language, "value") else str(report_language)
+    )
+    std_rows = await ensure_project_standards(db, project, lang=report_lang_value)
+    selected_standards = []
+    for r in std_rows:
+        if not r.is_selected:
+            continue
+        std = get_standard(r.standard_code)
+        title = std.title_for(report_lang_value) if std else (r.title or r.standard_code)
+        selected_standards.append(
+            {
+                "code": r.standard_code,
+                "title": title,
+                "standard_class": r.standard_class or "technical",
+                "is_selected": True,
+            }
+        )
 
     result = analyze_project_documents(
         country=project.country,

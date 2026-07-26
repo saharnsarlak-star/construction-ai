@@ -43,6 +43,37 @@ def _lang(map_: dict[LanguageCode, str], lang: LanguageCode) -> str:
     return map_.get(lang) or map_.get(LanguageCode.EN) or next(iter(map_.values()))
 
 
+def _impact_label(level: str | None, lang: LanguageCode) -> str | None:
+    """Localize high/medium/low impact tags so findings never mix EN into FA/DE UI."""
+    if not level:
+        return None
+    key = str(level).strip().lower()
+    labels = {
+        "high": {
+            LanguageCode.FA: "بالا",
+            LanguageCode.EN: "high",
+            LanguageCode.DE: "hoch",
+            LanguageCode.FR: "élevé",
+        },
+        "medium": {
+            LanguageCode.FA: "متوسط",
+            LanguageCode.EN: "medium",
+            LanguageCode.DE: "mittel",
+            LanguageCode.FR: "moyen",
+        },
+        "low": {
+            LanguageCode.FA: "پایین",
+            LanguageCode.EN: "low",
+            LanguageCode.DE: "niedrig",
+            LanguageCode.FR: "faible",
+        },
+    }
+    bucket = labels.get(key)
+    if not bucket:
+        return level
+    return _lang(bucket, lang)
+
+
 def _contains_any(text: str, keywords: list[str]) -> bool:
     lower = text.lower()
     return any(k.lower() in lower for k in keywords)
@@ -67,45 +98,45 @@ def _with_score(finding: RiskFinding, score: int | None) -> RiskFinding:
 
 def _extraction_stats(documents: list[dict]) -> dict:
     total = len(documents)
-    readable = [d for d in documents if has_usable_text(d.get("extracted_text") or "")]
-    failed = [d for d in documents if not has_usable_text(d.get("extracted_text") or "")]
-    rate = (len(readable) / total) if total else 0.0
-    # Drawings often have no text — weight tender/schedule/standard more for gate
-    critical = [
-        d
-        for d in documents
-        if d.get("category")
-        in {DocumentCategory.TENDER, DocumentCategory.SCHEDULE, DocumentCategory.STANDARD}
-        or str(d.get("category")) in {"tender", "schedule", "standard"}
-    ]
-    if critical:
-        crit_ok = sum(1 for d in critical if has_usable_text(d.get("extracted_text") or ""))
-        critical_rate = crit_ok / len(critical)
-        # Gate uses max of overall and critical (tender-heavy) so all-drawing packages don't false-block
-        # if tender is readable; but if tender failed, critical_rate drops.
-        gate_rate = min(rate, critical_rate) if critical else rate
-    else:
-        gate_rate = rate
+
+    def _cat(d: dict) -> str:
+        c = d.get("category")
+        return c.value if isinstance(c, DocumentCategory) else str(c)
+
+    # Drawings are often CAD/vector with no text — never use them to block analysis.
+    text_docs = [d for d in documents if _cat(d) != DocumentCategory.DRAWING.value]
+    drawing_docs = [d for d in documents if _cat(d) == DocumentCategory.DRAWING.value]
+
+    readable_text = [d for d in text_docs if has_usable_text(d.get("extracted_text") or "")]
+    failed_text = [d for d in text_docs if not has_usable_text(d.get("extracted_text") or "")]
+    gate_rate = (len(readable_text) / len(text_docs)) if text_docs else 0.0
+
+    failed_all = [d for d in documents if not has_usable_text(d.get("extracted_text") or "")]
+    readable_all = [d for d in documents if has_usable_text(d.get("extracted_text") or "")]
+    overall = (len(readable_all) / total) if total else 0.0
+
     return {
         "total": total,
-        "readable_count": len(readable),
-        "failed_count": len(failed),
-        "failed_names": [d.get("original_name") or "unnamed" for d in failed],
-        "readable_names": [d.get("original_name") or "unnamed" for d in readable],
-        "success_rate": rate,
+        "text_doc_count": len(text_docs),
+        "drawing_count": len(drawing_docs),
+        "readable_count": len(readable_text),
+        "failed_count": len(failed_text),
+        "failed_names": [d.get("original_name") or "unnamed" for d in failed_text],
+        "readable_names": [d.get("original_name") or "unnamed" for d in readable_text],
+        "success_rate": overall,
         "gate_rate": gate_rate,
     }
 
 
 # Subject-matter topics for semantic coverage (NOT standard title strings).
 _TOPIC_KEYWORDS: dict[str, list[str]] = {
-    "fire": ["حریق", "آتش", "اطفا", "خروج اضطراری", "fire", "sprinkler", "evacuation", "Brandschutz"],
-    "electrical": ["برق", "الکتریکال", "تابلو", "کابل", "روشنایی", "electrical", "voltage", "panel", "Elektro"],
-    "mechanical": ["مکانیک", "تهویه", "HVAC", "چیلر", "دیگ", "mechanical", "ventilation", "heating"],
-    "plumbing": ["لوله", "فاضلاب", "آبرسانی", "بهداشتی", "plumbing", "sanitary", "drainage", "آبگرم"],
-    "structure_concrete": ["بتن", "آرمه", "مقاومت فشاری", "concrete", "rebar", "cover", "Beton"],
-    "structure_steel": ["فولاد", "سازه فولادی", "اتصالات", "steel", "welding", "Stahlbau"],
-    "foundation": ["پی", "فونداسیون", "ژئوتکنیک", "foundation", "pile", "soil", "Gründung"],
+    "fire": ["حریق", "آتش", "اطفا", "خروج اضطراری", "fire", "sprinkler", "evacuation", "Brandschutz", "A-FIRE"],
+    "electrical": ["برق", "الکتریکال", "تابلو", "کابل", "روشنایی", "electrical", "voltage", "panel", "Elektro", "ELEC", "lighting"],
+    "mechanical": ["مکانیک", "تهویه", "HVAC", "چیلر", "دیگ", "mechanical", "ventilation", "heating", "MECH", "duct"],
+    "plumbing": ["لوله", "فاضلاب", "آبرسانی", "بهداشتی", "plumbing", "sanitary", "drainage", "آبگرم", "PLUMB", "sanitär"],
+    "structure_concrete": ["بتن", "آرمه", "مقاومت فشاری", "concrete", "rebar", "cover", "Beton", "S-CONC"],
+    "structure_steel": ["فولاد", "سازه فولادی", "اتصالات", "steel", "welding", "Stahlbau", "S-STEEL", "beam", "column"],
+    "foundation": ["پی", "فونداسیون", "ژئوتکنیک", "foundation", "pile", "soil", "Gründung", "S-FND"],
     "loads": ["بار", "زلزله", "باد", "بار زنده", "seismic", "load", "dead load", "Last"],
     "energy": ["انرژی", "عایق حرارتی", "مصرف انرژی", "energy", "insulation", "U-value"],
     "gas": ["گاز", "لوله گاز", "gas piping", "Gasleitung"],
@@ -119,7 +150,7 @@ _TOPIC_KEYWORDS: dict[str, list[str]] = {
     "payment": ["پرداخت", "صورت وضعیت", "پیش پرداخت", "retention", "payment", "holdback"],
     "claims": ["ادعا", "تغییر مقادیر", "دستور کار", "claim", "variation", "change order", "Nachtrag"],
     "schedule": ["برنامه زمان", "مایلستون", "مدت پیمان", "schedule", "programme", "milestone", "completion"],
-    "scope": ["شرح کار", "محدوده کار", "scope", "Leistungsbeschreibung"],
+    "scope": ["شرح کار", "محدوده کار", "scope", "Leistungsbeschreibung", "ARCH", "A-WALL", "A-DOOR", "floor", "level", "plan"],
 }
 
 
@@ -186,6 +217,7 @@ def _analyze_selected_standards_semantic(
     selected_standards: list[dict],
     tender_text: str,
     standard_text: str,
+    drawing_text: str = "",
     caveat: str | None,
 ) -> list[RiskFinding]:
     """
@@ -196,7 +228,7 @@ def _analyze_selected_standards_semantic(
         return []
 
     findings: list[RiskFinding] = []
-    technical_corpus = f"{tender_text}\n{standard_text}"
+    technical_corpus = f"{tender_text}\n{standard_text}\n{drawing_text}"
     contract_corpus = tender_text
     unverifiable: list[str] = []
 
@@ -262,8 +294,8 @@ def _analyze_selected_standards_semantic(
                             "Ajouter des sections mesurables pour chaque domaine non couvert, puis citer la norme."
                         ),
                     }[lang],
-                    financial_impact="medium",
-                    schedule_impact="medium",
+                    financial_impact=_impact_label("medium", lang),
+                    schedule_impact=_impact_label("medium", lang),
                     evidence=preview,
                     source_excerpt=preview[:500],
                     cause_effect_chain=[
@@ -293,12 +325,7 @@ def _analyze_selected_standards_semantic(
                         }[lang],
                     ],
                     data_completeness_caveat=caveat,
-                    estimated_impact={
-                        LanguageCode.FA: "ریسک ادعای تغییر مقادیر و تأخیر در حوزه‌های بدون مشخصات",
-                        LanguageCode.EN: "Variation/delay risk in domains without specs",
-                        LanguageCode.DE: "Nachtrags-/Verzugsrisiko ohne Specs",
-                        LanguageCode.FR: "Risque d'avenant/retard sans specs",
-                    }[lang],
+                    estimated_impact=_impact_label("medium", lang),
                 ),
                 55,
             )
@@ -389,11 +416,11 @@ def _apply_rule(
                     title=_lang(rule.title, lang),
                     description=_lang(rule.description, lang),
                     recommendation=_lang(rule.recommendation, lang),
-                    financial_impact=rule.financial_impact,
-                    schedule_impact=rule.schedule_impact,
+                    financial_impact=_impact_label(rule.financial_impact, lang),
+                    schedule_impact=_impact_label(rule.schedule_impact, lang),
                     cause_effect_chain=chain,
                     data_completeness_caveat=caveat,
-                    estimated_impact=rule.financial_impact,
+                    estimated_impact=_impact_label(rule.financial_impact, lang),
                 ),
                 score,
             )
@@ -411,8 +438,8 @@ def _apply_rule(
                 title=_lang(rule.title, lang),
                 description=_lang(rule.description, lang),
                 recommendation=_lang(rule.recommendation, lang),
-                financial_impact=rule.financial_impact,
-                schedule_impact=rule.schedule_impact,
+                financial_impact=_impact_label(rule.financial_impact, lang),
+                schedule_impact=_impact_label(rule.schedule_impact, lang),
                 cause_effect_chain=[
                     {
                         LanguageCode.FA: "الزام قراردادی/فنی در متن دیده نشد",
@@ -436,7 +463,7 @@ def _apply_rule(
                 if rule.severity != RiskSeverity.LOW
                 else [],
                 data_completeness_caveat=caveat,
-                estimated_impact=rule.financial_impact,
+                estimated_impact=_impact_label(rule.financial_impact, lang),
             ),
             score,
         )
@@ -485,8 +512,8 @@ def analyze_project_documents(
 
     # ---------- FIX 1: hard gate ----------
     if stats["total"] == 0 or gate_rate < _EXTRACTION_HARD_GATE:
-        failed_list = "، ".join(failed_names[:40])
-        more = f" (+{len(failed_names) - 40})" if len(failed_names) > 40 else ""
+        failed_list = "، ".join(failed_names[:12])
+        more = f" (+{len(failed_names) - 12})" if len(failed_names) > 12 else ""
         block = RiskFinding(
             code="EXTRACT-BLOCK-001",
             category="process",
@@ -500,52 +527,55 @@ def analyze_project_documents(
             }[lang],
             description={
                 LanguageCode.FA: (
-                    f"{stats['failed_count']} از {stats['total']} فایل قابل خواندن نبودند "
-                    f"(نرخ استخراج مفید ≈ {int(gate_rate * 100)}٪). "
-                    f"تا زمانی که نسخه متنی/Word یا OCR معتبر نباشد، ادعا درباره ارجاع استاندارد یا ریسک قراردادی معتبر نیست.\n"
-                    f"فایل‌های ناموفق: {failed_list}{more}"
+                    f"از {stats.get('text_doc_count', stats['total'])} سند متنی "
+                    f"(نقشه‌ها جدا حساب می‌شوند)، {stats['failed_count']} قابل خواندن نبود "
+                    f"(≈ {int(gate_rate * 100)}٪). "
+                    f"تعداد نقشه: {stats.get('drawing_count', 0)}. "
+                    f"نمونه فایل‌های ناموفق: {failed_list}{more}"
                 ),
                 LanguageCode.EN: (
-                    f"{stats['failed_count']} of {stats['total']} files were not readable "
-                    f"(usable extraction ≈ {int(gate_rate * 100)}%). "
-                    f"Until text/Word or valid OCR is available, claims about standards or contract risk are not reliable.\n"
-                    f"Failed files: {failed_list}{more}"
+                    f"Of {stats.get('text_doc_count', stats['total'])} text documents "
+                    f"(drawings excluded), {stats['failed_count']} unreadable "
+                    f"(≈ {int(gate_rate * 100)}%). Drawings: {stats.get('drawing_count', 0)}. "
+                    f"Sample: {failed_list}{more}"
                 ),
                 LanguageCode.DE: (
-                    f"{stats['failed_count']} von {stats['total']} Dateien nicht lesbar "
-                    f"(≈ {int(gate_rate * 100)}٪). Failed: {failed_list}{more}"
+                    f"{stats['failed_count']}/{stats.get('text_doc_count', stats['total'])} Textdocs unlesbar "
+                    f"(≈ {int(gate_rate * 100)}٪). Beispiel: {failed_list}{more}"
                 ),
                 LanguageCode.FR: (
-                    f"{stats['failed_count']} sur {stats['total']} fichiers illisibles "
-                    f"(≈ {int(gate_rate * 100)}%). Échecs: {failed_list}{more}"
+                    f"{stats['failed_count']}/{stats.get('text_doc_count', stats['total'])} docs texte illisibles "
+                    f"(≈ {int(gate_rate * 100)}٪). Exemples: {failed_list}{more}"
                 ),
             }[lang],
             recommendation={
-                LanguageCode.FA: "نسخه قابل‌خواندن (متن/Word) بارگذاری کنید یا OCR را فعال/بهبود دهید، سپس تحلیل را دوباره اجرا کنید.",
-                LanguageCode.EN: "Upload readable text/Word versions or enable/improve OCR, then re-run analysis.",
-                LanguageCode.DE: "Lesbare Text-/Word-Versionen hochladen oder OCR verbessern, dann erneut analysieren.",
-                LanguageCode.FR: "Téléverser des versions texte/Word lisibles ou améliorer l'OCR, puis relancer.",
+                LanguageCode.FA: "اسناد مناقصه را Word یا PDF متنی بارگذاری کنید و «استخراج مجدد» بزنید. نقشه‌های بدون متن مانع تحلیل نیستند.",
+                LanguageCode.EN: "Upload tender docs as Word/text PDF and use Re-extract. Drawings without text do not block analysis.",
+                LanguageCode.DE: "Ausschreibung als Word/Text-PDF laden und erneut extrahieren. Pläne ohne Text blockieren nicht.",
+                LanguageCode.FR: "Charger l'AO en Word/PDF texte et ré-extraire. Les plans sans texte ne bloquent pas.",
             }[lang],
             evidence=failed_list,
-            source_excerpt=failed_list[:800],
+            source_excerpt=failed_list[:400],
             risk_score=None,
         )
         summary = {
             LanguageCode.FA: (
-                f"تحلیل مسدود شد: آمادگی استخراج متن {int(gate_rate * 100)}٪ "
-                f"({stats['readable_count']}/{stats['total']} فایل). هیچ ریسک محتوایی ادعا نشده است."
+                f"تحلیل مسدود شد: استخراج اسناد متنی {int(gate_rate * 100)}٪ "
+                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])}؛ "
+                f"نقشه={stats.get('drawing_count', 0)}). ریسک محتوایی ادعا نشد."
             ),
             LanguageCode.EN: (
-                f"Analysis blocked: text extraction readiness {int(gate_rate * 100)}% "
-                f"({stats['readable_count']}/{stats['total']} files). No content risks claimed."
+                f"Analysis blocked: text-doc extraction {int(gate_rate * 100)}% "
+                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])}; "
+                f"drawings={stats.get('drawing_count', 0)}). No content risks claimed."
             ),
             LanguageCode.DE: (
-                f"Analyse blockiert: Textextraktion {int(gate_rate * 100)}% "
-                f"({stats['readable_count']}/{stats['total']}). Keine inhaltlichen Risiken behauptet."
+                f"Analyse blockiert: {int(gate_rate * 100)}% "
+                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])})."
             ),
             LanguageCode.FR: (
-                f"Analyse bloquée: extraction {int(gate_rate * 100)}% "
-                f"({stats['readable_count']}/{stats['total']}). Aucun risque de contenu affirmé."
+                f"Analyse bloquée: {int(gate_rate * 100)}% "
+                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])})."
             ),
         }[lang]
         return {
@@ -571,13 +601,13 @@ def analyze_project_documents(
     if gate_rate < _EXTRACTION_SOFT_GATE:
         caveat = {
             LanguageCode.FA: (
-                f"هشدار کامل‌بودن داده: فقط {stats['readable_count']} از {stats['total']} فایل متن قابل‌استفاده داشتند. "
+                f"هشدار کامل‌بودن داده: فقط {stats['readable_count']} از {stats.get('text_doc_count', stats['total'])} سند متنی قابل‌استفاده داشتند. "
                 f"یافته‌ها فقط روی اسناد خوانا اعتبار دارند. خوانده‌نشده: "
                 + "، ".join(failed_names[:12])
                 + ("…" if len(failed_names) > 12 else "")
             ),
             LanguageCode.EN: (
-                f"Data completeness caveat: only {stats['readable_count']}/{stats['total']} files had usable text. "
+                f"Data completeness caveat: only {stats['readable_count']}/{stats.get('text_doc_count', stats['total'])} text docs had usable text. "
                 f"Findings are only as reliable as readable sources. Unreadable: "
                 + ", ".join(failed_names[:12])
                 + ("…" if len(failed_names) > 12 else "")
@@ -595,7 +625,10 @@ def analyze_project_documents(
     tender_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.TENDER])
     standard_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.STANDARD])
     schedule_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.SCHEDULE])
-    # Prefer readable corpus only for rules
+    # IFC / DXF / DWG / Revit live under drawing → technical_corpus via drawing_text
+    drawing_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.DRAWING])
+    # GAEB LV should be uploaded as tender → contract_corpus + technical via tender_text
+    # Prefer readable corpus only for rules (includes IFC/CAD/GAEB native text)
     readable_docs = [d for d in documents if has_usable_text(d.get("extracted_text") or "")]
     corpus_for_rules = "\n".join((d.get("extracted_text") or "") for d in readable_docs)
 
@@ -652,6 +685,7 @@ def analyze_project_documents(
             selected_standards=selected_standards,
             tender_text=tender_text,
             standard_text=standard_text,
+            drawing_text=drawing_text,
             caveat=caveat,
         )
     )

@@ -1,3 +1,6 @@
-# Optional heavy OCR stack (install later if needed)
+# OCR stack is now included in requirements.txt (required for scanned PDF/Word).
+# Kept for reference / local extras.
 numpy==2.2.2
+onnxruntime==1.20.1
 rapidocr-onnxruntime==1.4.4
+pytesseract==0.3.13

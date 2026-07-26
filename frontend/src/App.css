@@ -84,6 +84,12 @@ textarea {
   margin-top: 1.25rem;
 }
 
+.lang-hint {
+  margin: 0.5rem 0 0;
+  font-size: 0.85rem;
+  max-width: 28rem;
+}
+
 .lang-bar label,
 .form-grid label {
   display: flex;
@@ -335,6 +341,15 @@ button:disabled {
 .upload-hint {
   margin: 0 0 0.65rem;
   font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.format-line {
+  margin: -0.25rem 0 0.75rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--brand);
   line-height: 1.35;
 }
 

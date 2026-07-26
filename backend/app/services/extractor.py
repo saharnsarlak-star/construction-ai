@@ -31,6 +31,38 @@ SUPPORTED_EXTENSIONS = {
     ".webp",
     ".dwg",
     ".dxf",
+    ".rvt",
+    ".rfa",
+    ".rte",
+    ".rft",
+    ".ifc",
+    ".x81",
+    ".x82",
+    ".x83",
+    ".x84",
+    ".x85",
+    ".x86",
+    ".d81",
+    ".d82",
+    ".d83",
+    ".d84",
+    ".d85",
+    ".d86",
+}
+
+_GAEB_EXTENSIONS = {
+    ".x81",
+    ".x82",
+    ".x83",
+    ".x84",
+    ".x85",
+    ".x86",
+    ".d81",
+    ".d82",
+    ".d83",
+    ".d84",
+    ".d85",
+    ".d86",
 }
 
 _MAX_DOCX_IMAGES = 12
@@ -73,7 +105,19 @@ def extract_text_from_file(
                     "OCR skipped during bulk upload. Use re-extract if text is needed."
                 )
             return _extract_image(path)
-        if suffix in {".dwg", ".dxf", ".doc"}:
+        if suffix in {".dwg", ".dxf", ".rvt", ".rfa", ".rte", ".rft"}:
+            from app.services.cad_extractor import extract_cad_text
+
+            return extract_cad_text(path)
+        if suffix == ".ifc":
+            from app.services.ifc_extractor import extract_ifc
+
+            return extract_ifc(path).merged_text
+        if suffix in _GAEB_EXTENSIONS:
+            from app.services.gaeb_extractor import extract_gaeb
+
+            return extract_gaeb(path).merged_text
+        if suffix == ".doc":
             return (
                 f"[BINARY_OR_IMAGE_FILE] {path.name}\n"
                 "Text extraction for this format is limited in MVP. "
@@ -91,7 +135,7 @@ def extract_document_full(
     treat_as_drawing: bool = False,
     on_progress=None,
 ):
-    """Full structured extraction (pages JSON + merged text)."""
+    """Full structured extraction (pages JSON + merged text + optional structured meta)."""
     suffix = path.suffix.lower()
     if suffix == ".pdf":
         return extract_document(
@@ -100,11 +144,27 @@ def extract_document_full(
             treat_as_drawing=treat_as_drawing,
             on_progress=on_progress,
         )
+    if suffix == ".ifc":
+        from app.services.ifc_extractor import extract_ifc
+
+        return extract_ifc(path).to_document_result()
+    if suffix in _GAEB_EXTENSIONS:
+        from app.services.gaeb_extractor import extract_gaeb
+
+        return extract_gaeb(path).to_document_result()
+
     # Non-PDF: wrap flat extract into a minimal result-like dict via pipeline types
     from app.services.ocr.types import DocumentExtractionResult, OcrPageResult
 
     text = extract_text_from_file(path, allow_ocr=allow_ocr, treat_as_drawing=treat_as_drawing)
     ok = has_usable_text(text)
+    method = None
+    if suffix == ".dxf":
+        method = "dxf_native"
+    elif suffix == ".dwg":
+        method = "dwg_harvest"
+    elif suffix in {".rvt", ".rfa", ".rte", ".rft"}:
+        method = "rvt_harvest"
     page = OcrPageResult(
         page=1,
         text=text if ok else "",
@@ -113,6 +173,7 @@ def extract_document_full(
         source="native",
         kind="searchable" if ok else "empty",
         error=None if ok else text[:200],
+        contains_drawing=treat_as_drawing or suffix in {".dwg", ".dxf", ".rvt", ".rfa", ".rte", ".rft"},
     )
     return DocumentExtractionResult(
         pages=[page],
@@ -122,8 +183,10 @@ def extract_document_full(
         ocr_page_count=0,
         failed_pages=[] if ok else [1],
         needs_manual_review=not ok,
-        provider="legacy",
+        provider=method or "legacy",
         phase=ExtractionPhase.COMPLETED.value if ok else ExtractionPhase.FAILED.value,
+        extraction_method=method,
+        confidence_score=82.0 if ok and method == "dxf_native" else (50.0 if ok and method else None),
     )
 
 
@@ -138,10 +201,20 @@ def has_usable_text(text: str | None) -> bool:
             "[OCR_UNAVAILABLE]",
             "[OCR_EMPTY]",
             "[OCR_SKIPPED]",
+            "[CAD_EMPTY]",
+            "[CAD_UNSUPPORTED]",
+            "[IFC_EMPTY]",
+            "[IFC_ERROR]",
+            "[GAEB_EMPTY]",
+            "[GAEB_ERROR]",
         )
     ):
         return False
     cleaned = re.sub(r"^\[OCR_APPLIED\][^\n]*\n?", "", stripped, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^---\s*cad:[^\n]*\n?", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^---\s*ifc:[^\n]*\n?", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^---\s*gaeb:[^\n]*\n?", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"^\[(?:DWG|DXF|Revit|DXF-fallback) strings\]\s*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"---\s*(page|sheet|ocr)[^-\n]*---", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\[OCR_TRUNCATED\][^\n]*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\[NEEDS_MANUAL_REVIEW\]", "", cleaned, flags=re.IGNORECASE)
