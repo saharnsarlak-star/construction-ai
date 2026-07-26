@@ -26,7 +26,11 @@ from app.schemas import (
 from app.services.analyzer import analyze_project_documents
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
 from app.services import storage as file_storage
-from app.services.project_standards import apply_user_standard_selection, ensure_project_standards
+from app.services.project_standards import (
+    apply_user_standard_selection,
+    ensure_project_standards,
+    list_or_seed_project_standards,
+)
 from app.knowledge.country_profiles import get_country_profile
 from app.knowledge.standards_catalog import get_standard
 
@@ -163,11 +167,14 @@ async def list_project_standards(
     project_id: int, db: AsyncSession = Depends(get_db)
 ) -> list[ProjectStandardOut]:
     project = await _get_project(db, project_id)
-    rows = await ensure_project_standards(db, project, lang=project.ui_language.value)
-    # Selected defaults first, then optional unchecked
+    rows = await list_or_seed_project_standards(db, project, lang=project.ui_language.value)
     rows_sorted = sorted(
         rows,
-        key=lambda r: (0 if r.is_selected else 1, 0 if (r.applicability_level or "") == "mandatory_default" else 1, r.standard_code),
+        key=lambda r: (
+            0 if r.is_selected else 1,
+            0 if (r.applicability_level or "") == "mandatory_default" else 1,
+            r.standard_code,
+        ),
     )
     return [_standard_out(r) for r in rows_sorted]
 
@@ -180,7 +187,9 @@ async def update_project_standards(
 ) -> list[ProjectStandardOut]:
     project = await _get_project(db, project_id)
     updates = [(item.standard_code, item.is_selected) for item in payload.items]
-    rows = await apply_user_standard_selection(db, project, updates)
+    rows = await apply_user_standard_selection(
+        db, project, updates, lang=project.ui_language.value
+    )
     rows_sorted = sorted(
         rows,
         key=lambda r: (0 if r.is_selected else 1, r.standard_code),

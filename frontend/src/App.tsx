@@ -100,17 +100,23 @@ function App() {
 
   async function toggleStandard(code: string, next: boolean) {
     if (!project) return;
-    setBusy(true);
-    setError(null);
+    // Optimistic UI — do not freeze the whole page with global busy.
+    const previous = projectStandards;
+    setProjectStandards((rows) =>
+      rows.map((s) =>
+        s.standard_code === code
+          ? { ...s, is_selected: next, selected_by: "user_override" }
+          : s,
+      ),
+    );
     try {
       const updated = await api.updateProjectStandards(project.id, [
         { standard_code: code, is_selected: next },
       ]);
       setProjectStandards(updated);
     } catch (e) {
+      setProjectStandards(previous);
       setError(String(e));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -483,7 +489,6 @@ function App() {
                         <input
                           type="checkbox"
                           checked={s.is_selected}
-                          disabled={busy}
                           onChange={(e) => void toggleStandard(s.standard_code, e.target.checked)}
                         />
                         <span className="std-main">
