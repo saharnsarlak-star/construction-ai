@@ -186,6 +186,21 @@ export const api = {
     request<{ ok: boolean }>(`/projects/${projectId}/documents/${documentId}`, {
       method: "DELETE",
     }),
+  bulkDeleteDocuments: (projectId: number, documentIds: number[], force = false) =>
+    request<{
+      deleted_count: number;
+      failed_count: number;
+      results: Array<{
+        document_id: number;
+        original_name: string | null;
+        status: "deleted" | "not_found" | "blocked_referenced" | "error";
+        detail: string | null;
+      }>;
+    }>(`/projects/${projectId}/documents/bulk-delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ document_ids: documentIds, force }),
+    }),
   reextractDocument: (projectId: number, documentId: number) =>
     request<DocumentOut>(`/projects/${projectId}/documents/${documentId}/reextract`, {
       method: "POST",

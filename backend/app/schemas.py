@@ -47,6 +47,26 @@ class UploadBatchOut(BaseModel):
     errors: list[UploadErrorOut] = []
 
 
+class DocumentBulkDelete(BaseModel):
+    document_ids: list[int] = Field(min_length=1, max_length=500)
+    # When True, allow deleting files whose names appear in existing findings.
+    # Historical findings stay; source file is simply gone.
+    force: bool = False
+
+
+class BulkDeleteItemResult(BaseModel):
+    document_id: int
+    original_name: str | None = None
+    status: Literal["deleted", "not_found", "blocked_referenced", "error"]
+    detail: str | None = None
+
+
+class DocumentBulkDeleteOut(BaseModel):
+    deleted_count: int = 0
+    failed_count: int = 0
+    results: list[BulkDeleteItemResult] = []
+
+
 class ProjectStandardOut(BaseModel):
     standard_code: str
     title: str

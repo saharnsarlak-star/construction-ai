@@ -12,6 +12,7 @@ import {
   type ProjectType,
 } from "./api";
 import { countryOptions, languageOptions, projectTypeOptions, t } from "./i18n";
+import { BulkFileList } from "./BulkFileList";
 import "./App.css";
 
 const uploadCategories: { key: DocumentCategory; labelKey: string; optional?: boolean }[] = [
@@ -20,6 +21,24 @@ const uploadCategories: { key: DocumentCategory; labelKey: string; optional?: bo
   { key: "schedule", labelKey: "schedule", optional: true },
   // standards has a dedicated selection panel + custom upload
 ];
+
+function findingTier(f: { finding_category?: string | null; code?: string }): "limitation" | "methodology" | "risk" {
+  const cat = f.finding_category || "risk";
+  if (cat === "limitation" || cat === "methodology") return cat;
+  const code = (f.code || "").toUpperCase();
+  if (code.startsWith("EXTRACT-") || code.startsWith("OCR-")) return "limitation";
+  if (code.startsWith("STD-SELECT")) return "methodology";
+  return "risk";
+}
+
+function shortenText(text: string, max = 280): string {
+  const t = (text || "").trim();
+  if (t.length <= max) return t;
+  return `${t.slice(0, max)}…`;
+}
+
+type StagingItem = { key: string; file: File; selected: boolean };
+type StagingQueue = { category: DocumentCategory; items: StagingItem[] };
 
 function App() {
   const [uiLang, setUiLang] = useState<LanguageCode>(() => {
@@ -30,12 +49,16 @@ function App() {
   const [project, setProject] = useState<ProjectOut | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisOut | null>(null);
   const [projectStandards, setProjectStandards] = useState<ProjectStandardOut[]>([]);
+  const [standardsLoading, setStandardsLoading] = useState(false);
+  const [standardsError, setStandardsError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     done: number;
     total: number;
     category: DocumentCategory;
   } | null>(null);
+  const [staging, setStaging] = useState<StagingQueue | null>(null);
+  const [notice, setNotice] = useState<{ text: string; kind: "success" | "error" } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -61,6 +84,10 @@ function App() {
       setProject(null);
       setAnalysis(null);
       setProjectStandards([]);
+      setStandardsError(false);
+      setStandardsLoading(false);
+      setStaging(null);
+      setNotice(null);
       return;
     }
     void loadProject(selectedId);
@@ -75,18 +102,27 @@ function App() {
     }
   }
 
+  async function loadStandards(id: number) {
+    setStandardsLoading(true);
+    setStandardsError(false);
+    try {
+      const standards = await api.listProjectStandards(id);
+      setProjectStandards(standards);
+    } catch {
+      setProjectStandards([]);
+      setStandardsError(true);
+    } finally {
+      setStandardsLoading(false);
+    }
+  }
+
   async function loadProject(id: number) {
     setError(null);
     try {
       const p = await api.getProject(id);
       setProject(p);
       setReportLang(p.report_language);
-      try {
-        const standards = await api.listProjectStandards(id);
-        setProjectStandards(standards);
-      } catch {
-        setProjectStandards([]);
-      }
+      void loadStandards(id);
       try {
         const a = await api.latestAnalysis(id);
         setAnalysis(a);
@@ -211,17 +247,85 @@ function App() {
     }
   }
 
+  function queueFiles(category: DocumentCategory, files: FileList | null) {
+    if (!files?.length) return;
+    const incoming = Array.from(files).map((file, i) => ({
+      key: `${category}-${Date.now()}-${i}-${file.name}-${file.size}`,
+      file,
+      selected: true,
+    }));
+    setStaging((prev) => {
+      if (prev && prev.category === category) {
+        const existingNames = new Set(prev.items.map((x) => `${x.file.name}:${x.file.size}`));
+        const merged = [...prev.items];
+        for (const item of incoming) {
+          const id = `${item.file.name}:${item.file.size}`;
+          if (!existingNames.has(id)) merged.push(item);
+        }
+        return { category, items: merged };
+      }
+      return { category, items: incoming };
+    });
+  }
+
+  function setStagingSelected(all: boolean) {
+    setStaging((prev) =>
+      prev ? { ...prev, items: prev.items.map((x) => ({ ...x, selected: all })) } : prev,
+    );
+  }
+
+  function toggleStagingItem(key: string, selected: boolean) {
+    setStaging((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((x) => (x.key === key ? { ...x, selected } : x)),
+          }
+        : prev,
+    );
+  }
+
+  function removeStagingUnchecked() {
+    setStaging((prev) => {
+      if (!prev) return prev;
+      const items = prev.items.filter((x) => x.selected);
+      return items.length ? { ...prev, items } : null;
+    });
+  }
+
+  async function uploadFiles(category: DocumentCategory, files: File[]) {
+    if (!files.length) {
+      setError(t(uiLang, "stagingEmpty"));
+      return;
+    }
+    const dt = new DataTransfer();
+    files.forEach((f) => dt.items.add(f));
+    setStaging(null);
+    await onUpload(category, dt.files);
+  }
+
   async function onDeleteDoc(docId: number) {
     if (!project) return;
     setBusy(true);
+    setError(null);
     try {
       await api.deleteDocument(project.id, docId);
       await loadProject(project.id);
+      setNotice({ text: t(uiLang, "bulkDeleteSuccess").replace("{n}", "1"), kind: "success" });
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onBulkDeleteFiles(ids: number[], opts: { force: boolean }) {
+    if (!project) {
+      return { deleted_count: 0, failed_count: ids.length, results: [] };
+    }
+    const result = await api.bulkDeleteDocuments(project.id, ids, opts.force);
+    await loadProject(project.id);
+    return result;
   }
 
   async function onReextract(docId: number) {
@@ -290,6 +394,14 @@ function App() {
 
       <main className="layout">
         {error && <div className="error-banner">{error}</div>}
+        {notice && (
+          <div className={notice.kind === "success" ? "success-banner" : "error-banner"} role="status">
+            {notice.text}
+            <button type="button" className="linkish" onClick={() => setNotice(null)}>
+              ×
+            </button>
+          </div>
+        )}
 
         {!selectedId && (
           <section className="panel">
@@ -420,71 +532,83 @@ function App() {
               </p>
             )}
 
-            <div className="upload-grid">
-              {uploadCategories.map((cat) => (
-                <article key={cat.key} className="upload-card">
-                  <h3>
-                    {t(uiLang, cat.labelKey)}
-                    {cat.optional ? (
-                      <span className="optional-badge"> {t(uiLang, "optional")}</span>
-                    ) : null}
-                  </h3>
-                  <p className="muted upload-hint">
-                    {cat.key === "schedule" ? t(uiLang, "scheduleOptionalHint") : t(uiLang, "uploadHint")}
-                  </p>
-                  <label className={`file-btn${busy ? " disabled" : ""}`}>
-                    {busy && uploadProgress?.category === cat.key
-                      ? t(uiLang, "uploading")
-                      : t(uiLang, "upload")}
-                    <input
-                      type="file"
-                      multiple
-                      accept={FILE_ACCEPT}
-                      disabled={busy}
-                      onChange={(e) => {
-                        void onUpload(cat.key, e.target.files);
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                  {docsByCategory[cat.key].length === 0 ? (
-                    <p className="muted">{t(uiLang, "noFiles")}</p>
-                  ) : (
-                    <ul className="file-list">
-                      {docsByCategory[cat.key].map((d) => (
-                        <li key={d.id}>
-                          <div className="file-meta">
-                            <span title={d.original_name}>{d.original_name}</span>
-                            <small className={d.has_text ? "tag ok" : "tag warn"}>
-                              {d.has_text ? t(uiLang, "textOk") : t(uiLang, "textMissing")}
-                              {d.ocr_applied ? ` · ${t(uiLang, "ocrUsed")}` : ""}
-                            </small>
-                          </div>
-                          <div className="file-actions">
-                            {!d.has_text && (
-                              <button
-                                className="linkish"
-                                disabled={busy}
-                                onClick={() => void onReextract(d.id)}
-                              >
-                                {t(uiLang, "reextract")}
-                              </button>
-                            )}
-                            <button
-                              className="linkish"
-                              disabled={busy}
-                              onClick={() => void onDeleteDoc(d.id)}
-                            >
-                              {t(uiLang, "delete")}
-                            </button>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </article>
-              ))}
-            </div>
+            {staging && (
+              <article className="upload-card staging-panel">
+                <h3>
+                  {t(uiLang, "stagingTitle")}
+                  <span className="optional-badge">
+                    {" "}
+                    · {t(uiLang, staging.category === "drawing" ? "drawings" : staging.category === "tender" ? "tenderDocs" : staging.category === "schedule" ? "schedule" : "standards")}
+                  </span>
+                </h3>
+                <div className="file-toolbar">
+                  <button type="button" className="linkish" disabled={busy} onClick={() => setStagingSelected(true)}>
+                    {t(uiLang, "stagingSelectAll")}
+                  </button>
+                  <button type="button" className="linkish" disabled={busy} onClick={() => setStagingSelected(false)}>
+                    {t(uiLang, "stagingDeselectAll")}
+                  </button>
+                  <button type="button" className="linkish" disabled={busy} onClick={() => removeStagingUnchecked()}>
+                    {t(uiLang, "stagingRemoveUnchecked")}
+                  </button>
+                  <span className="muted">
+                    {t(uiLang, "selectedCount").replace(
+                      "{n}",
+                      String(staging.items.filter((x) => x.selected).length),
+                    )}
+                    {" / "}
+                    {staging.items.length}
+                  </span>
+                </div>
+                <ul className="file-list staging-list">
+                  {staging.items.map((item) => (
+                    <li key={item.key}>
+                      <label className="file-check">
+                        <input
+                          type="checkbox"
+                          checked={item.selected}
+                          disabled={busy}
+                          onChange={(e) => toggleStagingItem(item.key, e.target.checked)}
+                        />
+                        <span title={item.file.name}>{item.file.name}</span>
+                      </label>
+                      <button
+                        type="button"
+                        className="linkish"
+                        disabled={busy}
+                        onClick={() =>
+                          setStaging((prev) => {
+                            if (!prev) return prev;
+                            const items = prev.items.filter((x) => x.key !== item.key);
+                            return items.length ? { ...prev, items } : null;
+                          })
+                        }
+                      >
+                        {t(uiLang, "delete")}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                <div className="file-toolbar actions-row">
+                  <button
+                    type="button"
+                    className="primary"
+                    disabled={busy || !staging.items.some((x) => x.selected)}
+                    onClick={() =>
+                      void uploadFiles(
+                        staging.category,
+                        staging.items.filter((x) => x.selected).map((x) => x.file),
+                      )
+                    }
+                  >
+                    {t(uiLang, "stagingUploadSelected")}
+                  </button>
+                  <button type="button" className="ghost" disabled={busy} onClick={() => setStaging(null)}>
+                    {t(uiLang, "stagingCancel")}
+                  </button>
+                </div>
+              </article>
+            )}
 
             <article className="upload-card standards-panel">
               <h3>
@@ -492,8 +616,30 @@ function App() {
                 <span className="optional-badge"> {t(uiLang, "optional")}</span>
               </h3>
               <p className="muted upload-hint">{t(uiLang, "standardsSelectHint")}</p>
-              {projectStandards.length === 0 ? (
+              {standardsLoading ? (
                 <p className="muted">{t(uiLang, "standardsLoading")}</p>
+              ) : standardsError ? (
+                <div className="file-list-meta">
+                  <span>{t(uiLang, "standardsLoadError")}</span>
+                  <button
+                    className="linkish"
+                    disabled={busy || selectedId == null}
+                    onClick={() => selectedId != null && void loadStandards(selectedId)}
+                  >
+                    {t(uiLang, "standardsRetry")}
+                  </button>
+                </div>
+              ) : projectStandards.length === 0 ? (
+                <div className="file-list-meta">
+                  <span>{t(uiLang, "standardsLoadError")}</span>
+                  <button
+                    className="linkish"
+                    disabled={busy || selectedId == null}
+                    onClick={() => selectedId != null && void loadStandards(selectedId)}
+                  >
+                    {t(uiLang, "standardsRetry")}
+                  </button>
+                </div>
               ) : (
                 <ul className="standards-checklist">
                   {projectStandards.map((s) => (
@@ -529,7 +675,7 @@ function App() {
                   accept={FILE_ACCEPT}
                   disabled={busy}
                   onChange={(e) => {
-                    void onUpload("standard", e.target.files);
+                    queueFiles("standard", e.target.files);
                     e.target.value = "";
                   }}
                 />
@@ -537,29 +683,74 @@ function App() {
               {docsByCategory.standard.length === 0 ? (
                 <p className="muted">{t(uiLang, "noCustomStandards")}</p>
               ) : (
-                <ul className="file-list">
-                  {docsByCategory.standard.map((d) => (
-                    <li key={d.id}>
-                      <div className="file-meta">
-                        <span title={d.original_name}>{d.original_name}</span>
-                        <small className={d.has_text ? "tag ok" : "tag warn"}>
-                          {d.has_text ? t(uiLang, "textOk") : t(uiLang, "textMissing")}
-                        </small>
-                      </div>
-                      <div className="file-actions">
-                        <button
-                          className="linkish"
-                          disabled={busy}
-                          onClick={() => void onDeleteDoc(d.id)}
-                        >
-                          {t(uiLang, "delete")}
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
+                <BulkFileList
+                  uiLang={uiLang}
+                  category="standard"
+                  files={docsByCategory.standard}
+                  emptyLabel={t(uiLang, "noCustomStandards")}
+                  busy={busy}
+                  onDeleteOne={(id) => onDeleteDoc(id)}
+                  onBulkDelete={onBulkDeleteFiles}
+                  onNotify={(text, kind) => {
+                    setNotice({ text, kind });
+                    if (kind === "error") setError(text);
+                  }}
+                />
               )}
             </article>
+
+            <div className="upload-grid">
+              {uploadCategories.map((cat) => (
+                <article
+                  key={cat.key}
+                  className={`upload-card${cat.key === "drawing" ? " wide" : ""}`}
+                >
+                  <h3>
+                    {t(uiLang, cat.labelKey)}
+                    {cat.optional ? (
+                      <span className="optional-badge"> {t(uiLang, "optional")}</span>
+                    ) : null}
+                  </h3>
+                  <p className="muted upload-hint">
+                    {cat.key === "schedule"
+                      ? t(uiLang, "scheduleOptionalHint")
+                      : cat.key === "drawing"
+                        ? t(uiLang, "drawingsNoTextHint")
+                        : t(uiLang, "uploadHint")}
+                  </p>
+                  <label className={`file-btn${busy ? " disabled" : ""}`}>
+                    {busy && uploadProgress?.category === cat.key
+                      ? t(uiLang, "uploading")
+                      : t(uiLang, "upload")}
+                    <input
+                      type="file"
+                      multiple
+                      accept={FILE_ACCEPT}
+                      disabled={busy}
+                      onChange={(e) => {
+                        queueFiles(cat.key, e.target.files);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <BulkFileList
+                    uiLang={uiLang}
+                    category={cat.key}
+                    files={docsByCategory[cat.key]}
+                    emptyLabel={t(uiLang, "noFiles")}
+                    busy={busy}
+                    showReextract={cat.key !== "drawing"}
+                    onDeleteOne={(id) => onDeleteDoc(id)}
+                    onBulkDelete={onBulkDeleteFiles}
+                    onReextract={(id) => void onReextract(id)}
+                    onNotify={(text, kind) => {
+                      setNotice({ text, kind });
+                      if (kind === "error") setError(text);
+                    }}
+                  />
+                </article>
+              ))}
+            </div>
 
             {analysis && (
               <div className="report">
@@ -597,9 +788,9 @@ function App() {
                   const unique = new Map<number, (typeof analysis.findings)[0]>();
                   for (const f of analysis.findings) unique.set(f.id, f);
                   const all = [...unique.values()];
-                  const limitations = all.filter((f) => (f.finding_category || "risk") === "limitation");
-                  const risks = all.filter((f) => (f.finding_category || "risk") === "risk");
-                  const methodology = all.filter((f) => f.finding_category === "methodology");
+                  const limitations = all.filter((f) => findingTier(f) === "limitation");
+                  const risks = all.filter((f) => findingTier(f) === "risk");
+                  const methodology = all.filter((f) => findingTier(f) === "methodology");
                   return (
                     <>
                       {limitations.length > 0 && (
@@ -607,7 +798,7 @@ function App() {
                           {limitations.map((f) => (
                             <aside key={f.id} className="limitation-banner">
                               <strong>{f.title}</strong>
-                              <p>{f.description}</p>
+                              <p>{shortenText(f.description, 360)}</p>
                               <p>
                                 <em>{f.recommendation}</em>
                               </p>
@@ -637,7 +828,7 @@ function App() {
                               <p>{f.description}</p>
                               {(f.source_excerpt || f.evidence) && (
                                 <blockquote className="source-excerpt">
-                                  {f.source_excerpt || f.evidence}
+                                  {shortenText(f.source_excerpt || f.evidence || "", 220)}
                                 </blockquote>
                               )}
                               {f.cause_effect_chain && f.cause_effect_chain.length > 0 && (

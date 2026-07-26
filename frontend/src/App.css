@@ -94,13 +94,29 @@ textarea {
 }
 
 select,
-input,
+input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
 textarea {
   border: 1px solid var(--line);
   background: #fff;
   border-radius: 10px;
   padding: 0.65rem 0.75rem;
   color: var(--ink);
+}
+
+input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  width: 1.15rem;
+  height: 1.15rem;
+  min-width: 1.15rem;
+  margin: 0;
+  padding: 0;
+  border: 1.5px solid rgba(15, 92, 110, 0.55);
+  border-radius: 4px;
+  background: #fff;
+  accent-color: var(--brand, #0f5c6e);
+  cursor: pointer;
+  flex-shrink: 0;
 }
 
 .layout {
@@ -224,6 +240,11 @@ button:disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
   margin: 1.2rem 0 0;
+  align-items: start;
+}
+
+.upload-card.wide {
+  grid-column: 1 / -1;
 }
 
 .upload-card {
@@ -231,6 +252,9 @@ button:disabled {
   border-radius: 16px;
   padding: 1rem;
   background: rgba(255, 255, 255, 0.55);
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .upload-card h3 {
@@ -329,8 +353,199 @@ button:disabled {
   padding: 0;
   display: grid;
   gap: 0.45rem;
-  max-height: 280px;
-  overflow: auto;
+  max-height: 220px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.file-list-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.55rem;
+  font-size: 0.8rem;
+  color: var(--muted, #5a6b73);
+}
+
+.file-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem 0.85rem;
+  margin-top: 0.65rem;
+  font-size: 0.82rem;
+}
+
+.file-toolbar.actions-row {
+  margin-top: 0.85rem;
+}
+
+.docs-panel {
+  margin-top: 0.65rem;
+}
+
+.bulk-primary-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(15, 92, 110, 0.28);
+  border-radius: 14px;
+  background: rgba(15, 92, 110, 0.07);
+  margin-bottom: 0.55rem;
+}
+
+.bulk-primary-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+}
+
+.bulk-primary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.btn-danger-solid {
+  border: none;
+  background: #b42318;
+  color: #fff;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-danger-solid:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.docs-select-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid rgba(15, 92, 110, 0.25);
+  border-radius: 12px;
+  background: rgba(15, 92, 110, 0.06);
+}
+
+.docs-select-left {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem 1rem;
+}
+
+.docs-master-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.docs-selected-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--brand, #0f5c6e);
+}
+
+.bulk-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  margin-top: 0.55rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: 12px;
+  background: rgba(180, 35, 24, 0.08);
+  border: 1px solid rgba(180, 35, 24, 0.25);
+}
+
+.success-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: rgba(20, 120, 80, 0.12);
+  border: 1px solid rgba(20, 120, 80, 0.3);
+  color: #146c48;
+  white-space: pre-wrap;
+}
+
+.docs-select-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.btn-sm {
+  border: 1px solid rgba(15, 92, 110, 0.3);
+  background: #fff;
+  color: var(--brand);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.btn-sm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-sm.danger {
+  border-color: rgba(180, 35, 24, 0.35);
+  color: var(--high, #b42318);
+}
+
+.docs-file-list li.is-selected {
+  background: rgba(15, 92, 110, 0.08);
+  border-radius: 10px;
+  padding-inline: 0.35rem;
+}
+
+.file-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+  cursor: pointer;
+}
+
+.file-check input[type="checkbox"] {
+  margin-top: 0.15rem;
+}
+
+.staging-panel {
+  margin: 0.9rem 0 1rem;
+  border-style: solid;
+  border-color: rgba(15, 92, 110, 0.45);
+  background: rgba(15, 92, 110, 0.05);
+}
+
+.staging-list {
+  max-height: 260px;
+}
+
+.linkish.danger {
+  color: var(--high, #b42318);
 }
 
 .file-list li {

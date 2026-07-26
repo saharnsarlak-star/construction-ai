@@ -13,6 +13,9 @@ from app.models import Analysis, Document, DocumentCategory, Finding, Project, P
 from app.schemas import (
     AnalysisOut,
     AnalyzeRequest,
+    DocumentBulkDelete,
+    DocumentBulkDeleteOut,
+    BulkDeleteItemResult,
     DocumentOut,
     FindingOut,
     ProjectCreate,
@@ -24,7 +27,7 @@ from app.schemas import (
     UploadErrorOut,
 )
 from app.services.analyzer import analyze_project_documents
-from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
+from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text, ocr_status
 from app.services import storage as file_storage
 from app.services.project_standards import (
     ensure_project_standards,
@@ -237,8 +240,8 @@ async def upload_documents(
     max_bytes = (
         None if settings.max_upload_mb <= 0 else settings.max_upload_mb * 1024 * 1024
     )
-    # Skip OCR for drawings always; also for larger batches so uploads finish.
-    allow_ocr = category != DocumentCategory.DRAWING and len(files) <= 2
+    # Skip OCR only for drawings (CAD/scan packages). Tender/schedule/standard always extract fully.
+    allow_ocr = category != DocumentCategory.DRAWING
     saved: list[Document] = []
     errors: list[UploadErrorOut] = []
 
@@ -321,6 +324,116 @@ async def delete_document(
     return {"ok": True}
 
 
+@router.post("/{project_id}/documents/bulk-delete", response_model=DocumentBulkDeleteOut)
+async def bulk_delete_documents(
+    project_id: int,
+    payload: DocumentBulkDelete,
+    db: AsyncSession = Depends(get_db),
+) -> DocumentBulkDeleteOut:
+    """
+    Delete many documents in one request, scoped to this project only.
+
+    Findings do not FK to documents; we treat a file as "referenced" when its
+    original_name appears in any finding evidence/source_excerpt/description
+    for this project's analyses.
+
+    Safer default: block referenced files unless force=true.
+    When force=true, files are deleted and historical findings are kept as-is
+    (source file was later removed).
+    """
+    await _get_project_meta(db, project_id)
+    ids = list(dict.fromkeys(payload.document_ids))
+
+    result = await db.execute(
+        select(Document).where(Document.project_id == project_id, Document.id.in_(ids))
+    )
+    found = {d.id: d for d in result.scalars().all()}
+
+    referenced_names: set[str] = set()
+    try:
+        findings_q = await db.execute(
+            select(Finding.evidence, Finding.source_excerpt, Finding.description)
+            .join(Analysis, Analysis.id == Finding.analysis_id)
+            .where(Analysis.project_id == project_id)
+        )
+        for evidence, excerpt, description in findings_q.all():
+            blob = " ".join(x for x in (evidence, excerpt, description) if x)
+            if blob:
+                referenced_names.add(blob)
+    except Exception:  # noqa: BLE001
+        referenced_names = set()
+
+    def _is_referenced(name: str) -> bool:
+        if not name or not referenced_names:
+            return False
+        return any(name in blob for blob in referenced_names)
+
+    results: list[BulkDeleteItemResult] = []
+    deleted_count = 0
+
+    for doc_id in ids:
+        doc = found.get(doc_id)
+        if not doc:
+            results.append(
+                BulkDeleteItemResult(
+                    document_id=doc_id,
+                    original_name=None,
+                    status="not_found",
+                    detail="File not found in this project",
+                )
+            )
+            continue
+
+        name = doc.original_name or ""
+        if not payload.force and _is_referenced(name):
+            results.append(
+                BulkDeleteItemResult(
+                    document_id=doc.id,
+                    original_name=name,
+                    status="blocked_referenced",
+                    detail=(
+                        "This file appears in a previous analysis finding. "
+                        "Deleting it may invalidate existing references. "
+                        "Retry with force=true to delete anyway; findings are kept."
+                    ),
+                )
+            )
+            continue
+
+        try:
+            try:
+                await file_storage.delete_stored(doc.stored_path)
+            except file_storage.StorageError:
+                pass
+            await db.delete(doc)
+            deleted_count += 1
+            results.append(
+                BulkDeleteItemResult(
+                    document_id=doc.id,
+                    original_name=name,
+                    status="deleted",
+                    detail=None,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001
+            results.append(
+                BulkDeleteItemResult(
+                    document_id=doc.id,
+                    original_name=name,
+                    status="error",
+                    detail=str(exc),
+                )
+            )
+
+    await db.commit()
+    failed_count = sum(1 for r in results if r.status != "deleted")
+    return DocumentBulkDeleteOut(
+        deleted_count=deleted_count,
+        failed_count=failed_count,
+        results=results,
+    )
+
+
 @router.post("/{project_id}/documents/{document_id}/reextract", response_model=DocumentOut)
 async def reextract_document(
     project_id: int, document_id: int, db: AsyncSession = Depends(get_db)
@@ -336,7 +449,9 @@ async def reextract_document(
         path = await file_storage.open_for_read(doc.stored_path)
     except file_storage.StorageError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    doc.extracted_text = extract_text_from_file(path)
+    doc.extracted_text = extract_text_from_file(
+        path, allow_ocr=doc.category != DocumentCategory.DRAWING
+    )
     await db.commit()
     await db.refresh(doc)
     return _doc_out(doc)
@@ -348,8 +463,35 @@ async def analyze_project(
     payload: AnalyzeRequest | None = None,
     db: AsyncSession = Depends(get_db),
 ) -> AnalysisOut:
+    import asyncio
+
     project = await _get_project(db, project_id)
     report_language = (payload.report_language if payload and payload.report_language else None) or project.report_language
+
+    # Before analysis: OCR any tender/schedule/standard that still lacks usable text.
+    # Drawings are skipped (CAD packages); they must not block analysis.
+    refreshed = 0
+    for doc in project.documents:
+        if refreshed >= 8:
+            break
+        if doc.category == DocumentCategory.DRAWING:
+            continue
+        if has_usable_text(doc.extracted_text or ""):
+            continue
+        try:
+            path = await file_storage.open_for_read(doc.stored_path)
+            text = await asyncio.to_thread(
+                extract_text_from_file, path, allow_ocr=True
+            )
+            doc.extracted_text = text
+            refreshed += 1
+        except Exception:  # noqa: BLE001
+            continue
+    if refreshed:
+        await db.commit()
+        await db.refresh(project)
+        # reload documents after commit
+        project = await _get_project(db, project_id)
 
     docs_payload = [
         {
