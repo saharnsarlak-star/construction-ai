@@ -49,6 +49,9 @@ const dictionaries: Record<LanguageCode, Dict> = {
     tenderDocs: "اسناد مناقصه / پیمان",
     drawings: "نقشه‌ها",
     schedule: "برنامه زمان‌بندی",
+    optional: "اختیاری",
+    scheduleOptionalHint:
+      "اگر برنامه زمان‌بندی ندارید مشکلی نیست — تحلیل بدون آن ادامه می‌یابد؛ فقط یک هشدار ریسک ثبت می‌شود.",
     standards: "استانداردها",
     upload: "بارگذاری چند فایل",
     uploadHint: "چند فایل را با هم انتخاب کنید (Ctrl/Shift). دسته‌ای آپلود می‌شود.",
@@ -123,6 +126,9 @@ const dictionaries: Record<LanguageCode, Dict> = {
     tenderDocs: "Tender / contract documents",
     drawings: "Drawings",
     schedule: "Schedule",
+    optional: "optional",
+    scheduleOptionalHint:
+      "No schedule is fine — analysis continues without it; only a risk note is recorded.",
     standards: "Standards",
     upload: "Upload multiple files",
     uploadHint: "Select many files at once (Ctrl/Shift). Uploaded in batches.",
@@ -197,6 +203,9 @@ const dictionaries: Record<LanguageCode, Dict> = {
     tenderDocs: "Ausschreibungs-/Vertragsunterlagen",
     drawings: "Pläne",
     schedule: "Terminplan",
+    optional: "optional",
+    scheduleOptionalHint:
+      "Kein Terminplan ist in Ordnung — die Analyse läuft weiter; nur ein Risikohinweis.",
     standards: "Standards",
     upload: "Mehrere Dateien hochladen",
     uploadHint: "Mehrere Dateien gleichzeitig wählen (Strg/Umschalt). Batch-Upload.",
@@ -271,6 +280,9 @@ const dictionaries: Record<LanguageCode, Dict> = {
     tenderDocs: "Documents d'AO / marché",
     drawings: "Plans",
     schedule: "Planning",
+    optional: "optionnel",
+    scheduleOptionalHint:
+      "Sans planning, l'analyse continue; seule une note de risque est enregistrée.",
     standards: "Normes",
     upload: "Téléverser plusieurs fichiers",
     uploadHint: "Sélectionnez plusieurs fichiers (Ctrl/Shift). Envoi par lots.",

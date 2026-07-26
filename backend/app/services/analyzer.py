@@ -123,6 +123,16 @@ def _analyze_standard_completeness(
 
 
 def _apply_rule(rule: RuleDef, *, by_cat: dict, corpus: str, lang: LanguageCode) -> RiskFinding | None:
+    only_if = (rule.logic_config or {}).get("only_if_category")
+    if only_if:
+        try:
+            needed = only_if if isinstance(only_if, DocumentCategory) else DocumentCategory(str(only_if))
+        except ValueError:
+            needed = None
+        if needed is not None and not by_cat.get(needed):
+            # Category absent → skip content checks (covered by a separate optional-missing rule).
+            return None
+
     if rule.requires_category:
         if not by_cat.get(rule.requires_category):
             return RiskFinding(
@@ -358,16 +368,16 @@ def analyze_project_documents(
                     LanguageCode.FR: "Aucun document téléversé",
                 }[lang],
                 description={
-                    LanguageCode.FA: "برای گزارش ریسک حداقل اسناد مناقصه و استاندارد لازم است.",
-                    LanguageCode.EN: "At least tender docs and standards are required.",
-                    LanguageCode.DE: "Mindestens Ausschreibung und Standards nötig.",
-                    LanguageCode.FR: "AO et normes au minimum requis.",
+                    LanguageCode.FA: "برای گزارش ریسک حداقل اسناد مناقصه کافی است؛ نقشه، زمان‌بندی و استاندارد اختیاری‌اند ولی کیفیت را بالا می‌برند.",
+                    LanguageCode.EN: "Tender documents are enough to run analysis; drawings, schedule, and standards are optional but improve quality.",
+                    LanguageCode.DE: "Ausschreibungsunterlagen reichen; Pläne, Terminplan und Standards sind optional.",
+                    LanguageCode.FR: "Les documents d'AO suffisent; plans, planning et normes sont optionnels.",
                 }[lang],
                 recommendation={
-                    LanguageCode.FA: "اسناد، نقشه، زمان‌بندی و استاندارد را بارگذاری کنید.",
-                    LanguageCode.EN: "Upload tender, drawings, schedule, and standards.",
-                    LanguageCode.DE: "Ausschreibung, Pläne, Terminplan, Standards hochladen.",
-                    LanguageCode.FR: "Téléverser AO, plans, planning et normes.",
+                    LanguageCode.FA: "حداقل اسناد مناقصه را بارگذاری کنید. برنامه زمان‌بندی در صورت نبود مانع تحلیل نیست.",
+                    LanguageCode.EN: "Upload at least tender docs. Missing schedule does not block analysis.",
+                    LanguageCode.DE: "Mindestens Ausschreibung hochladen. Fehlender Terminplan blockiert die Analyse nicht.",
+                    LanguageCode.FR: "Téléverser au moins l'AO. L'absence de planning ne bloque pas l'analyse.",
                 }[lang],
                 financial_impact="high",
                 schedule_impact="high",

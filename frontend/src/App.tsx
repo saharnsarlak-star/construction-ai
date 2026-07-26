@@ -13,11 +13,11 @@ import {
 import { countryOptions, languageOptions, projectTypeOptions, t } from "./i18n";
 import "./App.css";
 
-const uploadCategories: { key: DocumentCategory; labelKey: string }[] = [
+const uploadCategories: { key: DocumentCategory; labelKey: string; optional?: boolean }[] = [
   { key: "tender", labelKey: "tenderDocs" },
-  { key: "drawing", labelKey: "drawings" },
-  { key: "schedule", labelKey: "schedule" },
-  { key: "standard", labelKey: "standards" },
+  { key: "drawing", labelKey: "drawings", optional: true },
+  { key: "schedule", labelKey: "schedule", optional: true },
+  { key: "standard", labelKey: "standards", optional: true },
 ];
 
 function App() {
@@ -379,8 +379,15 @@ function App() {
             <div className="upload-grid">
               {uploadCategories.map((cat) => (
                 <article key={cat.key} className="upload-card">
-                  <h3>{t(uiLang, cat.labelKey)}</h3>
-                  <p className="muted upload-hint">{t(uiLang, "uploadHint")}</p>
+                  <h3>
+                    {t(uiLang, cat.labelKey)}
+                    {cat.optional ? (
+                      <span className="optional-badge"> {t(uiLang, "optional")}</span>
+                    ) : null}
+                  </h3>
+                  <p className="muted upload-hint">
+                    {cat.key === "schedule" ? t(uiLang, "scheduleOptionalHint") : t(uiLang, "uploadHint")}
+                  </p>
                   <label className={`file-btn${busy ? " disabled" : ""}`}>
                     {busy && uploadProgress?.category === cat.key
                       ? t(uiLang, "uploading")
