@@ -546,9 +546,34 @@ on conflict (code) do nothing;
 
 insert into public.project_types (code, name_en, name_fa, description) values
   ('residential', 'Residential', 'مسکونی', 'Housing and residential complexes'),
+  ('office', 'Office building', 'ساختمان اداری', 'Office and administrative buildings'),
+  ('commercial', 'Commercial', 'تجاری', 'Commercial buildings'),
+  ('mixed_use', 'Mixed-use', 'کاربری مختلط', 'Mixed-use developments'),
   ('hospital', 'Hospital / Healthcare', 'بیمارستان / درمانی', 'Hospitals and clinical facilities'),
-  ('industrial', 'Industrial', 'صنعتی', 'Plants, factories, warehouses'),
-  ('infrastructure', 'Infrastructure', 'زیرساخت', 'Roads, utilities, civil infrastructure')
+  ('educational', 'Educational', 'آموزشی', 'Schools, universities, campuses'),
+  ('hospitality', 'Hotel / Hospitality', 'هتل / گردشگری', 'Hotels and hospitality'),
+  ('industrial', 'Industrial', 'صنعتی', 'Plants, factories'),
+  ('warehouse', 'Warehouse / Logistics', 'انبار / لجستیک', 'Warehouses and logistics hubs'),
+  ('retail', 'Retail / Mall', 'فروشگاهی / مال', 'Retail and shopping centres'),
+  ('cultural', 'Cultural / Civic', 'فرهنگی / عمومی', 'Museums, civic and cultural'),
+  ('sports', 'Sports / Recreation', 'ورزشی / تفریحی', 'Stadiums and recreation'),
+  ('data_center', 'Data center', 'مرکز داده', 'Data centres'),
+  ('laboratory', 'Laboratory / Research', 'آزمایشگاه / تحقیقاتی', 'Labs and research facilities'),
+  ('infrastructure', 'Infrastructure', 'زیرساخت', 'General civil infrastructure'),
+  ('road_highway', 'Road / Highway', 'جاده‌ای / بزرگراه', 'Roads and highways'),
+  ('bridge', 'Bridge', 'پل', 'Bridges'),
+  ('tunnel', 'Tunnel', 'تونل', 'Tunnels'),
+  ('railway', 'Railway / Metro', 'راه‌آهن / مترو', 'Rail and metro'),
+  ('airport', 'Airport', 'فرودگاه', 'Airports'),
+  ('port_marine', 'Port / Marine', 'بندر / دریایی', 'Ports and marine works'),
+  ('dam_water', 'Dam / Hydraulic', 'سد / سازه آبی', 'Dams and hydraulic structures'),
+  ('water_wastewater', 'Water / Wastewater', 'آب و فاضلاب', 'Water and wastewater'),
+  ('power_energy', 'Power / Energy', 'نیروگاه / انرژی', 'Power and energy'),
+  ('oil_gas', 'Oil & Gas', 'نفت و گاز', 'Oil and gas facilities'),
+  ('telecom', 'Telecom', 'مخابرات', 'Telecom infrastructure'),
+  ('landscape_urban', 'Landscape / Urban', 'فضای شهری / محوطه‌سازی', 'Urban realm and landscape'),
+  ('renovation_fitout', 'Renovation / Fit-out', 'بازسازی / فیت‌اوت', 'Renovation and fit-out'),
+  ('other', 'Other', 'سایر', 'Other project types')
 on conflict (code) do nothing;
 
 insert into public.document_types (code, name_en, name_fa, sort_order, extraction_profile_key) values

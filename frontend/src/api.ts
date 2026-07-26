@@ -1,6 +1,35 @@
 export type LanguageCode = "fa" | "en" | "de" | "fr";
 export type CountryCode = "IR" | "DE" | "CA" | "EU";
-export type ProjectType = "residential" | "hospital" | "industrial" | "infrastructure";
+export type ProjectType =
+  | "residential"
+  | "office"
+  | "commercial"
+  | "mixed_use"
+  | "hospital"
+  | "educational"
+  | "hospitality"
+  | "industrial"
+  | "warehouse"
+  | "retail"
+  | "cultural"
+  | "sports"
+  | "data_center"
+  | "laboratory"
+  | "infrastructure"
+  | "road_highway"
+  | "bridge"
+  | "tunnel"
+  | "railway"
+  | "airport"
+  | "port_marine"
+  | "dam_water"
+  | "water_wastewater"
+  | "power_energy"
+  | "oil_gas"
+  | "telecom"
+  | "landscape_urban"
+  | "renovation_fitout"
+  | "other";
 export type DocumentCategory = "tender" | "drawing" | "schedule" | "standard";
 export type RiskSeverity = "high" | "medium" | "low";
 
@@ -63,7 +92,8 @@ export interface UploadBatchOut {
   errors: UploadErrorOut[];
 }
 
-const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+const API_BASE =
+  import.meta.env.VITE_API_BASE || "https://construction-ai-production-1d78.up.railway.app/api";
 
 /** Keep each request small so Railway/proxy do not time out on bulk uploads. */
 export const UPLOAD_CHUNK_SIZE = 4;

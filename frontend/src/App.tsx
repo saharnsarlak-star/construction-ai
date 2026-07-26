@@ -38,7 +38,7 @@ function App() {
 
   const [name, setName] = useState("");
   const [country, setCountry] = useState<CountryCode>("IR");
-  const [projectType, setProjectType] = useState<ProjectType>("infrastructure");
+  const [projectType, setProjectType] = useState<ProjectType>("office");
   const [reportLang, setReportLang] = useState<LanguageCode>("fa");
   const [description, setDescription] = useState("");
 

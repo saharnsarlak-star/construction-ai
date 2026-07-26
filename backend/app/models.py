@@ -33,10 +33,37 @@ class DocumentCategory(str, enum.Enum):
 
 
 class ProjectType(str, enum.Enum):
+    """International construction / infrastructure project categories."""
+
     RESIDENTIAL = "residential"
+    OFFICE = "office"
+    COMMERCIAL = "commercial"
+    MIXED_USE = "mixed_use"
     HOSPITAL = "hospital"
+    EDUCATIONAL = "educational"
+    HOSPITALITY = "hospitality"
     INDUSTRIAL = "industrial"
+    WAREHOUSE = "warehouse"
+    RETAIL = "retail"
+    CULTURAL = "cultural"
+    SPORTS = "sports"
+    DATA_CENTER = "data_center"
+    LABORATORY = "laboratory"
     INFRASTRUCTURE = "infrastructure"
+    ROAD_HIGHWAY = "road_highway"
+    BRIDGE = "bridge"
+    TUNNEL = "tunnel"
+    RAILWAY = "railway"
+    AIRPORT = "airport"
+    PORT_MARINE = "port_marine"
+    DAM_WATER = "dam_water"
+    WATER_WASTEWATER = "water_wastewater"
+    POWER_ENERGY = "power_energy"
+    OIL_GAS = "oil_gas"
+    TELECOM = "telecom"
+    LANDSCAPE_URBAN = "landscape_urban"
+    RENOVATION_FITOUT = "renovation_fitout"
+    OTHER = "other"
 
 
 class RiskSeverity(str, enum.Enum):

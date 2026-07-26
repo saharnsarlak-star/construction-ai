@@ -130,7 +130,7 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)) ->
 @router.post("/{project_id}/documents", response_model=UploadBatchOut)
 async def upload_documents(
     project_id: int,
-    category: DocumentCategory = Form(...),
+    category: Annotated[DocumentCategory, Form()],
     files: Annotated[list[UploadFile], File()],
     db: AsyncSession = Depends(get_db),
 ) -> UploadBatchOut:
