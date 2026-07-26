@@ -1,7 +1,9 @@
 from collections.abc import AsyncGenerator
+from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
@@ -10,17 +12,28 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(
-    settings.database_url,
-    echo=False,
-    # Supabase transaction pooler (PgBouncer) rejects asyncpg prepared statements.
-    connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-    }
-    if "postgresql" in settings.database_url
-    else {},
-)
+def _build_engine():
+    url = settings.database_url
+    is_postgres = "postgresql" in url
+    if is_postgres:
+        # Disable SQLAlchemy asyncpg dialect prepared-statement cache (PgBouncer-safe).
+        join = "&" if "?" in url else "?"
+        if "prepared_statement_cache_size=" not in url:
+            url = f"{url}{join}prepared_statement_cache_size=0"
+        return create_async_engine(
+            url,
+            echo=False,
+            poolclass=NullPool,
+            connect_args={
+                # Disable asyncpg's own statement cache for transaction-mode PgBouncer.
+                "statement_cache_size": 0,
+                "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4().hex}__",
+            },
+        )
+    return create_async_engine(url, echo=False)
+
+
+engine = _build_engine()
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
