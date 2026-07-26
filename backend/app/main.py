@@ -36,11 +36,14 @@ async def health() -> HealthOut:
 
 @app.get("/api/health/detail")
 async def health_detail() -> dict:
+    from app.services.extractor import ocr_status
+
     return {
         "status": "ok",
         "app": settings.app_name,
         "storage": storage_mode(),
         "database": "postgres" if "postgresql" in settings.database_url else "sqlite",
+        "ocr": ocr_status(),
     }
 
 

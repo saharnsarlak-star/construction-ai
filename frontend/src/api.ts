@@ -41,6 +41,10 @@ export interface DocumentOut {
   size_bytes: number;
   has_text: boolean;
   ocr_applied?: boolean;
+  extraction_phase?: string | null;
+  extraction_progress?: number | null;
+  extraction_message?: string | null;
+  needs_manual_review?: boolean;
   created_at: string;
 }
 

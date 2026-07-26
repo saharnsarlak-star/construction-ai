@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -28,6 +28,7 @@ from app.schemas import (
 )
 from app.services.analyzer import analyze_project_documents
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
+from app.services.extraction_jobs import process_document_extraction, queued_meta
 from app.services import storage as file_storage
 from app.services.project_standards import (
     ensure_project_standards,
@@ -40,8 +41,35 @@ from app.knowledge.standards_catalog import get_standard
 router = APIRouter(prefix="/projects", tags=["projects"])
 
 
+def _extraction_fields(doc: Document) -> dict:
+    phase = None
+    progress = None
+    message = None
+    needs_review = False
+    if doc.meta_json:
+        try:
+            meta = json.loads(doc.meta_json)
+            ex = meta.get("extraction") or {}
+            phase = ex.get("phase")
+            progress = ex.get("progressPercent")
+            message = ex.get("message")
+            needs_review = bool(ex.get("needsManualReview"))
+            if not needs_review:
+                pages = meta.get("pages") or []
+                needs_review = any(p.get("needsManualReview") for p in pages if isinstance(p, dict))
+        except json.JSONDecodeError:
+            pass
+    return {
+        "extraction_phase": phase,
+        "extraction_progress": progress,
+        "extraction_message": message,
+        "needs_manual_review": needs_review,
+    }
+
+
 def _doc_out(doc: Document) -> DocumentOut:
     text = doc.extracted_text or ""
+    extra = _extraction_fields(doc)
     return DocumentOut(
         id=doc.id,
         category=doc.category,
@@ -49,8 +77,11 @@ def _doc_out(doc: Document) -> DocumentOut:
         content_type=doc.content_type,
         size_bytes=doc.size_bytes,
         has_text=has_usable_text(text),
-        ocr_applied=text.lstrip().startswith("[OCR_APPLIED]"),
+        ocr_applied=text.lstrip().startswith("[OCR_APPLIED]")
+        or "(ocr" in text.lower()
+        or (extra.get("extraction_phase") == "completed" and "ocr" in (text[:200].lower())),
         created_at=doc.created_at,
+        **extra,
     )
 
 
@@ -227,11 +258,12 @@ async def upload_documents(
     project_id: int,
     category: Annotated[DocumentCategory, Form()],
     files: Annotated[list[UploadFile], File()],
+    background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> UploadBatchOut:
     """
-    Accept many files in one request. Failures are per-file (partial success).
-    Drawing uploads skip OCR so bulk plan packages do not time out.
+    Accept many files quickly. Text/OCR runs asynchronously via DocumentPipeline
+    so scanned PDFs and drawings do not block the upload request.
     """
     project = await _get_project(db, project_id)
     if not files:
@@ -240,10 +272,9 @@ async def upload_documents(
     max_bytes = (
         None if settings.max_upload_mb <= 0 else settings.max_upload_mb * 1024 * 1024
     )
-    # Skip OCR only for drawings (CAD/scan packages). Tender/schedule/standard always extract fully.
-    allow_ocr = category != DocumentCategory.DRAWING
     saved: list[Document] = []
     errors: list[UploadErrorOut] = []
+    extract_ids: list[int] = []
 
     for upload in files:
         name = upload.filename or "unnamed"
@@ -273,7 +304,14 @@ async def upload_documents(
                 data=data,
                 content_type=upload.content_type,
             )
-            text = extract_text_from_file(local_path, allow_ocr=allow_ocr)
+            # Fast path for tiny text files; PDFs/images go async OCR pipeline.
+            if suffix in {".txt", ".csv"}:
+                text = local_path.read_text(encoding="utf-8", errors="ignore")
+                meta = None
+            else:
+                text = ""
+                meta = queued_meta()
+
             doc = Document(
                 project_id=project.id,
                 category=category,
@@ -282,6 +320,7 @@ async def upload_documents(
                 content_type=upload.content_type,
                 size_bytes=size,
                 extracted_text=text,
+                meta_json=meta,
             )
             db.add(doc)
             saved.append(doc)
@@ -302,6 +341,12 @@ async def upload_documents(
     await db.commit()
     for doc in saved:
         await db.refresh(doc)
+        if doc.meta_json and '"queued"' in doc.meta_json:
+            extract_ids.append(doc.id)
+
+    for doc_id in extract_ids:
+        background_tasks.add_task(process_document_extraction, doc_id)
+
     return UploadBatchOut(documents=[_doc_out(d) for d in saved], errors=errors)
 
 
@@ -436,24 +481,23 @@ async def bulk_delete_documents(
 
 @router.post("/{project_id}/documents/{document_id}/reextract", response_model=DocumentOut)
 async def reextract_document(
-    project_id: int, document_id: int, db: AsyncSession = Depends(get_db)
+    project_id: int,
+    document_id: int,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db),
 ) -> DocumentOut:
-    """Re-run text/OCR extraction on an already stored file."""
+    """Queue full detect→OCR→merge pipeline again for one document."""
     result = await db.execute(
         select(Document).where(Document.id == document_id, Document.project_id == project_id)
     )
     doc = result.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
-    try:
-        path = await file_storage.open_for_read(doc.stored_path)
-    except file_storage.StorageError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
-    doc.extracted_text = extract_text_from_file(
-        path, allow_ocr=doc.category != DocumentCategory.DRAWING
-    )
+    doc.meta_json = queued_meta()
+    doc.extracted_text = ""
     await db.commit()
     await db.refresh(doc)
+    background_tasks.add_task(process_document_extraction, doc.id)
     return _doc_out(doc)
 
 

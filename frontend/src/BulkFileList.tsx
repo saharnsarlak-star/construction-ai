@@ -240,7 +240,15 @@ export function BulkFileList({
                 <div className="file-meta">
                   <span title={d.original_name}>{d.original_name}</span>
                   <small className={textOk ? "tag ok" : "tag warn"}>
-                    {d.has_text ? t(uiLang, "textOk") : t(uiLang, "textMissing")}
+                    {d.extraction_phase &&
+                    d.extraction_phase !== "completed" &&
+                    d.extraction_phase !== "failed"
+                      ? `${t(uiLang, "extracting")} ${d.extraction_progress ?? 0}%`
+                      : d.needs_manual_review
+                        ? t(uiLang, "needsReview")
+                        : d.has_text
+                          ? t(uiLang, "textOk")
+                          : t(uiLang, "textMissing")}
                     {d.ocr_applied ? ` · ${t(uiLang, "ocrUsed")}` : ""}
                   </small>
                 </div>

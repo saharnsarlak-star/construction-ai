@@ -32,6 +32,10 @@ class DocumentOut(BaseModel):
     size_bytes: int
     has_text: bool
     ocr_applied: bool = False
+    extraction_phase: str | None = None
+    extraction_progress: int | None = None
+    extraction_message: str | None = None
+    needs_manual_review: bool = False
     created_at: datetime
 
     model_config = {"from_attributes": True}

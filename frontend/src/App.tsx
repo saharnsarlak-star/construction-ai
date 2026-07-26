@@ -93,6 +93,20 @@ function App() {
     void loadProject(selectedId);
   }, [selectedId]);
 
+  // Poll while any document is still in the OCR/extraction pipeline.
+  useEffect(() => {
+    if (!project) return;
+    const busyDocs = project.documents.some((d) => {
+      const phase = d.extraction_phase;
+      return phase && phase !== "completed" && phase !== "failed";
+    });
+    if (!busyDocs) return;
+    const timer = window.setInterval(() => {
+      void loadProject(project.id);
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [project]);
+
   async function refreshProjects() {
     try {
       const list = await api.listProjects();
