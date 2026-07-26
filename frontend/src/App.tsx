@@ -100,8 +100,7 @@ function App() {
 
   async function toggleStandard(code: string, next: boolean) {
     if (!project) return;
-    // Optimistic UI — do not freeze the whole page with global busy.
-    const previous = projectStandards;
+    // Optimistic + merge — never replace whole list (avoids reorder "hang" feel).
     setProjectStandards((rows) =>
       rows.map((s) =>
         s.standard_code === code
@@ -113,9 +112,23 @@ function App() {
       const updated = await api.updateProjectStandards(project.id, [
         { standard_code: code, is_selected: next },
       ]);
-      setProjectStandards(updated);
+      if (updated.length) {
+        const byCode = new Map(updated.map((u) => [u.standard_code, u]));
+        setProjectStandards((rows) =>
+          rows.map((s) => {
+            const u = byCode.get(s.standard_code);
+            return u ? { ...s, ...u } : s;
+          }),
+        );
+      }
     } catch (e) {
-      setProjectStandards(previous);
+      setProjectStandards((rows) =>
+        rows.map((s) =>
+          s.standard_code === code
+            ? { ...s, is_selected: !next }
+            : s,
+        ),
+      );
       setError(String(e));
     }
   }

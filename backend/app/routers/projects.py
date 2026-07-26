@@ -27,9 +27,9 @@ from app.services.analyzer import analyze_project_documents
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
 from app.services import storage as file_storage
 from app.services.project_standards import (
-    apply_user_standard_selection,
     ensure_project_standards,
     list_or_seed_project_standards,
+    toggle_one_standard,
 )
 from app.knowledge.country_profiles import get_country_profile
 from app.knowledge.standards_catalog import get_standard
@@ -166,7 +166,7 @@ def _standard_out(row: ProjectStandard) -> ProjectStandardOut:
 async def list_project_standards(
     project_id: int, db: AsyncSession = Depends(get_db)
 ) -> list[ProjectStandardOut]:
-    project = await _get_project(db, project_id)
+    project = await _get_project_meta(db, project_id)
     rows = await list_or_seed_project_standards(db, project, lang=project.ui_language.value)
     rows_sorted = sorted(
         rows,
@@ -185,16 +185,38 @@ async def update_project_standards(
     payload: ProjectStandardsUpdate,
     db: AsyncSession = Depends(get_db),
 ) -> list[ProjectStandardOut]:
-    project = await _get_project(db, project_id)
-    updates = [(item.standard_code, item.is_selected) for item in payload.items]
-    rows = await apply_user_standard_selection(
-        db, project, updates, lang=project.ui_language.value
-    )
-    rows_sorted = sorted(
-        rows,
-        key=lambda r: (0 if r.is_selected else 1, r.standard_code),
-    )
-    return [_standard_out(r) for r in rows_sorted]
+    """Fast path: toggle without loading project documents (avoids multi-second hangs)."""
+    await _get_project_meta(db, project_id)
+    # Prefer single-item toggle path used by the UI
+    if len(payload.items) == 1:
+        item = payload.items[0]
+        row = await toggle_one_standard(
+            db,
+            project_id=project_id,
+            standard_code=item.standard_code,
+            is_selected=item.is_selected,
+        )
+        if row is not None:
+            return [_standard_out(row)]
+    # Fallback: seed then toggle
+    project = await _get_project_meta(db, project_id)
+    rows = await list_or_seed_project_standards(db, project, lang=project.ui_language.value)
+    by_code = {r.standard_code: r for r in rows}
+    for item in payload.items:
+        row = by_code.get(item.standard_code)
+        if row is None:
+            continue
+        row.is_selected = item.is_selected
+        row.selected_by = "user_override"
+    await db.commit()
+    # Return only updated rows so the client can merge without reshuffling the whole list
+    out = []
+    for item in payload.items:
+        row = by_code.get(item.standard_code)
+        if row is not None:
+            await db.refresh(row)
+            out.append(_standard_out(row))
+    return out
 
 
 @router.post("/{project_id}/documents", response_model=UploadBatchOut)
@@ -428,6 +450,15 @@ async def _get_project(db: AsyncSession, project_id: int) -> Project:
     result = await db.execute(
         select(Project).options(selectinload(Project.documents)).where(Project.id == project_id)
     )
+    project = result.scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+async def _get_project_meta(db: AsyncSession, project_id: int) -> Project:
+    """Project row only — do not load documents (extracted_text can be huge)."""
+    result = await db.execute(select(Project).where(Project.id == project_id))
     project = result.scalar_one_or_none()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")

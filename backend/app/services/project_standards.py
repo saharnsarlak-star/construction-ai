@@ -51,7 +51,6 @@ async def ensure_project_standards(db: AsyncSession, project: Project, *, lang: 
             existing[standard.code] = row
             dirty = True
             continue
-        # Refresh metadata only when changed
         if (
             row.applicability_level != level
             or row.standard_class != standard.standard_class
@@ -79,11 +78,14 @@ async def ensure_project_standards(db: AsyncSession, project: Project, *, lang: 
 async def list_or_seed_project_standards(
     db: AsyncSession, project: Project, *, lang: str = "fa"
 ) -> list[ProjectStandard]:
-    """Fast path: return existing rows; seed only when empty."""
+    """Return rows; seed missing catalog codes without forcing a full wipe."""
     rows = await _fetch_rows(db, project.id)
-    if rows:
-        return rows
-    return await ensure_project_standards(db, project, lang=lang)
+    country = project.country if isinstance(project.country, CountryCode) else CountryCode(str(project.country))
+    plan = default_selection_plan(country, project.project_type or "infrastructure")
+    existing = {r.standard_code for r in rows}
+    if not rows or any(s.code not in existing for s, _, _ in plan):
+        return await ensure_project_standards(db, project, lang=lang)
+    return rows
 
 
 async def apply_user_standard_selection(
@@ -93,7 +95,7 @@ async def apply_user_standard_selection(
     *,
     lang: str = "fa",
 ) -> list[ProjectStandard]:
-    """Lightweight toggle — no full catalog resync on every click."""
+    """Lightweight toggle — update only requested rows, one commit."""
     result = await db.execute(select(ProjectStandard).where(ProjectStandard.project_id == project.id))
     by_code = {row.standard_code: row for row in result.scalars().all()}
     if not by_code:
@@ -123,4 +125,29 @@ async def apply_user_standard_selection(
             row.selected_by = "user_override"
 
     await db.commit()
+    # Return only touched codes' current state is enough for API; keep full list for compatibility
     return await _fetch_rows(db, project.id)
+
+
+async def toggle_one_standard(
+    db: AsyncSession,
+    *,
+    project_id: int,
+    standard_code: str,
+    is_selected: bool,
+) -> ProjectStandard | None:
+    """Minimal path for a single checkbox — no document loading, no full resync."""
+    result = await db.execute(
+        select(ProjectStandard).where(
+            ProjectStandard.project_id == project_id,
+            ProjectStandard.standard_code == standard_code,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+    row.is_selected = is_selected
+    row.selected_by = "user_override"
+    await db.commit()
+    await db.refresh(row)
+    return row
