@@ -27,7 +27,7 @@ from app.schemas import (
     UploadErrorOut,
 )
 from app.services.analyzer import analyze_project_documents
-from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text, ocr_status
+from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
 from app.services import storage as file_storage
 from app.services.project_standards import (
     ensure_project_standards,
