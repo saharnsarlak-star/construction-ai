@@ -395,13 +395,17 @@ async def analyze_project(
 
     analysis = Analysis(
         project_id=project.id,
-        status="completed",
+        status=result.get("analysis_status") or "completed",
         summary=result["summary"],
         report_language=report_language,
         result_json=json.dumps(
             {
                 "readiness_score": result["readiness_score"],
                 "counts": result["counts"],
+                "counts_risk": result.get("counts_risk") or result["counts"],
+                "aggregate_risk_score": result.get("aggregate_risk_score"),
+                "documents_with_limitations": result.get("documents_with_limitations"),
+                "text_extraction_success_rate": result.get("text_extraction_success_rate"),
                 "engine": result.get("engine"),
             },
             ensure_ascii=False,
@@ -410,7 +414,11 @@ async def analyze_project(
     db.add(analysis)
     await db.flush()
 
+    seen_codes: set[str] = set()
     for item in result["findings"]:
+        if item.code in seen_codes:
+            continue
+        seen_codes.add(item.code)
         db.add(
             Finding(
                 analysis_id=analysis.id,
@@ -423,6 +431,14 @@ async def analyze_project(
                 financial_impact=item.financial_impact,
                 schedule_impact=item.schedule_impact,
                 evidence=item.evidence,
+                finding_category=getattr(item, "finding_category", None) or "risk",
+                risk_score=getattr(item, "risk_score", None),
+                source_excerpt=getattr(item, "source_excerpt", None) or item.evidence,
+                cause_effect_json=json.dumps(
+                    getattr(item, "cause_effect_chain", None) or [], ensure_ascii=False
+                ),
+                data_completeness_caveat=getattr(item, "data_completeness_caveat", None),
+                estimated_impact=getattr(item, "estimated_impact", None),
             )
         )
 
@@ -475,6 +491,47 @@ async def _analysis_out(db: AsyncSession, analysis_id: int) -> AnalysisOut:
 
 def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
     payload = json.loads(analysis.result_json or "{}")
+    findings_out: list[FindingOut] = []
+    seen_ids: set[int] = set()
+    for f in analysis.findings:
+        if f.id in seen_ids:
+            continue
+        seen_ids.add(f.id)
+        chain: list[str] = []
+        raw_chain = getattr(f, "cause_effect_json", None)
+        if raw_chain:
+            try:
+                parsed = json.loads(raw_chain)
+                if isinstance(parsed, list):
+                    chain = [str(x) for x in parsed]
+            except json.JSONDecodeError:
+                chain = []
+        findings_out.append(
+            FindingOut(
+                id=f.id,
+                code=f.code,
+                category=f.category,
+                severity=f.severity,
+                title=f.title,
+                description=f.description,
+                recommendation=f.recommendation,
+                financial_impact=f.financial_impact,
+                schedule_impact=f.schedule_impact,
+                evidence=f.evidence,
+                finding_category=getattr(f, "finding_category", None) or "risk",
+                risk_score=getattr(f, "risk_score", None),
+                source_excerpt=getattr(f, "source_excerpt", None),
+                cause_effect_chain=chain,
+                data_completeness_caveat=getattr(f, "data_completeness_caveat", None),
+                estimated_impact=getattr(f, "estimated_impact", None),
+            )
+        )
+    counts = payload.get("counts_risk") or payload.get("counts") or {
+        "high": 0,
+        "medium": 0,
+        "low": 0,
+        "total": 0,
+    }
     return AnalysisOut(
         id=analysis.id,
         project_id=analysis.project_id,
@@ -482,7 +539,11 @@ def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
         summary=analysis.summary,
         report_language=analysis.report_language,
         readiness_score=payload.get("readiness_score", 0),
-        counts=payload.get("counts", {"high": 0, "medium": 0, "low": 0, "total": 0}),
-        findings=[FindingOut.model_validate(f) for f in analysis.findings],
+        counts=counts,
+        counts_risk=counts,
+        aggregate_risk_score=payload.get("aggregate_risk_score"),
+        documents_with_limitations=payload.get("documents_with_limitations"),
+        text_extraction_success_rate=payload.get("text_extraction_success_rate"),
+        findings=findings_out,
         created_at=analysis.created_at,
     )

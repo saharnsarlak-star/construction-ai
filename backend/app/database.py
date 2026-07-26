@@ -69,6 +69,18 @@ async def init_db() -> None:
                     "WHERE project_type IS NULL"
                 )
             )
+            for stmt in (
+                "ALTER TABLE findings ADD COLUMN IF NOT EXISTS finding_category VARCHAR(32) DEFAULT 'risk'",
+                "ALTER TABLE findings ADD COLUMN IF NOT EXISTS risk_score INTEGER",
+                "ALTER TABLE findings ADD COLUMN IF NOT EXISTS source_excerpt TEXT",
+                "ALTER TABLE findings ADD COLUMN IF NOT EXISTS cause_effect_json TEXT",
+                "ALTER TABLE findings ADD COLUMN IF NOT EXISTS data_completeness_caveat TEXT",
+                "ALTER TABLE findings ADD COLUMN IF NOT EXISTS estimated_impact VARCHAR(512)",
+            ):
+                try:
+                    await conn.execute(text(stmt))
+                except Exception:
+                    pass
     except Exception as exc:  # noqa: BLE001
         print(f"[init_db] alter warning: {exc}")
 

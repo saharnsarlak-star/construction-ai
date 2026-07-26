@@ -180,5 +180,11 @@ class Finding(Base):
     financial_impact: Mapped[str | None] = mapped_column(String(255), nullable=True)
     schedule_impact: Mapped[str | None] = mapped_column(String(255), nullable=True)
     evidence: Mapped[str | None] = mapped_column(Text, nullable=True)
+    finding_category: Mapped[str | None] = mapped_column(String(32), nullable=True, default="risk")
+    risk_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_excerpt: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cause_effect_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    data_completeness_caveat: Mapped[str | None] = mapped_column(Text, nullable=True)
+    estimated_impact: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
     analysis: Mapped["Analysis"] = relationship(back_populates="findings")

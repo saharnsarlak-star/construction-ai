@@ -68,6 +68,12 @@ export interface FindingOut {
   financial_impact: string | null;
   schedule_impact: string | null;
   evidence: string | null;
+  finding_category?: "risk" | "limitation" | "methodology";
+  risk_score?: number | null;
+  source_excerpt?: string | null;
+  cause_effect_chain?: string[];
+  data_completeness_caveat?: string | null;
+  estimated_impact?: string | null;
 }
 
 export interface AnalysisOut {
@@ -78,6 +84,10 @@ export interface AnalysisOut {
   report_language: LanguageCode;
   readiness_score: number;
   counts: Record<string, number>;
+  counts_risk?: Record<string, number>;
+  aggregate_risk_score?: number | null;
+  documents_with_limitations?: number | null;
+  text_extraction_success_rate?: number | null;
   findings: FindingOut[];
   created_at: string;
 }

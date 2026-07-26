@@ -410,6 +410,98 @@ button:disabled {
   gap: 0.8rem;
 }
 
+.limitation-banners {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 1.2rem;
+}
+
+.limitation-banner {
+  border-radius: 14px;
+  padding: 0.9rem 1rem;
+  background: rgba(180, 120, 20, 0.12);
+  border: 1px solid rgba(180, 120, 20, 0.35);
+  color: #6a4a10;
+}
+
+.limitation-banner p {
+  margin: 0.35rem 0 0;
+}
+
+.blocked-note {
+  color: var(--high);
+  font-weight: 600;
+}
+
+.source-excerpt {
+  margin: 0.6rem 0;
+  padding: 0.65rem 0.8rem;
+  border-inline-start: 3px solid var(--brand);
+  background: rgba(15, 92, 110, 0.06);
+  font-size: 0.92rem;
+}
+
+.cause-chain {
+  margin: 0.7rem 0;
+}
+
+.cause-chain .chain-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--muted, #5a6b73);
+}
+
+.cause-chain ol {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+}
+
+.cause-chain li {
+  background: rgba(15, 92, 110, 0.08);
+  border-radius: 999px;
+  padding: 0.25rem 0.65rem;
+  font-size: 0.82rem;
+}
+
+.cause-chain li:not(:last-child)::after {
+  content: "→";
+  margin-inline-start: 0.45rem;
+  opacity: 0.7;
+}
+
+.score-badge {
+  min-width: 2.4rem;
+  justify-content: center;
+}
+
+.caveat {
+  margin-top: 0.5rem;
+  font-size: 0.85rem;
+  color: #8a5a10;
+}
+
+.methodology-footer {
+  margin-top: 1.2rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px dashed var(--line);
+}
+
+.methodology-item {
+  margin-top: 0.55rem;
+}
+
+.methodology-item p {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+}
+
 .finding {
   border-radius: 14px;
   padding: 0.95rem 1rem;

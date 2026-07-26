@@ -567,38 +567,119 @@ function App() {
                   <div>
                     <h2>{t(uiLang, "summary")}</h2>
                     <p>{analysis.summary}</p>
+                    {analysis.status === "blocked" && (
+                      <p className="blocked-note">{t(uiLang, "analysisBlocked")}</p>
+                    )}
                   </div>
                   <div className="score">
                     <span>{t(uiLang, "readiness")}</span>
                     <strong>{analysis.readiness_score}%</strong>
                     <small>
-                      {t(uiLang, "high")}: {analysis.counts.high || 0} · {t(uiLang, "medium")}:{" "}
-                      {analysis.counts.medium || 0} · {t(uiLang, "low")}: {analysis.counts.low || 0}
+                      {t(uiLang, "realRisks")}: {t(uiLang, "high")}{" "}
+                      {(analysis.counts_risk || analysis.counts).high || 0} · {t(uiLang, "medium")}{" "}
+                      {(analysis.counts_risk || analysis.counts).medium || 0} · {t(uiLang, "low")}{" "}
+                      {(analysis.counts_risk || analysis.counts).low || 0}
                     </small>
+                    {analysis.aggregate_risk_score != null && (
+                      <small>
+                        {t(uiLang, "avgRiskScore")}: {analysis.aggregate_risk_score}
+                      </small>
+                    )}
+                    {analysis.documents_with_limitations != null && (
+                      <small>
+                        {t(uiLang, "docsLimited")}: {analysis.documents_with_limitations}
+                      </small>
+                    )}
                   </div>
                 </div>
 
-                <h2>{t(uiLang, "findings")}</h2>
-                <div className="findings">
-                  {analysis.findings.map((f) => (
-                    <article key={f.id} className={`finding sev-${f.severity}`}>
-                      <header>
-                        <span className="badge">{t(uiLang, f.severity)}</span>
-                        <code>{f.code}</code>
-                      </header>
-                      <h3>{f.title}</h3>
-                      <p>{f.description}</p>
-                      <p>
-                        <strong>{t(uiLang, "recommendation")}:</strong> {f.recommendation}
-                      </p>
-                      {f.evidence && (
-                        <p className="evidence">
-                          <strong>{t(uiLang, "evidence")}:</strong> {f.evidence}
-                        </p>
+                {(() => {
+                  const unique = new Map<number, (typeof analysis.findings)[0]>();
+                  for (const f of analysis.findings) unique.set(f.id, f);
+                  const all = [...unique.values()];
+                  const limitations = all.filter((f) => (f.finding_category || "risk") === "limitation");
+                  const risks = all.filter((f) => (f.finding_category || "risk") === "risk");
+                  const methodology = all.filter((f) => f.finding_category === "methodology");
+                  return (
+                    <>
+                      {limitations.length > 0 && (
+                        <div className="limitation-banners">
+                          {limitations.map((f) => (
+                            <aside key={f.id} className="limitation-banner">
+                              <strong>{f.title}</strong>
+                              <p>{f.description}</p>
+                              <p>
+                                <em>{f.recommendation}</em>
+                              </p>
+                            </aside>
+                          ))}
+                        </div>
                       )}
-                    </article>
-                  ))}
-                </div>
+
+                      <h2>{t(uiLang, "findings")}</h2>
+                      {risks.length === 0 ? (
+                        <p className="muted">
+                          {analysis.status === "blocked"
+                            ? t(uiLang, "noRisksBlocked")
+                            : t(uiLang, "noRealRisks")}
+                        </p>
+                      ) : (
+                        <div className="findings">
+                          {risks.map((f) => (
+                            <article key={f.id} className={`finding sev-${f.severity} finding-risk`}>
+                              <header>
+                                <span className="badge score-badge">
+                                  {f.risk_score != null ? f.risk_score : "—"}
+                                </span>
+                                <span className="badge">{t(uiLang, f.severity)}</span>
+                              </header>
+                              <h3>{f.title}</h3>
+                              <p>{f.description}</p>
+                              {(f.source_excerpt || f.evidence) && (
+                                <blockquote className="source-excerpt">
+                                  {f.source_excerpt || f.evidence}
+                                </blockquote>
+                              )}
+                              {f.cause_effect_chain && f.cause_effect_chain.length > 0 && (
+                                <div className="cause-chain">
+                                  <span className="chain-label">{t(uiLang, "causeEffect")}</span>
+                                  <ol>
+                                    {f.cause_effect_chain.map((step, i) => (
+                                      <li key={`${f.id}-c-${i}`}>{step}</li>
+                                    ))}
+                                  </ol>
+                                </div>
+                              )}
+                              <p>
+                                <strong>{t(uiLang, "recommendation")}:</strong> {f.recommendation}
+                              </p>
+                              {f.estimated_impact && (
+                                <p className="muted">
+                                  <strong>{t(uiLang, "estimatedImpact")}:</strong> {f.estimated_impact}
+                                </p>
+                              )}
+                              {f.data_completeness_caveat && (
+                                <p className="caveat">{f.data_completeness_caveat}</p>
+                              )}
+                            </article>
+                          ))}
+                        </div>
+                      )}
+
+                      {methodology.length > 0 && (
+                        <details className="methodology-footer">
+                          <summary>{t(uiLang, "methodologyFooter")}</summary>
+                          {methodology.map((f) => (
+                            <div key={f.id} className="methodology-item">
+                              <strong>{f.title}</strong>
+                              <p>{f.description}</p>
+                            </div>
+                          ))}
+                        </details>
+                      )}
+                    </>
+                  );
+                })()}
                 <p className="disclaimer">{t(uiLang, "disclaimer")}</p>
               </div>
             )}

@@ -1,7 +1,10 @@
+"""Tender risk analysis engine — gated extraction, semantic standards, 3-tier findings."""
+
 from __future__ import annotations
 
+import json
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from app.knowledge.country_profiles import get_country_profile, profile_snapshot
 from app.knowledge.document_templates import resolve_document_template
@@ -11,11 +14,16 @@ from app.knowledge.standards_catalog import get_standard
 from app.models import CountryCode, DocumentCategory, LanguageCode, ProjectType, RiskSeverity
 from app.services.extractor import has_usable_text
 
+# Below this success rate → block full analysis (no confident risk claims).
+_EXTRACTION_HARD_GATE = 0.50
+# Between hard gate and this → proceed with caveats.
+_EXTRACTION_SOFT_GATE = 0.90
+
 
 @dataclass
 class RiskFinding:
     code: str
-    category: str
+    category: str  # thematic: scope, compliance, …
     severity: RiskSeverity
     title: str
     description: str
@@ -23,16 +31,12 @@ class RiskFinding:
     financial_impact: str | None = None
     schedule_impact: str | None = None
     evidence: str | None = None
-
-
-TRANSLATIONS: dict[str, dict[LanguageCode, str]] = {
-    "summary_template": {
-        LanguageCode.FA: "آمادگی اسناد: {score}٪. {high} ریسک بالا، {medium} متوسط، {low} پایین. پروفایل: {profile}. مخاطب: کارفرما.",
-        LanguageCode.EN: "Document readiness: {score}%. {high} high, {medium} medium, {low} low risks. Profile: {profile}. Audience: Employer.",
-        LanguageCode.DE: "Dokumentenbereitschaft: {score}%. {high} hoch, {medium} mittel, {low} niedrig. Profil: {profile}. Zielgruppe: Auftraggeber.",
-        LanguageCode.FR: "Niveau de préparation: {score}%. {high} élevé(s), {medium} moyen(s), {low} faible(s). Profil: {profile}. Public: Maître d'ouvrage.",
-    },
-}
+    finding_category: str = "risk"  # risk | limitation | methodology
+    risk_score: int | None = None
+    source_excerpt: str | None = None
+    cause_effect_chain: list[str] = field(default_factory=list)
+    data_completeness_caveat: str | None = None
+    estimated_impact: str | None = None
 
 
 def _lang(map_: dict[LanguageCode, str], lang: LanguageCode) -> str:
@@ -44,86 +48,304 @@ def _contains_any(text: str, keywords: list[str]) -> bool:
     return any(k.lower() in lower for k in keywords)
 
 
-_COMPLETE_STD_MARKERS = [
-    "shall",
-    "must",
-    "required",
-    "باید",
-    "الزام",
-    "اجباری",
-    "ماده",
-    "بند",
-    "clause",
-    "section",
-    "pflicht",
-    "obligatoire",
-    "norm",
-    "استاندارد",
-    "specification",
-    "مشخصات",
-    "VOB",
-    "DIN",
-    "CCDC",
-    "NBC",
-]
+def _severity_from_score(score: int) -> RiskSeverity:
+    if score >= 70:
+        return RiskSeverity.HIGH
+    if score >= 40:
+        return RiskSeverity.MEDIUM
+    return RiskSeverity.LOW
 
 
-def _analyze_standard_completeness(
+def _with_score(finding: RiskFinding, score: int | None) -> RiskFinding:
+    if score is None:
+        return finding
+    finding.risk_score = max(0, min(100, score))
+    if finding.finding_category == "risk":
+        finding.severity = _severity_from_score(finding.risk_score)
+    return finding
+
+
+def _extraction_stats(documents: list[dict]) -> dict:
+    total = len(documents)
+    readable = [d for d in documents if has_usable_text(d.get("extracted_text") or "")]
+    failed = [d for d in documents if not has_usable_text(d.get("extracted_text") or "")]
+    rate = (len(readable) / total) if total else 0.0
+    # Drawings often have no text — weight tender/schedule/standard more for gate
+    critical = [
+        d
+        for d in documents
+        if d.get("category")
+        in {DocumentCategory.TENDER, DocumentCategory.SCHEDULE, DocumentCategory.STANDARD}
+        or str(d.get("category")) in {"tender", "schedule", "standard"}
+    ]
+    if critical:
+        crit_ok = sum(1 for d in critical if has_usable_text(d.get("extracted_text") or ""))
+        critical_rate = crit_ok / len(critical)
+        # Gate uses max of overall and critical (tender-heavy) so all-drawing packages don't false-block
+        # if tender is readable; but if tender failed, critical_rate drops.
+        gate_rate = min(rate, critical_rate) if critical else rate
+    else:
+        gate_rate = rate
+    return {
+        "total": total,
+        "readable_count": len(readable),
+        "failed_count": len(failed),
+        "failed_names": [d.get("original_name") or "unnamed" for d in failed],
+        "readable_names": [d.get("original_name") or "unnamed" for d in readable],
+        "success_rate": rate,
+        "gate_rate": gate_rate,
+    }
+
+
+# Subject-matter topics for semantic coverage (NOT standard title strings).
+_TOPIC_KEYWORDS: dict[str, list[str]] = {
+    "fire": ["حریق", "آتش", "اطفا", "خروج اضطراری", "fire", "sprinkler", "evacuation", "Brandschutz"],
+    "electrical": ["برق", "الکتریکال", "تابلو", "کابل", "روشنایی", "electrical", "voltage", "panel", "Elektro"],
+    "mechanical": ["مکانیک", "تهویه", "HVAC", "چیلر", "دیگ", "mechanical", "ventilation", "heating"],
+    "plumbing": ["لوله", "فاضلاب", "آبرسانی", "بهداشتی", "plumbing", "sanitary", "drainage", "آبگرم"],
+    "structure_concrete": ["بتن", "آرمه", "مقاومت فشاری", "concrete", "rebar", "cover", "Beton"],
+    "structure_steel": ["فولاد", "سازه فولادی", "اتصالات", "steel", "welding", "Stahlbau"],
+    "foundation": ["پی", "فونداسیون", "ژئوتکنیک", "foundation", "pile", "soil", "Gründung"],
+    "loads": ["بار", "زلزله", "باد", "بار زنده", "seismic", "load", "dead load", "Last"],
+    "energy": ["انرژی", "عایق حرارتی", "مصرف انرژی", "energy", "insulation", "U-value"],
+    "gas": ["گاز", "لوله گاز", "gas piping", "Gasleitung"],
+    "elevator": ["آسانسور", "پله برقی", "elevator", "lift", "escalator"],
+    "safety_site": ["ایمنی کارگاه", "HSE", "حفاظت کار", "safety", "PPE", "Arbeitsschutz"],
+    "acoustic": ["صدا", "عایق صوتی", "acoustic", "Schallschutz"],
+    "boq_building": ["فهرست بها", "ابنیه", "متره", "ردیف", "برآورد", "quantity", "unit price"],
+    "boq_elec": ["فهرست بها", "تأسیسات برقی", "ردیف برقی"],
+    "boq_mech": ["فهرست بها", "تأسیسات مکانیکی", "ردیف مکانیکی"],
+    "contract_general": ["شرایط عمومی", "کارفرما", "پیمانکار", "تعهدات", "VOB", "CCDC", "FIDIC", "clause"],
+    "payment": ["پرداخت", "صورت وضعیت", "پیش پرداخت", "retention", "payment", "holdback"],
+    "claims": ["ادعا", "تغییر مقادیر", "دستور کار", "claim", "variation", "change order", "Nachtrag"],
+    "schedule": ["برنامه زمان", "مایلستون", "مدت پیمان", "schedule", "programme", "milestone", "completion"],
+    "scope": ["شرح کار", "محدوده کار", "scope", "Leistungsbeschreibung"],
+}
+
+
+def _topics_for_standard(code: str, title: str, sclass: str) -> list[str]:
+    """Map a catalog standard to subject topics (semantic), not its literal name."""
+    c = (code or "").upper()
+    t = (title or "").lower()
+    topics: list[str] = []
+
+    if sclass == "contractual" or "GENERAL_CONDITIONS" in c or "VOB" in c or "CCDC" in c or "FIDIC" in c:
+        topics.extend(["contract_general", "payment", "claims"])
+    if "NBR_03" in c or "حریق" in t or "fire" in t:
+        topics.append("fire")
+    if "NBR_13" in c or "برقی" in t or "electrical" in t:
+        topics.append("electrical")
+    if "NBR_14" in c or "مکانیک" in t:
+        topics.append("mechanical")
+    if "NBR_16" in c or "بهداشت" in t or "plumbing" in t:
+        topics.append("plumbing")
+    if "NBR_09" in c or "بتن" in t:
+        topics.append("structure_concrete")
+    if "NBR_10" in c or "فولاد" in t:
+        topics.append("structure_steel")
+    if "NBR_07" in c or "پی" in t:
+        topics.append("foundation")
+    if "NBR_06" in c or "بار" in t:
+        topics.append("loads")
+    if "NBR_19" in c or "انرژی" in t:
+        topics.append("energy")
+    if "NBR_17" in c or "گاز" in t:
+        topics.append("gas")
+    if "NBR_15" in c or "آسانسور" in t:
+        topics.append("elevator")
+    if "NBR_12" in c or "HSE" in c or "ایمنی" in t:
+        topics.append("safety_site")
+    if "NBR_18" in c or "صدا" in t:
+        topics.append("acoustic")
+    if "FEHREST_ABNIEH" in c or ("فهرست" in t and "ابنیه" in t):
+        topics.append("boq_building")
+    if "FEHREST_TAASISAT_BARGH" in c:
+        topics.append("boq_elec")
+    if "FEHREST_TAASISAT_MECHANIC" in c:
+        topics.append("boq_mech")
+    if "FEHREST" in c and not topics:
+        topics.append("boq_building")
+    if "DIN_1045" in c:
+        topics.append("structure_concrete")
+    if "NBC" in c:
+        topics.extend(["structure_concrete", "fire", "loads"])
+    if not topics:
+        # Generic technical: look for any engineering substance markers
+        topics.append("scope")
+    return list(dict.fromkeys(topics))
+
+
+def _corpus_covers_topic(corpus: str, topic: str) -> bool:
+    kws = _TOPIC_KEYWORDS.get(topic) or []
+    return bool(kws) and _contains_any(corpus, kws)
+
+
+def _analyze_selected_standards_semantic(
     *,
     lang: LanguageCode,
-    standard_docs: list[dict],
+    selected_standards: list[dict],
     tender_text: str,
+    standard_text: str,
+    caveat: str | None,
 ) -> list[RiskFinding]:
-    if not standard_docs:
+    """
+    Semantic topic coverage — not literal standard-name matching.
+    Unverifiable standards → ONE consolidated finding.
+    """
+    if not selected_standards:
         return []
 
     findings: list[RiskFinding] = []
-    incomplete_names: list[str] = []
+    technical_corpus = f"{tender_text}\n{standard_text}"
+    contract_corpus = tender_text
+    unverifiable: list[str] = []
 
-    for doc in standard_docs:
-        text = (doc.get("extracted_text") or "").strip()
-        name = doc.get("original_name") or "standard"
-        if not has_usable_text(text):
-            incomplete_names.append(name)
-            continue
-        cleaned = re.sub(r"\s+", " ", text)
-        marker_hits = sum(1 for m in _COMPLETE_STD_MARKERS if m.lower() in cleaned.lower())
-        if len(cleaned) < 500 or marker_hits < 2:
-            incomplete_names.append(name)
+    for item in selected_standards:
+        code = item.get("code") or ""
+        title = item.get("title") or code
+        sclass = item.get("standard_class") or "technical"
+        std = get_standard(code)
+        if std:
+            title = std.title_for(lang.value if hasattr(lang, "value") else str(lang))
+        topics = _topics_for_standard(code, title, sclass)
+        corpus = contract_corpus if sclass == "contractual" else technical_corpus
+        covered = any(_corpus_covers_topic(corpus, topic) for topic in topics)
+        if not covered:
+            unverifiable.append(title)
 
-    if incomplete_names:
+    if unverifiable:
+        preview = "؛ ".join(unverifiable[:12])
+        more = f" (+{len(unverifiable) - 12})" if len(unverifiable) > 12 else ""
         findings.append(
-            RiskFinding(
-                code="STD-THIN-001",
-                category="compliance",
-                severity=RiskSeverity.MEDIUM,
-                title={
-                    LanguageCode.FA: "استانداردهای بارگذاری‌شده ناقص یا کم‌ محتوا به نظر می‌رسند",
-                    LanguageCode.EN: "Uploaded standards appear thin or incomplete",
-                    LanguageCode.DE: "Hochgeladene Standards wirken dünn/unvollständig",
-                    LanguageCode.FR: "Normes téléversées paraissent incomplètes",
-                }[lang],
-                description={
-                    LanguageCode.FA: f"فایل‌های مشکوک: {', '.join(incomplete_names[:8])}",
-                    LanguageCode.EN: f"Suspect files: {', '.join(incomplete_names[:8])}",
-                    LanguageCode.DE: f"Verdächtige Dateien: {', '.join(incomplete_names[:8])}",
-                    LanguageCode.FR: f"Fichiers suspects: {', '.join(incomplete_names[:8])}",
-                }[lang],
-                recommendation={
-                    LanguageCode.FA: "نسخه کامل استاندارد اجباری کشور پروژه را بارگذاری کنید.",
-                    LanguageCode.EN: "Upload the full mandatory national standards for the project country.",
-                    LanguageCode.DE: "Vollständige verpflichtende Landesstandards hochladen.",
-                    LanguageCode.FR: "Téléverser les normes nationales obligatoires complètes.",
-                }[lang],
-                financial_impact="medium",
-                schedule_impact="medium",
-                evidence=", ".join(incomplete_names[:8]),
+            _with_score(
+                RiskFinding(
+                    code="STD-TOPIC-GAP-001",
+                    category="compliance",
+                    severity=RiskSeverity.MEDIUM,
+                    finding_category="risk",
+                    title={
+                        LanguageCode.FA: "پوشش موضوعی استانداردهای انتخاب‌شده در اسناد ناقص است",
+                        LanguageCode.EN: "Selected standards’ subject matter is not covered in documents",
+                        LanguageCode.DE: "Themen der gewählten Standards in Unterlagen nicht abgedeckt",
+                        LanguageCode.FR: "Sujets des normes sélectionnées non couverts dans les documents",
+                    }[lang],
+                    description={
+                        LanguageCode.FA: (
+                            f"{len(unverifiable)} استاندارد انتخاب‌شده از نظر موضوعی در متن قابل‌خواندن اسناد "
+                            f"قابل راستی‌آزمایی نبودند (نه صرفاً به‌خاطر نبودن نام استاندارد): {preview}{more}"
+                        ),
+                        LanguageCode.EN: (
+                            f"{len(unverifiable)} selected standards could not be verified by subject matter "
+                            f"in readable document text (not merely missing the standard’s name): {preview}{more}"
+                        ),
+                        LanguageCode.DE: (
+                            f"{len(unverifiable)} gewählte Standards thematisch nicht verifizierbar: {preview}{more}"
+                        ),
+                        LanguageCode.FR: (
+                            f"{len(unverifiable)} normes non vérifiables par sujet: {preview}{more}"
+                        ),
+                    }[lang],
+                    recommendation={
+                        LanguageCode.FA: (
+                            "در مشخصات فنی/شرایط خصوصی، برای هر حوزهٔ بدون پوشش (مثلاً حریق، برق، بتن) "
+                            "یک بخش اختصاصی با الزامات قابل‌اندازه‌گیری اضافه کنید؛ سپس همان استاندارد مرتبط را ارجاع دهید."
+                        ),
+                        LanguageCode.EN: (
+                            "Add dedicated measurable sections in specs/particular conditions for each uncovered "
+                            "domain (e.g. fire, electrical, concrete), then cite the related standard."
+                        ),
+                        LanguageCode.DE: (
+                            "Für jedes ungedeckte Thema (Brandschutz, Elektro, Beton) messbare Abschnitte "
+                            "in Specs/besondere Bedingungen ergänzen und den Standard zitieren."
+                        ),
+                        LanguageCode.FR: (
+                            "Ajouter des sections mesurables pour chaque domaine non couvert, puis citer la norme."
+                        ),
+                    }[lang],
+                    financial_impact="medium",
+                    schedule_impact="medium",
+                    evidence=preview,
+                    source_excerpt=preview[:500],
+                    cause_effect_chain=[
+                        {
+                            LanguageCode.FA: "بخش موضوعی استاندارد در اسناد نیست",
+                            LanguageCode.EN: "Standard subject section missing in docs",
+                            LanguageCode.DE: "Themenabschnitt fehlt",
+                            LanguageCode.FR: "Section thématique absente",
+                        }[lang],
+                        {
+                            LanguageCode.FA: "پیشنهاددهندگان الزامات را متفاوت تفسیر می‌کنند",
+                            LanguageCode.EN: "Bidders interpret requirements differently",
+                            LanguageCode.DE: "Bieter interpretieren unterschiedlich",
+                            LanguageCode.FR: "Interprétations divergentes des soumissionnaires",
+                        }[lang],
+                        {
+                            LanguageCode.FA: "اختلاف حین اجرا / ادعای تغییر",
+                            LanguageCode.EN: "Dispute / variation claim during execution",
+                            LanguageCode.DE: "Streit / Nachtrag in der Ausführung",
+                            LanguageCode.FR: "Litige / avenant en exécution",
+                        }[lang],
+                        {
+                            LanguageCode.FA: "تأخیر و افزایش هزینه برای کارفرما",
+                            LanguageCode.EN: "Delay and cost growth for the employer",
+                            LanguageCode.DE: "Verzug und Mehrkosten für Auftraggeber",
+                            LanguageCode.FR: "Retard et surcoût pour le maître d'ouvrage",
+                        }[lang],
+                    ],
+                    data_completeness_caveat=caveat,
+                    estimated_impact={
+                        LanguageCode.FA: "ریسک ادعای تغییر مقادیر و تأخیر در حوزه‌های بدون مشخصات",
+                        LanguageCode.EN: "Variation/delay risk in domains without specs",
+                        LanguageCode.DE: "Nachtrags-/Verzugsrisiko ohne Specs",
+                        LanguageCode.FR: "Risque d'avenant/retard sans specs",
+                    }[lang],
+                ),
+                55,
             )
         )
+
+    # Methodology footer (not a risk card)
+    names = "؛ ".join((s.get("title") or s.get("code") or "") for s in selected_standards[:15])
+    more = f" (+{len(selected_standards) - 15})" if len(selected_standards) > 15 else ""
+    findings.append(
+        RiskFinding(
+            code="STD-SELECT-001",
+            category="process",
+            severity=RiskSeverity.LOW,
+            finding_category="methodology",
+            title={
+                LanguageCode.FA: "استانداردهای انتخاب‌شده برای این تحلیل",
+                LanguageCode.EN: "Standards selected for this analysis",
+                LanguageCode.DE: "Für diese Analyse gewählte Standards",
+                LanguageCode.FR: "Normes sélectionnées pour cette analyse",
+            }[lang],
+            description={
+                LanguageCode.FA: f"{names}{more}",
+                LanguageCode.EN: f"{names}{more}",
+                LanguageCode.DE: f"{names}{more}",
+                LanguageCode.FR: f"{names}{more}",
+            }[lang],
+            recommendation={
+                LanguageCode.FA: "این مورد ریسک نیست؛ فقط فهرست روش کار است.",
+                LanguageCode.EN: "Not a risk — methodology checklist only.",
+                LanguageCode.DE: "Kein Risiko — nur Methodik-Checkliste.",
+                LanguageCode.FR: "Pas un risque — liste méthodologique uniquement.",
+            }[lang],
+            evidence=names,
+            risk_score=None,
+        )
+    )
     return findings
 
 
-def _apply_rule(rule: RuleDef, *, by_cat: dict, corpus: str, lang: LanguageCode) -> RiskFinding | None:
+def _apply_rule(
+    rule: RuleDef,
+    *,
+    by_cat: dict,
+    corpus: str,
+    lang: LanguageCode,
+    caveat: str | None,
+) -> RiskFinding | None:
     only_if = (rule.logic_config or {}).get("only_if_category")
     if only_if:
         try:
@@ -131,143 +353,105 @@ def _apply_rule(rule: RuleDef, *, by_cat: dict, corpus: str, lang: LanguageCode)
         except ValueError:
             needed = None
         if needed is not None and not by_cat.get(needed):
-            # Category absent → skip content checks (covered by a separate optional-missing rule).
             return None
 
     if rule.requires_category:
         if not by_cat.get(rule.requires_category):
-            return RiskFinding(
-                code=rule.code,
-                category=rule.category,
-                severity=rule.severity,
-                title=_lang(rule.title, lang),
-                description=_lang(rule.description, lang),
-                recommendation=_lang(rule.recommendation, lang),
-                financial_impact=rule.financial_impact,
-                schedule_impact=rule.schedule_impact,
-                evidence=None,
+            score = 75 if rule.severity == RiskSeverity.HIGH else 50 if rule.severity == RiskSeverity.MEDIUM else 25
+            chain = []
+            if rule.severity in {RiskSeverity.HIGH, RiskSeverity.MEDIUM}:
+                chain = [
+                    {
+                        LanguageCode.FA: f"سند الزامی ({rule.requires_category.value}) موجود نیست",
+                        LanguageCode.EN: f"Required document ({rule.requires_category.value}) missing",
+                        LanguageCode.DE: f"Erforderliches Dokument fehlt ({rule.requires_category.value})",
+                        LanguageCode.FR: f"Document requis manquant ({rule.requires_category.value})",
+                    }[lang],
+                    {
+                        LanguageCode.FA: "ابهام در مناقصه و اجرا",
+                        LanguageCode.EN: "Ambiguity at tender and on site",
+                        LanguageCode.DE: "Unklarheit in Ausschreibung und Ausführung",
+                        LanguageCode.FR: "Ambiguïté à l'AO et sur chantier",
+                    }[lang],
+                    {
+                        LanguageCode.FA: "ادعا / تأخیر / هزینه اضافی",
+                        LanguageCode.EN: "Claim / delay / extra cost",
+                        LanguageCode.DE: "Claim / Verzug / Mehrkosten",
+                        LanguageCode.FR: "Réclamation / retard / surcoût",
+                    }[lang],
+                ]
+            return _with_score(
+                RiskFinding(
+                    code=rule.code,
+                    category=rule.category,
+                    severity=rule.severity,
+                    finding_category="risk",
+                    title=_lang(rule.title, lang),
+                    description=_lang(rule.description, lang),
+                    recommendation=_lang(rule.recommendation, lang),
+                    financial_impact=rule.financial_impact,
+                    schedule_impact=rule.schedule_impact,
+                    cause_effect_chain=chain,
+                    data_completeness_caveat=caveat,
+                    estimated_impact=rule.financial_impact,
+                ),
+                score,
             )
         return None
 
     keywords = rule.keywords_any or []
     if keywords and not _contains_any(corpus, keywords):
-        return RiskFinding(
-            code=rule.code,
-            category=rule.category,
-            severity=rule.severity,
-            title=_lang(rule.title, lang),
-            description=_lang(rule.description, lang),
-            recommendation=_lang(rule.recommendation, lang),
-            financial_impact=rule.financial_impact,
-            schedule_impact=rule.schedule_impact,
-            evidence=None,
+        score = 70 if rule.severity == RiskSeverity.HIGH else 48 if rule.severity == RiskSeverity.MEDIUM else 22
+        return _with_score(
+            RiskFinding(
+                code=rule.code,
+                category=rule.category,
+                severity=rule.severity,
+                finding_category="risk",
+                title=_lang(rule.title, lang),
+                description=_lang(rule.description, lang),
+                recommendation=_lang(rule.recommendation, lang),
+                financial_impact=rule.financial_impact,
+                schedule_impact=rule.schedule_impact,
+                cause_effect_chain=[
+                    {
+                        LanguageCode.FA: "الزام قراردادی/فنی در متن دیده نشد",
+                        LanguageCode.EN: "Required contractual/technical element not found in text",
+                        LanguageCode.DE: "Erforderliches Element im Text nicht gefunden",
+                        LanguageCode.FR: "Élément requis absent du texte",
+                    }[lang],
+                    {
+                        LanguageCode.FA: "تفسیر متفاوت طرفین",
+                        LanguageCode.EN: "Divergent party interpretations",
+                        LanguageCode.DE: "Abweichende Auslegungen",
+                        LanguageCode.FR: "Interprétations divergentes",
+                    }[lang],
+                    {
+                        LanguageCode.FA: "اختلاف و تأخیر محتمل",
+                        LanguageCode.EN: "Likely dispute and delay",
+                        LanguageCode.DE: "Streit und Verzug wahrscheinlich",
+                        LanguageCode.FR: "Litige et retard probables",
+                    }[lang],
+                ]
+                if rule.severity != RiskSeverity.LOW
+                else [],
+                data_completeness_caveat=caveat,
+                estimated_impact=rule.financial_impact,
+            ),
+            score,
         )
     return None
 
 
-def _analyze_selected_standards(
-    *,
-    lang: LanguageCode,
-    selected_standards: list[dict],
-    tender_text: str,
-    standard_text: str,
-    drawing_names: list[str],
-) -> list[RiskFinding]:
-    """Cross-check selected catalog standards against tender/contract vs technical docs."""
-    if not selected_standards:
-        return []
-
-    findings: list[RiskFinding] = []
-    contract_corpus = tender_text
-    technical_corpus = "\n".join([standard_text, tender_text, " ".join(drawing_names)])
-
-    for item in selected_standards:
-        code = item.get("code") or ""
-        title = item.get("title") or code
-        sclass = item.get("standard_class") or "technical"
-        std = get_standard(code)
-        keywords = list(std.check_keywords) if std else []
-        if code:
-            keywords.append(code.replace("_", " "))
-
-        if sclass == "contractual":
-            target = contract_corpus
-            target_label = {
-                LanguageCode.FA: "اسناد پیمان/قرارداد",
-                LanguageCode.EN: "contract / tender conditions",
-                LanguageCode.DE: "Vertrags-/Ausschreibungsunterlagen",
-                LanguageCode.FR: "contrat / conditions d'AO",
-            }[lang]
-        else:
-            target = technical_corpus
-            target_label = {
-                LanguageCode.FA: "نقشه / مشخصات / BoQ / استاندارد بارگذاری‌شده",
-                LanguageCode.EN: "drawings / specs / BoQ / uploaded standards",
-                LanguageCode.DE: "Pläne / Specs / LV / hochgeladene Standards",
-                LanguageCode.FR: "plans / specs / métré / normes téléversées",
-            }[lang]
-
-        if keywords and not _contains_any(target, keywords):
-            findings.append(
-                RiskFinding(
-                    code=f"STD-MATCH-{code[:24]}",
-                    category="compliance",
-                    severity=RiskSeverity.MEDIUM,
-                    title={
-                        LanguageCode.FA: f"ارجاع ضعیف به استاندارد انتخاب‌شده: {title}",
-                        LanguageCode.EN: f"Weak reference to selected standard: {title}",
-                        LanguageCode.DE: f"Schwacher Bezug zum gewählten Standard: {title}",
-                        LanguageCode.FR: f"Référence faible à la norme sélectionnée : {title}",
-                    }[lang],
-                    description={
-                        LanguageCode.FA: f"استاندارد «{title}» ({sclass}) انتخاب شده ولی در {target_label} نشانه‌ای از ارجاع به آن دیده نشد.",
-                        LanguageCode.EN: f"Standard “{title}” ({sclass}) is selected but no clear reference was found in {target_label}.",
-                        LanguageCode.DE: f"Standard „{title}“ ({sclass}) gewählt, aber kein klarer Bezug in {target_label}.",
-                        LanguageCode.FR: f"Norme « {title} » ({sclass}) sélectionnée, mais pas de référence claire dans {target_label}.",
-                    }[lang],
-                    recommendation={
-                        LanguageCode.FA: "ارجاع صریح به این استاندارد را در اسناد هدف بنویسید یا فایل استاندارد را بارگذاری کنید.",
-                        LanguageCode.EN: "Cite this standard explicitly in the target documents, or upload the standard file.",
-                        LanguageCode.DE: "Standard in Zieldokumenten ausdrücklich nennen oder Datei hochladen.",
-                        LanguageCode.FR: "Citer explicitement cette norme dans les documents cibles, ou téléverser le fichier.",
-                    }[lang],
-                    financial_impact="medium",
-                    schedule_impact="low",
-                    evidence=code,
-                )
-            )
-
-    names = ", ".join((s.get("title") or s.get("code") or "") for s in selected_standards[:8])
-    more = f" (+{len(selected_standards) - 8})" if len(selected_standards) > 8 else ""
-    findings.append(
-        RiskFinding(
-            code="STD-SELECT-001",
-            category="compliance",
-            severity=RiskSeverity.LOW,
-            title={
-                LanguageCode.FA: "استانداردهای اعمال‌شده در این تحلیل",
-                LanguageCode.EN: "Standards applied in this analysis",
-                LanguageCode.DE: "In dieser Analyse angewandte Standards",
-                LanguageCode.FR: "Normes appliquées dans cette analyse",
-            }[lang],
-            description={
-                LanguageCode.FA: f"انتخاب‌شده: {names}{more}",
-                LanguageCode.EN: f"Selected: {names}{more}",
-                LanguageCode.DE: f"Ausgewählt: {names}{more}",
-                LanguageCode.FR: f"Sélectionnées : {names}{more}",
-            }[lang],
-            recommendation={
-                LanguageCode.FA: "در صورت نیاز چک‌لیست استانداردها را قبل از مناقصه نهایی کنید.",
-                LanguageCode.EN: "Finalize the standards checklist before tender issue if needed.",
-                LanguageCode.DE: "Standards-Checkliste vor Ausschreibung finalisieren.",
-                LanguageCode.FR: "Finaliser la liste des normes avant lancement de l'AO.",
-            }[lang],
-            financial_impact="low",
-            schedule_impact="low",
-            evidence=names,
-        )
-    )
-    return findings
+def _dedupe_findings(findings: list[RiskFinding]) -> list[RiskFinding]:
+    seen: set[str] = set()
+    out: list[RiskFinding] = []
+    for f in findings:
+        if f.code in seen:
+            continue
+        seen.add(f.code)
+        out.append(f)
+    return out
 
 
 def analyze_project_documents(
@@ -278,105 +462,207 @@ def analyze_project_documents(
     project_type: ProjectType | None = None,
     selected_standards: list[dict] | None = None,
 ) -> dict:
-    """Country-aware rule engine: resolve RuleSet + overrides from knowledge data."""
     lang = report_language
     ptype = project_type or ProjectType.INFRASTRUCTURE
     profile = get_country_profile(country)
-    rules = resolve_rules_for_project(
-        country=country,
-        project_type=ptype,
-        ruleset_code=profile.default_ruleset_code,
-    )
     selected_standards = selected_standards or []
 
     by_cat: dict[DocumentCategory, list[dict]] = {c: [] for c in DocumentCategory}
     for doc in documents:
-        by_cat[doc["category"]].append(doc)
+        cat = doc["category"]
+        if not isinstance(cat, DocumentCategory):
+            cat = DocumentCategory(str(cat))
+        by_cat[cat].append({**doc, "category": cat})
 
-    tender_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.TENDER])
-    standard_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.STANDARD])
-    schedule_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.SCHEDULE])
-    drawing_names = [d["original_name"] for d in by_cat[DocumentCategory.DRAWING]]
+    stats = _extraction_stats(documents)
+    gate_rate = float(stats["gate_rate"])
+    failed_names = stats["failed_names"]
 
-    # Document templates selected for this country (logic/context, not just labels)
     templates = {
         cat.value: resolve_document_template(category=cat, country=country, project_type=ptype).code
         for cat in DocumentCategory
     }
 
-    corpus = "\n".join([tender_text, standard_text, schedule_text, " ".join(drawing_names)])
-    # Boost corpus with country-specific framework hints so presence checks are jurisdiction-aware
+    # ---------- FIX 1: hard gate ----------
+    if stats["total"] == 0 or gate_rate < _EXTRACTION_HARD_GATE:
+        failed_list = "، ".join(failed_names[:40])
+        more = f" (+{len(failed_names) - 40})" if len(failed_names) > 40 else ""
+        block = RiskFinding(
+            code="EXTRACT-BLOCK-001",
+            category="process",
+            severity=RiskSeverity.HIGH,
+            finding_category="limitation",
+            title={
+                LanguageCode.FA: "تحلیل کامل امکان‌پذیر نیست",
+                LanguageCode.EN: "Full analysis is not possible",
+                LanguageCode.DE: "Vollständige Analyse nicht möglich",
+                LanguageCode.FR: "Analyse complète impossible",
+            }[lang],
+            description={
+                LanguageCode.FA: (
+                    f"{stats['failed_count']} از {stats['total']} فایل قابل خواندن نبودند "
+                    f"(نرخ استخراج مفید ≈ {int(gate_rate * 100)}٪). "
+                    f"تا زمانی که نسخه متنی/Word یا OCR معتبر نباشد، ادعا درباره ارجاع استاندارد یا ریسک قراردادی معتبر نیست.\n"
+                    f"فایل‌های ناموفق: {failed_list}{more}"
+                ),
+                LanguageCode.EN: (
+                    f"{stats['failed_count']} of {stats['total']} files were not readable "
+                    f"(usable extraction ≈ {int(gate_rate * 100)}%). "
+                    f"Until text/Word or valid OCR is available, claims about standards or contract risk are not reliable.\n"
+                    f"Failed files: {failed_list}{more}"
+                ),
+                LanguageCode.DE: (
+                    f"{stats['failed_count']} von {stats['total']} Dateien nicht lesbar "
+                    f"(≈ {int(gate_rate * 100)}٪). Failed: {failed_list}{more}"
+                ),
+                LanguageCode.FR: (
+                    f"{stats['failed_count']} sur {stats['total']} fichiers illisibles "
+                    f"(≈ {int(gate_rate * 100)}%). Échecs: {failed_list}{more}"
+                ),
+            }[lang],
+            recommendation={
+                LanguageCode.FA: "نسخه قابل‌خواندن (متن/Word) بارگذاری کنید یا OCR را فعال/بهبود دهید، سپس تحلیل را دوباره اجرا کنید.",
+                LanguageCode.EN: "Upload readable text/Word versions or enable/improve OCR, then re-run analysis.",
+                LanguageCode.DE: "Lesbare Text-/Word-Versionen hochladen oder OCR verbessern, dann erneut analysieren.",
+                LanguageCode.FR: "Téléverser des versions texte/Word lisibles ou améliorer l'OCR, puis relancer.",
+            }[lang],
+            evidence=failed_list,
+            source_excerpt=failed_list[:800],
+            risk_score=None,
+        )
+        summary = {
+            LanguageCode.FA: (
+                f"تحلیل مسدود شد: آمادگی استخراج متن {int(gate_rate * 100)}٪ "
+                f"({stats['readable_count']}/{stats['total']} فایل). هیچ ریسک محتوایی ادعا نشده است."
+            ),
+            LanguageCode.EN: (
+                f"Analysis blocked: text extraction readiness {int(gate_rate * 100)}% "
+                f"({stats['readable_count']}/{stats['total']} files). No content risks claimed."
+            ),
+            LanguageCode.DE: (
+                f"Analyse blockiert: Textextraktion {int(gate_rate * 100)}% "
+                f"({stats['readable_count']}/{stats['total']}). Keine inhaltlichen Risiken behauptet."
+            ),
+            LanguageCode.FR: (
+                f"Analyse bloquée: extraction {int(gate_rate * 100)}% "
+                f"({stats['readable_count']}/{stats['total']}). Aucun risque de contenu affirmé."
+            ),
+        }[lang]
+        return {
+            "summary": summary,
+            "readiness_score": int(round(gate_rate * 100)),
+            "analysis_status": "blocked",
+            "text_extraction_success_rate": gate_rate,
+            "counts": {"high": 0, "medium": 0, "low": 0, "total": 0},
+            "counts_risk": {"high": 0, "medium": 0, "low": 0, "total": 0},
+            "aggregate_risk_score": None,
+            "documents_with_limitations": stats["failed_count"],
+            "findings": [block],
+            "engine": {
+                "country_profile": profile_snapshot(country, ptype),
+                "blocked": True,
+                "extraction": stats,
+                "document_templates": templates,
+                "selected_standards": [s.get("code") for s in selected_standards],
+            },
+        }
+
+    caveat = None
+    if gate_rate < _EXTRACTION_SOFT_GATE:
+        caveat = {
+            LanguageCode.FA: (
+                f"هشدار کامل‌بودن داده: فقط {stats['readable_count']} از {stats['total']} فایل متن قابل‌استفاده داشتند. "
+                f"یافته‌ها فقط روی اسناد خوانا اعتبار دارند. خوانده‌نشده: "
+                + "، ".join(failed_names[:12])
+                + ("…" if len(failed_names) > 12 else "")
+            ),
+            LanguageCode.EN: (
+                f"Data completeness caveat: only {stats['readable_count']}/{stats['total']} files had usable text. "
+                f"Findings are only as reliable as readable sources. Unreadable: "
+                + ", ".join(failed_names[:12])
+                + ("…" if len(failed_names) > 12 else "")
+            ),
+            LanguageCode.DE: (
+                f"Datenlücke: nur {stats['readable_count']}/{stats['total']} Dateien nutzbar. "
+                + ", ".join(failed_names[:12])
+            ),
+            LanguageCode.FR: (
+                f"Limite de complétude: seulement {stats['readable_count']}/{stats['total']} fichiers lisibles. "
+                + ", ".join(failed_names[:12])
+            ),
+        }[lang]
+
+    tender_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.TENDER])
+    standard_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.STANDARD])
+    schedule_text = "\n".join((d.get("extracted_text") or "") for d in by_cat[DocumentCategory.SCHEDULE])
+    # Prefer readable corpus only for rules
+    readable_docs = [d for d in documents if has_usable_text(d.get("extracted_text") or "")]
+    corpus_for_rules = "\n".join((d.get("extracted_text") or "") for d in readable_docs)
+
+    rules = resolve_rules_for_project(
+        country=country,
+        project_type=ptype,
+        ruleset_code=profile.default_ruleset_code,
+    )
     hint_blob = " ".join(profile.config.get("contract_keywords_hint") or [])
-    corpus_for_rules = corpus  # findings still based on uploaded docs only
 
     findings: list[RiskFinding] = []
 
-    # Selected catalog standards vs document evidence
-    findings.extend(
-        _analyze_selected_standards(
-            lang=lang,
-            selected_standards=selected_standards,
-            tender_text=tender_text,
-            standard_text=standard_text,
-            drawing_names=drawing_names,
-        )
-    )
-
-    unreadables = [d for d in documents if not has_usable_text(d.get("extracted_text") or "")]
-    if unreadables:
-        names = ", ".join(d["original_name"] for d in unreadables[:8])
-        more = f" (+{len(unreadables) - 8})" if len(unreadables) > 8 else ""
+    # Section B — extraction limitation banner (not equal-weight risk)
+    if failed_names:
         findings.append(
             RiskFinding(
                 code="OCR-001",
                 category="process",
-                severity=RiskSeverity.HIGH
-                if any(d["category"] in {DocumentCategory.TENDER, DocumentCategory.STANDARD} for d in unreadables)
-                else RiskSeverity.MEDIUM,
+                severity=RiskSeverity.MEDIUM,
+                finding_category="limitation",
                 title={
-                    LanguageCode.FA: "متن قابل تحلیل از برخی فایل‌ها استخراج نشد",
-                    LanguageCode.EN: "No usable text extracted from some uploaded files",
-                    LanguageCode.DE: "Aus einigen Dateien kein nutzbarer Text",
-                    LanguageCode.FR: "Aucun texte exploitable extrait de certains fichiers",
+                    LanguageCode.FA: "محدودیت استخراج متن از برخی فایل‌ها",
+                    LanguageCode.EN: "Text extraction limitation on some files",
+                    LanguageCode.DE: "Textextraktionsgrenze bei einigen Dateien",
+                    LanguageCode.FR: "Limitation d'extraction sur certains fichiers",
                 }[lang],
                 description={
-                    LanguageCode.FA: f"فایل‌های بدون متن: {names}{more}",
-                    LanguageCode.EN: f"Files without usable text: {names}{more}",
-                    LanguageCode.DE: f"Dateien ohne Text: {names}{more}",
-                    LanguageCode.FR: f"Fichiers sans texte: {names}{more}",
+                    LanguageCode.FA: f"{stats['failed_count']} فایل بدون متن قابل‌استفاده: "
+                    + "، ".join(failed_names[:20])
+                    + ("…" if len(failed_names) > 20 else ""),
+                    LanguageCode.EN: f"{stats['failed_count']} files without usable text: "
+                    + ", ".join(failed_names[:20])
+                    + ("…" if len(failed_names) > 20 else ""),
+                    LanguageCode.DE: f"{stats['failed_count']} Dateien ohne Text: " + ", ".join(failed_names[:20]),
+                    LanguageCode.FR: f"{stats['failed_count']} fichiers sans texte: " + ", ".join(failed_names[:20]),
                 }[lang],
                 recommendation={
-                    LanguageCode.FA: "نسخه متنی/Word بارگذاری کنید یا OCR را فعال کنید.",
-                    LanguageCode.EN: "Upload text/Word versions or enable OCR.",
-                    LanguageCode.DE: "Text-/Word-Version hochladen oder OCR aktivieren.",
-                    LanguageCode.FR: "Charger une version texte/Word ou activer l'OCR.",
+                    LanguageCode.FA: "برای نقشه‌های اسکن‌شده OCR فعال کنید؛ برای قراردادها نسخه Word/PDF متنی بارگذاری کنید.",
+                    LanguageCode.EN: "Enable OCR for scanned drawings; upload text Word/PDF for contracts.",
+                    LanguageCode.DE: "OCR für Pläne; Text-PDF/Word für Verträge.",
+                    LanguageCode.FR: "OCR pour plans scannés; Word/PDF texte pour contrats.",
                 }[lang],
-                financial_impact="high",
-                schedule_impact="medium",
-                evidence=names,
+                evidence="، ".join(failed_names[:20]),
+                source_excerpt="، ".join(failed_names[:15]),
+                risk_score=None,
+                data_completeness_caveat=caveat,
             )
         )
 
+    # FIX 2 — semantic standards (consolidated)
     findings.extend(
-        _analyze_standard_completeness(
+        _analyze_selected_standards_semantic(
             lang=lang,
-            standard_docs=by_cat[DocumentCategory.STANDARD],
+            selected_standards=selected_standards,
             tender_text=tender_text,
+            standard_text=standard_text,
+            caveat=caveat,
         )
     )
 
     for rule in rules:
         if rule.code == "STD-001" and selected_standards:
-            # Catalog selection covers the "no standards pack" gap.
             continue
-        hit = _apply_rule(rule, by_cat=by_cat, corpus=corpus_for_rules, lang=lang)
+        hit = _apply_rule(rule, by_cat=by_cat, corpus=corpus_for_rules, lang=lang, caveat=caveat)
         if hit:
-            # annotate evidence with resolved jurisdiction when useful
-            if rule.override_country and not hit.evidence:
-                hit.evidence = f"ruleset={profile.default_ruleset_code}; override={rule.override_country.value}"
             findings.append(hit)
 
-    # Cross-doc schedule heuristic
     if by_cat[DocumentCategory.TENDER] and by_cat[DocumentCategory.SCHEDULE]:
         tender_has_duration = _contains_any(
             tender_text,
@@ -385,128 +671,102 @@ def analyze_project_documents(
         schedule_has_dates = bool(
             re.search(r"\d{4}[/-]\d{1,2}[/-]\d{1,2}|\d{1,2}[/-]\d{1,2}[/-]\d{2,4}", schedule_text)
         )
-        if tender_has_duration and not schedule_has_dates:
+        if tender_has_duration and not schedule_has_dates and has_usable_text(schedule_text):
             findings.append(
-                RiskFinding(
-                    code="XR-TIME-001",
-                    category="schedule",
-                    severity=RiskSeverity.MEDIUM,
-                    title={
-                        LanguageCode.FA: "عدم هم‌خوانی مدت پیمان و جزئیات برنامه",
-                        LanguageCode.EN: "Mismatch between contract duration and schedule detail",
-                        LanguageCode.DE: "Widerspruch Vertragslaufzeit / Terminplan-Detail",
-                        LanguageCode.FR: "Écart durée du marché / détail du planning",
-                    }[lang],
-                    description={
-                        LanguageCode.FA: "مدت در اسناد هست اما برنامه جزئیات تاریخ کافی ندارد.",
-                        LanguageCode.EN: "Duration exists in tender docs but schedule lacks date detail.",
-                        LanguageCode.DE: "Laufzeit genannt, Terminplan ohne ausreichende Daten.",
-                        LanguageCode.FR: "Durée citée mais planning sans dates suffisantes.",
-                    }[lang],
-                    recommendation={
-                        LanguageCode.FA: "برنامه مبنا را با مدت قراردادی هم‌راستا کنید.",
-                        LanguageCode.EN: "Align baseline schedule with contractual duration.",
-                        LanguageCode.DE: "Basisterminplan mit Vertragslaufzeit abstimmen.",
-                        LanguageCode.FR: "Aligner le planning avec la durée contractuelle.",
-                    }[lang],
-                    financial_impact="medium",
-                    schedule_impact="high",
+                _with_score(
+                    RiskFinding(
+                        code="XR-TIME-001",
+                        category="schedule",
+                        severity=RiskSeverity.MEDIUM,
+                        finding_category="risk",
+                        title={
+                            LanguageCode.FA: "عدم هم‌خوانی مدت پیمان و جزئیات برنامه",
+                            LanguageCode.EN: "Mismatch between contract duration and schedule detail",
+                            LanguageCode.DE: "Widerspruch Vertragslaufzeit / Terminplan-Detail",
+                            LanguageCode.FR: "Écart durée du marché / détail du planning",
+                        }[lang],
+                        description={
+                            LanguageCode.FA: "مدت در اسناد پیمان هست اما برنامه جزئیات تاریخ کافی ندارد.",
+                            LanguageCode.EN: "Duration exists in tender docs but schedule lacks date detail.",
+                            LanguageCode.DE: "Laufzeit genannt, Terminplan ohne ausreichende Daten.",
+                            LanguageCode.FR: "Durée citée mais planning sans dates suffisantes.",
+                        }[lang],
+                        recommendation={
+                            LanguageCode.FA: "در برنامه مبنا تاریخ شروع/پایان و مایلستون‌های هم‌تراز با مدت پیمان را صریح بنویسید.",
+                            LanguageCode.EN: "State start/finish and milestones in the baseline aligned to contract duration.",
+                            LanguageCode.DE: "Start/Ende und Meilensteine im Basisterminplan zur Vertragslaufzeit festlegen.",
+                            LanguageCode.FR: "Fixer début/fin et jalons alignés sur la durée contractuelle.",
+                        }[lang],
+                        cause_effect_chain=[
+                            {
+                                LanguageCode.FA: "مدت پیمان بدون برنامه تاریخ‌دار",
+                                LanguageCode.EN: "Contract duration without dated programme",
+                                LanguageCode.DE: "Laufzeit ohne datierten Terminplan",
+                                LanguageCode.FR: "Durée sans planning daté",
+                            }[lang],
+                            {
+                                LanguageCode.FA: "اختلاف در تمدید مدت / تأخیر",
+                                LanguageCode.EN: "Dispute on EOT / delay",
+                                LanguageCode.DE: "Streit um Verlängerung / Verzug",
+                                LanguageCode.FR: "Litige prolongation / retard",
+                            }[lang],
+                            {
+                                LanguageCode.FA: "هزینه تأخیر برای کارفرما",
+                                LanguageCode.EN: "Delay cost to employer",
+                                LanguageCode.DE: "Verzugskosten für Auftraggeber",
+                                LanguageCode.FR: "Coût de retard pour le maître d'ouvrage",
+                            }[lang],
+                        ],
+                        data_completeness_caveat=caveat,
+                        estimated_impact={
+                            LanguageCode.FA: "ریسک تمدید مدت و جریمه/تأخیر",
+                            LanguageCode.EN: "EOT / delay exposure",
+                            LanguageCode.DE: "Verlängerungs-/Verzugsrisiko",
+                            LanguageCode.FR: "Exposition prolongation/retard",
+                        }[lang],
+                    ),
+                    52,
                 )
             )
 
-    if standard_text.strip() and tender_text.strip():
-        std_keywords = set(re.findall(r"[\w\u0600-\u06FF]{5,}", standard_text.lower()))
-        tender_keywords = set(re.findall(r"[\w\u0600-\u06FF]{5,}", tender_text.lower()))
-        distinctive = [w for w in list(std_keywords)[:400] if w not in tender_keywords]
-        if len(distinctive) > 80:
-            findings.append(
-                RiskFinding(
-                    code="STD-ALIGN-001",
-                    category="compliance",
-                    severity=RiskSeverity.MEDIUM,
-                    title={
-                        LanguageCode.FA: "فاصله بین استاندارد و اسناد مناقصه",
-                        LanguageCode.EN: "Gap between standards and tender documents",
-                        LanguageCode.DE: "Lücke zwischen Standards und Ausschreibung",
-                        LanguageCode.FR: "Écart entre normes et documents d'AO",
-                    }[lang],
-                    description={
-                        LanguageCode.FA: "بخش زیادی از واژگان استاندارد در مناقصه دیده نشد.",
-                        LanguageCode.EN: "Much standards vocabulary is absent from tender text.",
-                        LanguageCode.DE: "Viele Standardbegriffe fehlen in der Ausschreibung.",
-                        LanguageCode.FR: "Beaucoup de vocabulaire normatif est absent de l'AO.",
-                    }[lang],
-                    recommendation={
-                        LanguageCode.FA: f"الزامات استاندارد را با چارچوب {profile.primary_standards_system} به شرایط خصوصی منتقل کنید.",
-                        LanguageCode.EN: f"Transfer mandatory clauses into particular conditions using {profile.primary_standards_system}.",
-                        LanguageCode.DE: f"Pflichtklauseln über {profile.primary_standards_system} in besondere Bedingungen überführen.",
-                        LanguageCode.FR: f"Reprendre les clauses obligatoires via {profile.primary_standards_system}.",
-                    }[lang],
-                    financial_impact="medium",
-                    schedule_impact="medium",
-                    evidence=", ".join(distinctive[:12]),
-                )
-            )
+    findings = _dedupe_findings(findings)
 
-    if not by_cat[DocumentCategory.STANDARD] and not selected_standards:
-        findings.append(
-            RiskFinding(
-                code="COUNTRY-STD-001",
-                category="compliance",
-                severity=RiskSeverity.MEDIUM,
-                title={
-                    LanguageCode.FA: f"هیچ استانداردی برای {country.value} انتخاب یا بارگذاری نشده",
-                    LanguageCode.EN: f"No standards selected or uploaded for {country.value}",
-                    LanguageCode.DE: f"Keine Standards gewählt/hochgeladen für {country.value}",
-                    LanguageCode.FR: f"Aucune norme sélectionnée/téléversée pour {country.value}",
-                }[lang],
-                description={
-                    LanguageCode.FA: f"پروفایل {profile.code} به سیستم {profile.primary_standards_system} وابسته است. از چک‌لیست استانداردها انتخاب کنید یا فایل سفارشی بارگذاری کنید.",
-                    LanguageCode.EN: f"Profile {profile.code} depends on {profile.primary_standards_system}. Select from the standards checklist or upload a custom file.",
-                    LanguageCode.DE: f"Profil {profile.code} hängt von {profile.primary_standards_system} ab.",
-                    LanguageCode.FR: f"Le profil {profile.code} dépend de {profile.primary_standards_system}.",
-                }[lang],
-                recommendation={
-                    LanguageCode.FA: "استانداردهای پیشنهادی کشور را تیک بزنید یا فایل استاندارد بارگذاری کنید.",
-                    LanguageCode.EN: "Tick recommended country standards or upload a standards file.",
-                    LanguageCode.DE: "Empfohlene Landesstandards anhaken oder Datei hochladen.",
-                    LanguageCode.FR: "Cocher les normes recommandées ou téléverser un fichier.",
-                }[lang],
-                financial_impact="high",
-                schedule_impact="medium",
-            )
-        )
+    risks = [f for f in findings if f.finding_category == "risk"]
+    high = sum(1 for f in risks if f.severity == RiskSeverity.HIGH)
+    medium = sum(1 for f in risks if f.severity == RiskSeverity.MEDIUM)
+    low = sum(1 for f in risks if f.severity == RiskSeverity.LOW)
+    scores = [f.risk_score for f in risks if f.risk_score is not None]
+    aggregate = int(round(sum(scores) / len(scores))) if scores else 0
+    # Readiness = extraction success (honest), not inverted risk penalty
+    readiness = int(round(gate_rate * 100))
 
-    if not documents:
-        findings.append(
-            RiskFinding(
-                code="EMPTY-001",
-                category="process",
-                severity=RiskSeverity.HIGH,
-                title={
-                    LanguageCode.FA: "هیچ سندی بارگذاری نشده",
-                    LanguageCode.EN: "No documents uploaded",
-                    LanguageCode.DE: "Keine Dokumente hochgeladen",
-                    LanguageCode.FR: "Aucun document téléversé",
-                }[lang],
-                description={
-                    LanguageCode.FA: "برای گزارش ریسک حداقل اسناد مناقصه کافی است؛ نقشه، زمان‌بندی و استاندارد اختیاری‌اند ولی کیفیت را بالا می‌برند.",
-                    LanguageCode.EN: "Tender documents are enough to run analysis; drawings, schedule, and standards are optional but improve quality.",
-                    LanguageCode.DE: "Ausschreibungsunterlagen reichen; Pläne, Terminplan und Standards sind optional.",
-                    LanguageCode.FR: "Les documents d'AO suffisent; plans, planning et normes sont optionnels.",
-                }[lang],
-                recommendation={
-                    LanguageCode.FA: "حداقل اسناد مناقصه را بارگذاری کنید. برنامه زمان‌بندی در صورت نبود مانع تحلیل نیست.",
-                    LanguageCode.EN: "Upload at least tender docs. Missing schedule does not block analysis.",
-                    LanguageCode.DE: "Mindestens Ausschreibung hochladen. Fehlender Terminplan blockiert die Analyse nicht.",
-                    LanguageCode.FR: "Téléverser au moins l'AO. L'absence de planning ne bloque pas l'analyse.",
-                }[lang],
-                financial_impact="high",
-                schedule_impact="high",
-            )
-        )
+    summary = {
+        LanguageCode.FA: (
+            f"آمادگی استخراج متن: {readiness}٪ ({stats['readable_count']}/{stats['total']} فایل). "
+            f"ریسک‌های واقعی: {high} بالا، {medium} متوسط، {low} پایین "
+            f"(میانگین امتیاز ریسک: {aggregate}). "
+            f"محدودیت اسناد: {stats['failed_count']} فایل. "
+            f"پروفایل: {profile.code}."
+        ),
+        LanguageCode.EN: (
+            f"Text extraction readiness: {readiness}% ({stats['readable_count']}/{stats['total']} files). "
+            f"Real risks: {high} high, {medium} medium, {low} low "
+            f"(avg risk score: {aggregate}). "
+            f"Document limitations: {stats['failed_count']} files. "
+            f"Profile: {profile.code}."
+        ),
+        LanguageCode.DE: (
+            f"Textextraktion: {readiness}% ({stats['readable_count']}/{stats['total']}). "
+            f"Echte Risiken: {high}/{medium}/{low} (Ø {aggregate}). "
+            f"Limitierungen: {stats['failed_count']}. Profil: {profile.code}."
+        ),
+        LanguageCode.FR: (
+            f"Extraction: {readiness}% ({stats['readable_count']}/{stats['total']}). "
+            f"Risques réels: {high}/{medium}/{low} (moy. {aggregate}). "
+            f"Limitations: {stats['failed_count']}. Profil: {profile.code}."
+        ),
+    }[lang]
 
-    # Prepare country prompt bundle for future LLM layer (stored in analysis metadata)
     prompt_bundle = render_prompt_bundle(
         code="ANALYZE_RESPONSIBILITY_CLAUSES",
         country=country,
@@ -514,24 +774,15 @@ def analyze_project_documents(
         extracted_text_excerpt=tender_text or hint_blob,
     )
 
-    high = sum(1 for f in findings if f.severity == RiskSeverity.HIGH)
-    medium = sum(1 for f in findings if f.severity == RiskSeverity.MEDIUM)
-    low = sum(1 for f in findings if f.severity == RiskSeverity.LOW)
-    penalty = high * 12 + medium * 6 + low * 2
-    score = max(0, min(100, 100 - penalty))
-
-    summary = TRANSLATIONS["summary_template"][lang].format(
-        score=score,
-        high=high,
-        medium=medium,
-        low=low,
-        profile=profile.code,
-    )
-
     return {
         "summary": summary,
-        "readiness_score": score,
-        "counts": {"high": high, "medium": medium, "low": low, "total": len(findings)},
+        "readiness_score": readiness,
+        "analysis_status": "completed",
+        "text_extraction_success_rate": gate_rate,
+        "counts": {"high": high, "medium": medium, "low": low, "total": len(risks)},
+        "counts_risk": {"high": high, "medium": medium, "low": low, "total": len(risks)},
+        "aggregate_risk_score": aggregate,
+        "documents_with_limitations": stats["failed_count"],
         "findings": findings,
         "engine": {
             "country_profile": profile_snapshot(country, ptype),
@@ -539,6 +790,8 @@ def analyze_project_documents(
             "resolved_rules": [r.code for r in rules],
             "document_templates": templates,
             "selected_standards": [s.get("code") for s in selected_standards],
+            "extraction": stats,
+            "data_completeness_caveat": caveat,
             "prompt_bundle": {
                 "template_code": prompt_bundle["template_code"],
                 "resolved_country_scope": prompt_bundle["resolved_country_scope"],

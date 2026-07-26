@@ -93,6 +93,12 @@ class FindingOut(BaseModel):
     financial_impact: str | None
     schedule_impact: str | None
     evidence: str | None
+    finding_category: str = "risk"
+    risk_score: int | None = None
+    source_excerpt: str | None = None
+    cause_effect_chain: list[str] = []
+    data_completeness_caveat: str | None = None
+    estimated_impact: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -105,6 +111,10 @@ class AnalysisOut(BaseModel):
     report_language: LanguageCode
     readiness_score: int
     counts: dict[str, int]
+    counts_risk: dict[str, int] | None = None
+    aggregate_risk_score: int | None = None
+    documents_with_limitations: int | None = None
+    text_extraction_success_rate: float | None = None
     findings: list[FindingOut]
     created_at: datetime
 
