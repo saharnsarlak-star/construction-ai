@@ -76,6 +76,74 @@ _CIVIL = frozenset(
     }
 )
 
+# Iran National Building Regulations — all topics (مباحث ۱ تا ۲۲)
+# tuple: (num, title_fa, title_en, title_de, building_level)
+_IR_NBR_TOPICS: list[tuple[int, str, str, str, str]] = [
+    (1, "تعاریف", "Definitions", "Begriffsbestimmungen", "optional"),
+    (2, "نظامات اداری", "Administrative regulations", "Verwaltungsvorschriften", "optional"),
+    (3, "حفاظت ساختمان‌ها در برابر حریق", "Fire protection", "Brandschutz", "mandatory_default"),
+    (4, "الزامات عمومی ساختمان", "General building requirements", "Allgemeine Gebäudeanforderungen", "mandatory_default"),
+    (5, "مصالح و فرآورده‌های ساختمانی", "Building materials and products", "Baustoffe", "recommended_default"),
+    (6, "بارهای وارد بر ساختمان", "Loads on buildings", "Einwirkungen / Lasten", "mandatory_default"),
+    (7, "پی و پی‌سازی", "Foundations", "Gründung", "mandatory_default"),
+    (8, "طرح و اجرای ساختمان‌های با مصالح بنایی", "Masonry structures", "Mauerwerksbau", "recommended_default"),
+    (9, "طرح و اجرای ساختمان‌های بتن آرمه", "Reinforced concrete structures", "Stahlbetonbau", "mandatory_default"),
+    (10, "طرح و اجرای ساختمان‌های فولادی", "Steel structures", "Stahlbau", "mandatory_default"),
+    (11, "طرح و اجرای صنعتی ساختمان‌ها", "Industrialized construction", "Industrialisiertes Bauen", "optional"),
+    (12, "ایمنی و حفاظت کار در حین اجرا", "Construction site safety", "Arbeitsschutz während der Ausführung", "mandatory_default"),
+    (13, "طرح و اجرای تأسیسات برقی ساختمان‌ها", "Electrical installations", "Elektroinstallationen", "mandatory_default"),
+    (14, "تأسیسات مکانیکی", "Mechanical installations", "Technische Gebäudeausrüstung", "mandatory_default"),
+    (15, "آسانسورها و پلکان برقی", "Elevators and escalators", "Aufzüge und Fahrtreppen", "recommended_default"),
+    (16, "تأسیسات بهداشتی", "Plumbing / sanitary installations", "Sanitärinstallationen", "mandatory_default"),
+    (17, "لوله‌کشی گاز طبیعی", "Natural gas piping", "Gasleitungen", "recommended_default"),
+    (18, "عایق‌بندی و تنظیم صدا", "Sound insulation", "Schallschutz", "recommended_default"),
+    (19, "صرفه‌جویی در مصرف انرژی", "Energy conservation", "Energieeinsparung", "mandatory_default"),
+    (20, "علائم و تابلوها", "Signs and boards", "Beschilderung", "optional"),
+    (21, "پدافند غیرعامل", "Passive defense", "Passiver Schutz", "optional"),
+    (22, "مراقبت و نگهداری از ساختمان‌ها", "Building care and maintenance", "Gebäudeunterhalt", "optional"),
+]
+
+
+def _ir_nbr_standards() -> list[StandardDef]:
+    out: list[StandardDef] = [
+        StandardDef(
+            code="IR_NBR",
+            standard_class="technical",
+            title_fa="مقررات ملی ساختمان (مجموعه / مرجع کلی)",
+            title_en="Iran National Building Regulations (set / general reference)",
+            title_de="Nationale Bauvorschriften Iran (Gesamtwerk)",
+            publisher="Ministry of Roads & Urban Development",
+            country_home=CountryCode.IR,
+            check_keywords=["مقررات ملی ساختمان", "مباحث"],
+            applicability=[
+                StandardApplicability(CountryCode.IR, _BUILDING, "recommended_default"),
+                StandardApplicability(CountryCode.IR, _CIVIL, "optional"),
+            ],
+        )
+    ]
+    for num, fa, en, de, level in _IR_NBR_TOPICS:
+        out.append(
+            StandardDef(
+                code=f"IR_NBR_{num:02d}",
+                standard_class="technical",
+                title_fa=f"مبحث {num} — {fa}",
+                title_en=f"NBR Topic {num} — {en}",
+                title_de=f"NBR Abschnitt {num} — {de}",
+                publisher="Ministry of Roads & Urban Development",
+                country_home=CountryCode.IR,
+                check_keywords=["مقررات ملی", f"مبحث {num}", f"مبحث{num}", fa[:28]],
+                applicability=[
+                    StandardApplicability(CountryCode.IR, _BUILDING, level),
+                    StandardApplicability(
+                        CountryCode.IR,
+                        _CIVIL,
+                        "recommended_default" if num in {3, 6, 7, 9, 10, 12} else "optional",
+                    ),
+                ],
+            )
+        )
+    return out
+
 
 STANDARDS_CATALOG: list[StandardDef] = [
     # ---- Iran ----
@@ -92,21 +160,8 @@ STANDARDS_CATALOG: list[StandardDef] = [
             StandardApplicability(CountryCode.IR, None, "mandatory_default"),
         ],
     ),
-    StandardDef(
-        code="IR_NBR",
-        standard_class="technical",
-        title_fa="مقررات ملی ساختمان (مباحث)",
-        title_en="Iran National Building Regulations",
-        title_de="Nationale Bauvorschriften Iran",
-        publisher="Ministry of Roads & Urban Development",
-        country_home=CountryCode.IR,
-        check_keywords=["مبحث", "مقررات ملی", "ساختمان"],
-        applicability=[
-            StandardApplicability(CountryCode.IR, _BUILDING, "mandatory_default"),
-            StandardApplicability(CountryCode.IR, _CIVIL, "recommended_default"),
-        ],
-    ),
-    # Fehrest Baha family — multiple discipline lists (all selectable)
+    *_ir_nbr_standards(),
+    # Fehrest Baha family
     StandardDef(
         code="IR_FEHREST_ABNIEH",
         standard_class="technical",
@@ -274,33 +329,6 @@ STANDARDS_CATALOG: list[StandardDef] = [
             StandardApplicability(CountryCode.IR, None, "recommended_default"),
         ],
     ),
-    StandardDef(
-        code="IR_ELECTRICAL",
-        standard_class="technical",
-        title_fa="مبحث ۱۳ / تأسیسات برقی",
-        title_en="Iran electrical installations (Topic 13)",
-        title_de="Elektroinstallationen Iran",
-        publisher="National Building Regulations",
-        country_home=CountryCode.IR,
-        check_keywords=["برق", "الکتریکال", "مبحث ۱۳"],
-        applicability=[
-            StandardApplicability(CountryCode.IR, _BUILDING, "recommended_default"),
-            StandardApplicability(CountryCode.IR, _CIVIL, "optional"),
-        ],
-    ),
-    StandardDef(
-        code="IR_FIRE",
-        standard_class="technical",
-        title_fa="مبحث ۳ / حفاظت در برابر حریق",
-        title_en="Iran fire protection (Topic 3)",
-        title_de="Brandschutz Iran",
-        publisher="National Building Regulations",
-        country_home=CountryCode.IR,
-        check_keywords=["حریق", "آتش‌نشانی", "مبحث ۳"],
-        applicability=[
-            StandardApplicability(CountryCode.IR, _BUILDING, "recommended_default"),
-        ],
-    ),
     # ---- Germany ----
     StandardDef(
         code="DE_VOB_B",
@@ -422,7 +450,7 @@ STANDARDS_CATALOG: list[StandardDef] = [
             StandardApplicability(CountryCode.CA, None, "recommended_default"),
         ],
     ),
-    # ---- Global / FIDIC (optional across countries) ----
+    # ---- Global / FIDIC ----
     StandardDef(
         code="FIDIC_RED",
         standard_class="contractual",
@@ -467,7 +495,6 @@ def applicability_level(
         if a.country != country:
             continue
         if a.project_types is None or ptype in a.project_types:
-            # Prefer more specific / stronger level if multiple match
             if matched is None or _level_rank(a.level) > _level_rank(matched):
                 matched = a.level
     return matched
