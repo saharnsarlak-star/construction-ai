@@ -250,8 +250,28 @@ button:disabled {
   width: fit-content;
 }
 
+.file-btn.disabled {
+  opacity: 0.55;
+  pointer-events: none;
+}
+
 .file-btn input {
   display: none;
+}
+
+.upload-hint {
+  margin: 0 0 0.65rem;
+  font-size: 0.82rem;
+  line-height: 1.35;
+}
+
+.upload-progress {
+  margin: 0.5rem 0 0;
+  padding: 0.65rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(15, 92, 110, 0.1);
+  color: var(--brand);
+  font-weight: 600;
 }
 
 .file-list {
@@ -260,6 +280,8 @@ button:disabled {
   padding: 0;
   display: grid;
   gap: 0.45rem;
+  max-height: 280px;
+  overflow: auto;
 }
 
 .file-list li {
@@ -402,6 +424,7 @@ button:disabled {
   border-radius: 12px;
   background: rgba(155, 44, 44, 0.1);
   color: var(--high);
+  white-space: pre-wrap;
 }
 
 @media (max-width: 800px) {

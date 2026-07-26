@@ -36,11 +36,17 @@ _ocr_engine = None
 _ocr_engine_tried = False
 
 
-def extract_text_from_file(path: Path) -> str:
+def extract_text_from_file(path: Path, *, allow_ocr: bool = True) -> str:
+    """
+    Extract text for analysis.
+
+    allow_ocr=False skips slow OCR (used for bulk drawing uploads so many files
+    can finish before the request times out). Users can re-extract later.
+    """
     suffix = path.suffix.lower()
     try:
         if suffix == ".pdf":
-            return _extract_pdf(path)
+            return _extract_pdf(path, allow_ocr=allow_ocr)
         if suffix == ".docx":
             return _extract_docx(path)
         if suffix in {".xlsx", ".xls"}:
@@ -48,6 +54,11 @@ def extract_text_from_file(path: Path) -> str:
         if suffix in {".txt", ".csv"}:
             return path.read_text(encoding="utf-8", errors="ignore")
         if suffix in {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}:
+            if not allow_ocr:
+                return (
+                    f"[OCR_SKIPPED] {path.name}\n"
+                    "OCR skipped during bulk upload. Use re-extract if text is needed."
+                )
             return _extract_image(path)
         if suffix in {".dwg", ".dxf", ".doc"}:
             return (
@@ -64,14 +75,16 @@ def has_usable_text(text: str | None) -> bool:
     if not text:
         return False
     stripped = text.strip()
-    if stripped.startswith(("[EXTRACT_ERROR]", "[BINARY_OR_IMAGE_FILE]", "[OCR_UNAVAILABLE]", "[OCR_EMPTY]")):
+    if stripped.startswith(
+        ("[EXTRACT_ERROR]", "[BINARY_OR_IMAGE_FILE]", "[OCR_UNAVAILABLE]", "[OCR_EMPTY]", "[OCR_SKIPPED]")
+    ):
         return False
     cleaned = re.sub(r"---\s*(page|sheet|ocr)[^-\n]*---", "", stripped, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return len(cleaned) >= _MIN_NATIVE_TEXT_CHARS
 
 
-def _extract_pdf(path: Path) -> str:
+def _extract_pdf(path: Path, *, allow_ocr: bool = True) -> str:
     native_chunks: list[str] = []
     page_count = 0
     with pdfplumber.open(path) as pdf:
@@ -84,6 +97,15 @@ def _extract_pdf(path: Path) -> str:
     native = "\n\n".join(native_chunks).strip()
     if len(re.sub(r"\s+", "", native)) >= _MIN_NATIVE_TEXT_CHARS:
         return native
+
+    if not allow_ocr:
+        if native:
+            return native
+        return (
+            f"[OCR_SKIPPED] {path.name}\n"
+            "No native PDF text; OCR skipped during bulk/drawing upload. "
+            "Use re-extract if OCR text is needed."
+        )
 
     ocr = _ocr_pdf_pages(path, page_count=page_count or _MAX_OCR_PAGES).strip()
     if ocr.startswith(("[OCR_UNAVAILABLE]", "[EXTRACT_ERROR]")):

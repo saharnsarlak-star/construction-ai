@@ -53,7 +53,25 @@ export interface AnalysisOut {
   created_at: string;
 }
 
+export interface UploadErrorOut {
+  filename: string;
+  detail: string;
+}
+
+export interface UploadBatchOut {
+  documents: DocumentOut[];
+  errors: UploadErrorOut[];
+}
+
 const API_BASE = import.meta.env.VITE_API_BASE || "/api";
+
+/** Keep each request small so Railway/proxy do not time out on bulk uploads. */
+export const UPLOAD_CHUNK_SIZE = 4;
+
+const FILE_ACCEPT =
+  ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.dwg,.dxf";
+
+export { FILE_ACCEPT };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, init);
@@ -99,8 +117,8 @@ export const api = {
   uploadDocuments: async (projectId: number, category: DocumentCategory, files: FileList | File[]) => {
     const form = new FormData();
     form.append("category", category);
-    Array.from(files).forEach((f) => form.append("files", f));
-    return request<DocumentOut[]>(`/projects/${projectId}/documents`, {
+    Array.from(files).forEach((f) => form.append("files", f, f.name));
+    return request<UploadBatchOut>(`/projects/${projectId}/documents`, {
       method: "POST",
       body: form,
     });

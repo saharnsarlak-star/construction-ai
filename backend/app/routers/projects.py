@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy import select
@@ -17,6 +18,8 @@ from app.schemas import (
     ProjectCreate,
     ProjectOut,
     ProjectUpdate,
+    UploadBatchOut,
+    UploadErrorOut,
 )
 from app.services.analyzer import analyze_project_documents
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
@@ -124,13 +127,17 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)) ->
     return {"ok": True}
 
 
-@router.post("/{project_id}/documents", response_model=list[DocumentOut])
+@router.post("/{project_id}/documents", response_model=UploadBatchOut)
 async def upload_documents(
     project_id: int,
     category: DocumentCategory = Form(...),
-    files: list[UploadFile] = File(...),
+    files: Annotated[list[UploadFile], File()],
     db: AsyncSession = Depends(get_db),
-) -> list[DocumentOut]:
+) -> UploadBatchOut:
+    """
+    Accept many files in one request. Failures are per-file (partial success).
+    Drawing uploads skip OCR so bulk plan packages do not time out.
+    """
     project = await _get_project(db, project_id)
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
@@ -138,29 +145,32 @@ async def upload_documents(
     max_bytes = (
         None if settings.max_upload_mb <= 0 else settings.max_upload_mb * 1024 * 1024
     )
+    # Skip OCR for drawings always; also for larger batches so uploads finish.
+    allow_ocr = category != DocumentCategory.DRAWING and len(files) <= 2
     saved: list[Document] = []
+    errors: list[UploadErrorOut] = []
 
     for upload in files:
         name = upload.filename or "unnamed"
         suffix = Path(name).suffix.lower()
         if suffix and suffix not in SUPPORTED_EXTENSIONS:
-            raise HTTPException(status_code=400, detail=f"Unsupported file type: {suffix}")
-
-        # Read in chunks to enforce size limit without holding extra copies longer than needed.
-        chunks: list[bytes] = []
-        size = 0
-        chunk_size = 1024 * 1024
-        while True:
-            chunk = await upload.read(chunk_size)
-            if not chunk:
-                break
-            size += len(chunk)
-            if max_bytes is not None and size > max_bytes:
-                raise HTTPException(status_code=400, detail=f"File too large: {name}")
-            chunks.append(chunk)
-        data = b"".join(chunks)
+            errors.append(UploadErrorOut(filename=name, detail=f"Unsupported file type: {suffix}"))
+            continue
 
         try:
+            chunks: list[bytes] = []
+            size = 0
+            chunk_size = 1024 * 1024
+            while True:
+                chunk = await upload.read(chunk_size)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if max_bytes is not None and size > max_bytes:
+                    raise ValueError(f"File too large: {name}")
+                chunks.append(chunk)
+            data = b"".join(chunks)
+
             stored_path, local_path = await file_storage.save_upload(
                 project_id=project.id,
                 category=category.value,
@@ -168,26 +178,36 @@ async def upload_documents(
                 data=data,
                 content_type=upload.content_type,
             )
+            text = extract_text_from_file(local_path, allow_ocr=allow_ocr)
+            doc = Document(
+                project_id=project.id,
+                category=category,
+                original_name=name,
+                stored_path=stored_path,
+                content_type=upload.content_type,
+                size_bytes=size,
+                extracted_text=text,
+            )
+            db.add(doc)
+            saved.append(doc)
         except file_storage.StorageError as exc:
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            errors.append(UploadErrorOut(filename=name, detail=str(exc)))
+        except Exception as exc:  # noqa: BLE001 — keep batch going
+            errors.append(UploadErrorOut(filename=name, detail=str(exc)))
 
-        text = extract_text_from_file(local_path)
-        doc = Document(
-            project_id=project.id,
-            category=category,
-            original_name=name,
-            stored_path=stored_path,
-            content_type=upload.content_type,
-            size_bytes=size,
-            extracted_text=text,
+    if not saved and errors:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "All uploads failed",
+                "errors": [e.model_dump() for e in errors],
+            },
         )
-        db.add(doc)
-        saved.append(doc)
 
     await db.commit()
     for doc in saved:
         await db.refresh(doc)
-    return [_doc_out(d) for d in saved]
+    return UploadBatchOut(documents=[_doc_out(d) for d in saved], errors=errors)
 
 
 @router.delete("/{project_id}/documents/{document_id}")

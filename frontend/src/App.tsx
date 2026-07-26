@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   api,
+  FILE_ACCEPT,
+  UPLOAD_CHUNK_SIZE,
   type AnalysisOut,
   type CountryCode,
   type DocumentCategory,
@@ -27,6 +29,11 @@ function App() {
   const [project, setProject] = useState<ProjectOut | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisOut | null>(null);
   const [busy, setBusy] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    done: number;
+    total: number;
+    category: DocumentCategory;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState("");
@@ -124,15 +131,39 @@ function App() {
 
   async function onUpload(category: DocumentCategory, files: FileList | null) {
     if (!project || !files?.length) return;
+    const list = Array.from(files);
     setBusy(true);
     setError(null);
+    setUploadProgress({ done: 0, total: list.length, category });
+    const failed: string[] = [];
     try {
-      await api.uploadDocuments(project.id, category, files);
+      for (let i = 0; i < list.length; i += UPLOAD_CHUNK_SIZE) {
+        const chunk = list.slice(i, i + UPLOAD_CHUNK_SIZE);
+        try {
+          const result = await api.uploadDocuments(project.id, category, chunk);
+          for (const err of result.errors) {
+            failed.push(`${err.filename}: ${err.detail}`);
+          }
+        } catch (e) {
+          failed.push(...chunk.map((f) => `${f.name}: ${String(e)}`));
+        }
+        setUploadProgress({
+          done: Math.min(i + chunk.length, list.length),
+          total: list.length,
+          category,
+        });
+      }
       await loadProject(project.id);
+      if (failed.length) {
+        const preview = failed.slice(0, 5).join("\n");
+        const more = failed.length > 5 ? `\n… +${failed.length - 5}` : "";
+        setError(`${t(uiLang, "uploadPartial")}\n${preview}${more}`);
+      }
     } catch (e) {
       setError(String(e));
     } finally {
       setBusy(false);
+      setUploadProgress(null);
     }
   }
 
@@ -337,15 +368,28 @@ function App() {
               </div>
             </div>
 
+            {uploadProgress && (
+              <p className="upload-progress" role="status">
+                {t(uiLang, "uploadingProgress")
+                  .replace("{done}", String(uploadProgress.done))
+                  .replace("{total}", String(uploadProgress.total))}
+              </p>
+            )}
+
             <div className="upload-grid">
               {uploadCategories.map((cat) => (
                 <article key={cat.key} className="upload-card">
                   <h3>{t(uiLang, cat.labelKey)}</h3>
-                  <label className="file-btn">
-                    {t(uiLang, "upload")}
+                  <p className="muted upload-hint">{t(uiLang, "uploadHint")}</p>
+                  <label className={`file-btn${busy ? " disabled" : ""}`}>
+                    {busy && uploadProgress?.category === cat.key
+                      ? t(uiLang, "uploading")
+                      : t(uiLang, "upload")}
                     <input
                       type="file"
                       multiple
+                      accept={FILE_ACCEPT}
+                      disabled={busy}
                       onChange={(e) => {
                         void onUpload(cat.key, e.target.files);
                         e.target.value = "";
@@ -375,7 +419,11 @@ function App() {
                                 {t(uiLang, "reextract")}
                               </button>
                             )}
-                            <button className="linkish" onClick={() => void onDeleteDoc(d.id)}>
+                            <button
+                              className="linkish"
+                              disabled={busy}
+                              onClick={() => void onDeleteDoc(d.id)}
+                            >
                               {t(uiLang, "delete")}
                             </button>
                           </div>

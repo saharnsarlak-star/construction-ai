@@ -37,6 +37,16 @@ class DocumentOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class UploadErrorOut(BaseModel):
+    filename: str
+    detail: str
+
+
+class UploadBatchOut(BaseModel):
+    documents: list[DocumentOut] = []
+    errors: list[UploadErrorOut] = []
+
+
 class ProjectOut(BaseModel):
     id: int
     name: str
