@@ -7,6 +7,7 @@ from app.knowledge.country_profiles import get_country_profile, profile_snapshot
 from app.knowledge.document_templates import resolve_document_template
 from app.knowledge.prompt_templates import render_prompt_bundle
 from app.knowledge.rules_registry import RuleDef, resolve_rules_for_project
+from app.knowledge.standards_catalog import get_standard
 from app.models import CountryCode, DocumentCategory, LanguageCode, ProjectType, RiskSeverity
 from app.services.extractor import has_usable_text
 
@@ -164,12 +165,118 @@ def _apply_rule(rule: RuleDef, *, by_cat: dict, corpus: str, lang: LanguageCode)
     return None
 
 
+def _analyze_selected_standards(
+    *,
+    lang: LanguageCode,
+    selected_standards: list[dict],
+    tender_text: str,
+    standard_text: str,
+    drawing_names: list[str],
+) -> list[RiskFinding]:
+    """Cross-check selected catalog standards against tender/contract vs technical docs."""
+    if not selected_standards:
+        return []
+
+    findings: list[RiskFinding] = []
+    contract_corpus = tender_text
+    technical_corpus = "\n".join([standard_text, tender_text, " ".join(drawing_names)])
+
+    for item in selected_standards:
+        code = item.get("code") or ""
+        title = item.get("title") or code
+        sclass = item.get("standard_class") or "technical"
+        std = get_standard(code)
+        keywords = list(std.check_keywords) if std else []
+        if code:
+            keywords.append(code.replace("_", " "))
+
+        if sclass == "contractual":
+            target = contract_corpus
+            target_label = {
+                LanguageCode.FA: "اسناد پیمان/قرارداد",
+                LanguageCode.EN: "contract / tender conditions",
+                LanguageCode.DE: "Vertrags-/Ausschreibungsunterlagen",
+                LanguageCode.FR: "contrat / conditions d'AO",
+            }[lang]
+        else:
+            target = technical_corpus
+            target_label = {
+                LanguageCode.FA: "نقشه / مشخصات / BoQ / استاندارد بارگذاری‌شده",
+                LanguageCode.EN: "drawings / specs / BoQ / uploaded standards",
+                LanguageCode.DE: "Pläne / Specs / LV / hochgeladene Standards",
+                LanguageCode.FR: "plans / specs / métré / normes téléversées",
+            }[lang]
+
+        if keywords and not _contains_any(target, keywords):
+            findings.append(
+                RiskFinding(
+                    code=f"STD-MATCH-{code[:24]}",
+                    category="compliance",
+                    severity=RiskSeverity.MEDIUM,
+                    title={
+                        LanguageCode.FA: f"ارجاع ضعیف به استاندارد انتخاب‌شده: {title}",
+                        LanguageCode.EN: f"Weak reference to selected standard: {title}",
+                        LanguageCode.DE: f"Schwacher Bezug zum gewählten Standard: {title}",
+                        LanguageCode.FR: f"Référence faible à la norme sélectionnée : {title}",
+                    }[lang],
+                    description={
+                        LanguageCode.FA: f"استاندارد «{title}» ({sclass}) انتخاب شده ولی در {target_label} نشانه‌ای از ارجاع به آن دیده نشد.",
+                        LanguageCode.EN: f"Standard “{title}” ({sclass}) is selected but no clear reference was found in {target_label}.",
+                        LanguageCode.DE: f"Standard „{title}“ ({sclass}) gewählt, aber kein klarer Bezug in {target_label}.",
+                        LanguageCode.FR: f"Norme « {title} » ({sclass}) sélectionnée, mais pas de référence claire dans {target_label}.",
+                    }[lang],
+                    recommendation={
+                        LanguageCode.FA: "ارجاع صریح به این استاندارد را در اسناد هدف بنویسید یا فایل استاندارد را بارگذاری کنید.",
+                        LanguageCode.EN: "Cite this standard explicitly in the target documents, or upload the standard file.",
+                        LanguageCode.DE: "Standard in Zieldokumenten ausdrücklich nennen oder Datei hochladen.",
+                        LanguageCode.FR: "Citer explicitement cette norme dans les documents cibles, ou téléverser le fichier.",
+                    }[lang],
+                    financial_impact="medium",
+                    schedule_impact="low",
+                    evidence=code,
+                )
+            )
+
+    names = ", ".join((s.get("title") or s.get("code") or "") for s in selected_standards[:8])
+    more = f" (+{len(selected_standards) - 8})" if len(selected_standards) > 8 else ""
+    findings.append(
+        RiskFinding(
+            code="STD-SELECT-001",
+            category="compliance",
+            severity=RiskSeverity.LOW,
+            title={
+                LanguageCode.FA: "استانداردهای اعمال‌شده در این تحلیل",
+                LanguageCode.EN: "Standards applied in this analysis",
+                LanguageCode.DE: "In dieser Analyse angewandte Standards",
+                LanguageCode.FR: "Normes appliquées dans cette analyse",
+            }[lang],
+            description={
+                LanguageCode.FA: f"انتخاب‌شده: {names}{more}",
+                LanguageCode.EN: f"Selected: {names}{more}",
+                LanguageCode.DE: f"Ausgewählt: {names}{more}",
+                LanguageCode.FR: f"Sélectionnées : {names}{more}",
+            }[lang],
+            recommendation={
+                LanguageCode.FA: "در صورت نیاز چک‌لیست استانداردها را قبل از مناقصه نهایی کنید.",
+                LanguageCode.EN: "Finalize the standards checklist before tender issue if needed.",
+                LanguageCode.DE: "Standards-Checkliste vor Ausschreibung finalisieren.",
+                LanguageCode.FR: "Finaliser la liste des normes avant lancement de l'AO.",
+            }[lang],
+            financial_impact="low",
+            schedule_impact="low",
+            evidence=names,
+        )
+    )
+    return findings
+
+
 def analyze_project_documents(
     *,
     country: CountryCode,
     report_language: LanguageCode,
     documents: list[dict],
     project_type: ProjectType | None = None,
+    selected_standards: list[dict] | None = None,
 ) -> dict:
     """Country-aware rule engine: resolve RuleSet + overrides from knowledge data."""
     lang = report_language
@@ -180,6 +287,7 @@ def analyze_project_documents(
         project_type=ptype,
         ruleset_code=profile.default_ruleset_code,
     )
+    selected_standards = selected_standards or []
 
     by_cat: dict[DocumentCategory, list[dict]] = {c: [] for c in DocumentCategory}
     for doc in documents:
@@ -202,6 +310,17 @@ def analyze_project_documents(
     corpus_for_rules = corpus  # findings still based on uploaded docs only
 
     findings: list[RiskFinding] = []
+
+    # Selected catalog standards vs document evidence
+    findings.extend(
+        _analyze_selected_standards(
+            lang=lang,
+            selected_standards=selected_standards,
+            tender_text=tender_text,
+            standard_text=standard_text,
+            drawing_names=drawing_names,
+        )
+    )
 
     unreadables = [d for d in documents if not has_usable_text(d.get("extracted_text") or "")]
     if unreadables:
@@ -247,6 +366,9 @@ def analyze_project_documents(
     )
 
     for rule in rules:
+        if rule.code == "STD-001" and selected_standards:
+            # Catalog selection covers the "no standards pack" gap.
+            continue
         hit = _apply_rule(rule, by_cat=by_cat, corpus=corpus_for_rules, lang=lang)
         if hit:
             # annotate evidence with resolved jurisdiction when useful
@@ -326,29 +448,29 @@ def analyze_project_documents(
                 )
             )
 
-    if not by_cat[DocumentCategory.STANDARD]:
+    if not by_cat[DocumentCategory.STANDARD] and not selected_standards:
         findings.append(
             RiskFinding(
                 code="COUNTRY-STD-001",
                 category="compliance",
-                severity=RiskSeverity.HIGH,
+                severity=RiskSeverity.MEDIUM,
                 title={
-                    LanguageCode.FA: f"استاندارد محلی برای {country.value} بارگذاری نشده",
-                    LanguageCode.EN: f"No local standards uploaded for {country.value}",
-                    LanguageCode.DE: f"Keine lokalen Standards für {country.value}",
-                    LanguageCode.FR: f"Aucune norme locale pour {country.value}",
+                    LanguageCode.FA: f"هیچ استانداردی برای {country.value} انتخاب یا بارگذاری نشده",
+                    LanguageCode.EN: f"No standards selected or uploaded for {country.value}",
+                    LanguageCode.DE: f"Keine Standards gewählt/hochgeladen für {country.value}",
+                    LanguageCode.FR: f"Aucune norme sélectionnée/téléversée pour {country.value}",
                 }[lang],
                 description={
-                    LanguageCode.FA: f"پروفایل {profile.code} به سیستم {profile.primary_standards_system} وابسته است.",
-                    LanguageCode.EN: f"Profile {profile.code} depends on {profile.primary_standards_system}.",
+                    LanguageCode.FA: f"پروفایل {profile.code} به سیستم {profile.primary_standards_system} وابسته است. از چک‌لیست استانداردها انتخاب کنید یا فایل سفارشی بارگذاری کنید.",
+                    LanguageCode.EN: f"Profile {profile.code} depends on {profile.primary_standards_system}. Select from the standards checklist or upload a custom file.",
                     LanguageCode.DE: f"Profil {profile.code} hängt von {profile.primary_standards_system} ab.",
                     LanguageCode.FR: f"Le profil {profile.code} dépend de {profile.primary_standards_system}.",
                 }[lang],
                 recommendation={
-                    LanguageCode.FA: "بسته استاندارد کشور پروژه را بارگذاری کنید.",
-                    LanguageCode.EN: "Upload the country standards pack for this project.",
-                    LanguageCode.DE: "Länderspezifisches Standards-Paket hochladen.",
-                    LanguageCode.FR: "Téléverser le pack de normes du pays.",
+                    LanguageCode.FA: "استانداردهای پیشنهادی کشور را تیک بزنید یا فایل استاندارد بارگذاری کنید.",
+                    LanguageCode.EN: "Tick recommended country standards or upload a standards file.",
+                    LanguageCode.DE: "Empfohlene Landesstandards anhaken oder Datei hochladen.",
+                    LanguageCode.FR: "Cocher les normes recommandées ou téléverser un fichier.",
                 }[lang],
                 financial_impact="high",
                 schedule_impact="medium",
@@ -416,6 +538,7 @@ def analyze_project_documents(
             "ruleset": profile.default_ruleset_code,
             "resolved_rules": [r.code for r in rules],
             "document_templates": templates,
+            "selected_standards": [s.get("code") for s in selected_standards],
             "prompt_bundle": {
                 "template_code": prompt_bundle["template_code"],
                 "resolved_country_scope": prompt_bundle["resolved_country_scope"],

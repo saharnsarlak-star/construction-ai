@@ -53,6 +53,13 @@ const dictionaries: Record<LanguageCode, Dict> = {
     scheduleOptionalHint:
       "اگر برنامه زمان‌بندی ندارید مشکلی نیست — تحلیل بدون آن ادامه می‌یابد؛ فقط یک هشدار ریسک ثبت می‌شود.",
     standards: "استانداردها",
+    standardsSelectHint:
+      "بر اساس کشور و نوع پروژه، استانداردهای پیشنهادی از قبل تیک خورده‌اند. می‌توانید تیک را کم/زیاد کنید.",
+    standardsCustomHint: "استاندارد داخلی یا کد منطقه‌ای که در کاتالوگ نیست را اینجا بارگذاری کنید.",
+    standardsLoading: "در حال بارگذاری فهرست استانداردها…",
+    uploadCustomStandard: "بارگذاری استاندارد سفارشی",
+    noCustomStandards: "فایل استاندارد سفارشی بارگذاری نشده",
+    userOverride: "انتخاب دستی",
     upload: "بارگذاری چند فایل",
     uploadHint: "چند فایل را با هم انتخاب کنید (Ctrl/Shift). دسته‌ای آپلود می‌شود.",
     uploading: "در حال بارگذاری…",
@@ -130,6 +137,13 @@ const dictionaries: Record<LanguageCode, Dict> = {
     scheduleOptionalHint:
       "No schedule is fine — analysis continues without it; only a risk note is recorded.",
     standards: "Standards",
+    standardsSelectHint:
+      "Based on country and project type, recommended standards are pre-selected. You can tick/untick freely.",
+    standardsCustomHint: "Upload an internal or uncatalogued regional standard here.",
+    standardsLoading: "Loading standards list…",
+    uploadCustomStandard: "Upload custom standard",
+    noCustomStandards: "No custom standard files uploaded",
+    userOverride: "manual override",
     upload: "Upload multiple files",
     uploadHint: "Select many files at once (Ctrl/Shift). Uploaded in batches.",
     uploading: "Uploading…",
@@ -207,6 +221,13 @@ const dictionaries: Record<LanguageCode, Dict> = {
     scheduleOptionalHint:
       "Kein Terminplan ist in Ordnung — die Analyse läuft weiter; nur ein Risikohinweis.",
     standards: "Standards",
+    standardsSelectHint:
+      "Je nach Land und Projekttyp sind empfohlene Standards vorausgewählt. Sie können frei an-/abhaken.",
+    standardsCustomHint: "Internen oder nicht katalogisierten Standard hier hochladen.",
+    standardsLoading: "Standardsliste wird geladen…",
+    uploadCustomStandard: "Eigenen Standard hochladen",
+    noCustomStandards: "Keine eigenen Standarddateien",
+    userOverride: "manuelle Auswahl",
     upload: "Mehrere Dateien hochladen",
     uploadHint: "Mehrere Dateien gleichzeitig wählen (Strg/Umschalt). Batch-Upload.",
     uploading: "Wird hochgeladen…",
@@ -284,6 +305,13 @@ const dictionaries: Record<LanguageCode, Dict> = {
     scheduleOptionalHint:
       "Sans planning, l'analyse continue; seule une note de risque est enregistrée.",
     standards: "Normes",
+    standardsSelectHint:
+      "Selon le pays et le type de projet, les normes recommandées sont pré-cochées. Vous pouvez modifier.",
+    standardsCustomHint: "Téléverser ici une norme interne ou non cataloguée.",
+    standardsLoading: "Chargement de la liste des normes…",
+    uploadCustomStandard: "Téléverser une norme personnalisée",
+    noCustomStandards: "Aucun fichier de norme personnalisée",
+    userOverride: "choix manuel",
     upload: "Téléverser plusieurs fichiers",
     uploadHint: "Sélectionnez plusieurs fichiers (Ctrl/Shift). Envoi par lots.",
     uploading: "Téléversement…",

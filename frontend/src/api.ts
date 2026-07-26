@@ -82,6 +82,17 @@ export interface AnalysisOut {
   created_at: string;
 }
 
+export interface ProjectStandardOut {
+  standard_code: string;
+  title: string;
+  standard_class: string;
+  publisher: string;
+  applicability_level: string;
+  is_selected: boolean;
+  selected_by: string;
+  check_target: string;
+}
+
 export interface UploadErrorOut {
   filename: string;
   detail: string;
@@ -153,6 +164,14 @@ export const api = {
       body: form,
     });
   },
+  listProjectStandards: (projectId: number) =>
+    request<ProjectStandardOut[]>(`/projects/${projectId}/standards`),
+  updateProjectStandards: (projectId: number, items: { standard_code: string; is_selected: boolean }[]) =>
+    request<ProjectStandardOut[]>(`/projects/${projectId}/standards`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    }),
   deleteDocument: (projectId: number, documentId: number) =>
     request<{ ok: boolean }>(`/projects/${projectId}/documents/${documentId}`, {
       method: "DELETE",

@@ -47,6 +47,26 @@ class UploadBatchOut(BaseModel):
     errors: list[UploadErrorOut] = []
 
 
+class ProjectStandardOut(BaseModel):
+    standard_code: str
+    title: str
+    standard_class: str
+    publisher: str
+    applicability_level: str
+    is_selected: bool
+    selected_by: str  # system_default | user_override
+    check_target: str  # technical docs vs contract
+
+
+class ProjectStandardUpdateItem(BaseModel):
+    standard_code: str
+    is_selected: bool
+
+
+class ProjectStandardsUpdate(BaseModel):
+    items: list[ProjectStandardUpdateItem]
+
+
 class ProjectOut(BaseModel):
     id: int
     name: str

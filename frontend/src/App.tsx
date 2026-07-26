@@ -8,6 +8,7 @@ import {
   type DocumentCategory,
   type LanguageCode,
   type ProjectOut,
+  type ProjectStandardOut,
   type ProjectType,
 } from "./api";
 import { countryOptions, languageOptions, projectTypeOptions, t } from "./i18n";
@@ -17,7 +18,7 @@ const uploadCategories: { key: DocumentCategory; labelKey: string; optional?: bo
   { key: "tender", labelKey: "tenderDocs" },
   { key: "drawing", labelKey: "drawings", optional: true },
   { key: "schedule", labelKey: "schedule", optional: true },
-  { key: "standard", labelKey: "standards", optional: true },
+  // standards has a dedicated selection panel + custom upload
 ];
 
 function App() {
@@ -28,6 +29,7 @@ function App() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [project, setProject] = useState<ProjectOut | null>(null);
   const [analysis, setAnalysis] = useState<AnalysisOut | null>(null);
+  const [projectStandards, setProjectStandards] = useState<ProjectStandardOut[]>([]);
   const [busy, setBusy] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{
     done: number;
@@ -58,6 +60,7 @@ function App() {
     if (selectedId == null) {
       setProject(null);
       setAnalysis(null);
+      setProjectStandards([]);
       return;
     }
     void loadProject(selectedId);
@@ -79,6 +82,12 @@ function App() {
       setProject(p);
       setReportLang(p.report_language);
       try {
+        const standards = await api.listProjectStandards(id);
+        setProjectStandards(standards);
+      } catch {
+        setProjectStandards([]);
+      }
+      try {
         const a = await api.latestAnalysis(id);
         setAnalysis(a);
       } catch {
@@ -86,6 +95,22 @@ function App() {
       }
     } catch (e) {
       setError(String(e));
+    }
+  }
+
+  async function toggleStandard(code: string, next: boolean) {
+    if (!project) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const updated = await api.updateProjectStandards(project.id, [
+        { standard_code: code, is_selected: next },
+      ]);
+      setProjectStandards(updated);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -441,6 +466,82 @@ function App() {
                 </article>
               ))}
             </div>
+
+            <article className="upload-card standards-panel">
+              <h3>
+                {t(uiLang, "standards")}
+                <span className="optional-badge"> {t(uiLang, "optional")}</span>
+              </h3>
+              <p className="muted upload-hint">{t(uiLang, "standardsSelectHint")}</p>
+              {projectStandards.length === 0 ? (
+                <p className="muted">{t(uiLang, "standardsLoading")}</p>
+              ) : (
+                <ul className="standards-checklist">
+                  {projectStandards.map((s) => (
+                    <li key={s.standard_code} className={s.is_selected ? "selected" : ""}>
+                      <label>
+                        <input
+                          type="checkbox"
+                          checked={s.is_selected}
+                          disabled={busy}
+                          onChange={(e) => void toggleStandard(s.standard_code, e.target.checked)}
+                        />
+                        <span className="std-main">
+                          <strong>{s.title}</strong>
+                          <small>
+                            {s.standard_class} · {s.applicability_level}
+                            {s.selected_by === "user_override" ? ` · ${t(uiLang, "userOverride")}` : ""}
+                            {" · "}
+                            {s.check_target}
+                          </small>
+                        </span>
+                      </label>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <p className="muted upload-hint">{t(uiLang, "standardsCustomHint")}</p>
+              <label className={`file-btn${busy ? " disabled" : ""}`}>
+                {busy && uploadProgress?.category === "standard"
+                  ? t(uiLang, "uploading")
+                  : t(uiLang, "uploadCustomStandard")}
+                <input
+                  type="file"
+                  multiple
+                  accept={FILE_ACCEPT}
+                  disabled={busy}
+                  onChange={(e) => {
+                    void onUpload("standard", e.target.files);
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              {docsByCategory.standard.length === 0 ? (
+                <p className="muted">{t(uiLang, "noCustomStandards")}</p>
+              ) : (
+                <ul className="file-list">
+                  {docsByCategory.standard.map((d) => (
+                    <li key={d.id}>
+                      <div className="file-meta">
+                        <span title={d.original_name}>{d.original_name}</span>
+                        <small className={d.has_text ? "tag ok" : "tag warn"}>
+                          {d.has_text ? t(uiLang, "textOk") : t(uiLang, "textMissing")}
+                        </small>
+                      </div>
+                      <div className="file-actions">
+                        <button
+                          className="linkish"
+                          disabled={busy}
+                          onClick={() => void onDeleteDoc(d.id)}
+                        >
+                          {t(uiLang, "delete")}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </article>
 
             {analysis && (
               <div className="report">

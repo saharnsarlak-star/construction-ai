@@ -223,7 +223,7 @@ button:disabled {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.9rem;
-  margin: 1.2rem 0 1.5rem;
+  margin: 1.2rem 0 0;
 }
 
 .upload-card {
@@ -242,6 +242,49 @@ button:disabled {
   font-size: 0.78rem;
   font-weight: 500;
   color: var(--muted, #5a6b73);
+}
+
+.standards-panel {
+  margin: 0.9rem 0 1.5rem;
+}
+
+.standards-checklist {
+  list-style: none;
+  margin: 0.75rem 0 1rem;
+  padding: 0;
+  display: grid;
+  gap: 0.45rem;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.standards-checklist li {
+  border: 1px solid rgba(15, 92, 110, 0.15);
+  border-radius: 12px;
+  padding: 0.55rem 0.7rem;
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.standards-checklist li.selected {
+  border-color: rgba(15, 92, 110, 0.45);
+  background: rgba(15, 92, 110, 0.06);
+}
+
+.standards-checklist label {
+  display: flex;
+  gap: 0.65rem;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.standards-checklist .std-main {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.standards-checklist .std-main small {
+  color: var(--muted, #5a6b73);
+  font-size: 0.78rem;
 }
 
 .file-btn {

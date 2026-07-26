@@ -9,7 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.database import get_db
-from app.models import Analysis, Document, DocumentCategory, Finding, Project, ProjectType
+from app.models import Analysis, Document, DocumentCategory, Finding, Project, ProjectStandard, ProjectType
 from app.schemas import (
     AnalysisOut,
     AnalyzeRequest,
@@ -17,6 +17,8 @@ from app.schemas import (
     FindingOut,
     ProjectCreate,
     ProjectOut,
+    ProjectStandardOut,
+    ProjectStandardsUpdate,
     ProjectUpdate,
     UploadBatchOut,
     UploadErrorOut,
@@ -24,7 +26,9 @@ from app.schemas import (
 from app.services.analyzer import analyze_project_documents
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
 from app.services import storage as file_storage
+from app.services.project_standards import apply_user_standard_selection, ensure_project_standards
 from app.knowledge.country_profiles import get_country_profile
+from app.knowledge.standards_catalog import get_standard
 
 router = APIRouter(prefix="/projects", tags=["projects"])
 
@@ -90,6 +94,7 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
     db.add(project)
     await db.commit()
     await db.refresh(project)
+    await ensure_project_standards(db, project, lang=payload.ui_language.value)
     # Reload with selectinload so async relationship access is safe.
     project = await _get_project(db, project.id)
     return _project_out(project)
@@ -106,9 +111,12 @@ async def update_project(
     project_id: int, payload: ProjectUpdate, db: AsyncSession = Depends(get_db)
 ) -> ProjectOut:
     project = await _get_project(db, project_id)
+    country_or_type_changed = False
     for key, value in payload.model_dump(exclude_unset=True).items():
         if key == "project_type" and hasattr(value, "value"):
             value = value.value
+        if key in {"country", "project_type"} and value is not None and getattr(project, key, None) != value:
+            country_or_type_changed = True
         if key == "country" and value is not None:
             setattr(project, key, value)
             project.country_profile_code = get_country_profile(value).code
@@ -116,6 +124,8 @@ async def update_project(
         setattr(project, key, value)
     await db.commit()
     project = await _get_project(db, project_id)
+    if country_or_type_changed:
+        await ensure_project_standards(db, project, lang=project.ui_language.value)
     return _project_out(project)
 
 
@@ -125,6 +135,57 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)) ->
     await db.delete(project)
     await db.commit()
     return {"ok": True}
+
+
+def _standard_out(row: ProjectStandard) -> ProjectStandardOut:
+    std = get_standard(row.standard_code)
+    sclass = row.standard_class or (std.standard_class if std else "technical")
+    if sclass == "contractual":
+        check_target = "contract"
+    elif sclass == "hybrid":
+        check_target = "contract+technical"
+    else:
+        check_target = "drawings+boq+specifications"
+    return ProjectStandardOut(
+        standard_code=row.standard_code,
+        title=row.title or (std.title_en if std else row.standard_code),
+        standard_class=sclass,
+        publisher=std.publisher if std else "",
+        applicability_level=row.applicability_level or "optional",
+        is_selected=bool(row.is_selected),
+        selected_by=row.selected_by or "system_default",
+        check_target=check_target,
+    )
+
+
+@router.get("/{project_id}/standards", response_model=list[ProjectStandardOut])
+async def list_project_standards(
+    project_id: int, db: AsyncSession = Depends(get_db)
+) -> list[ProjectStandardOut]:
+    project = await _get_project(db, project_id)
+    rows = await ensure_project_standards(db, project, lang=project.ui_language.value)
+    # Selected defaults first, then optional unchecked
+    rows_sorted = sorted(
+        rows,
+        key=lambda r: (0 if r.is_selected else 1, 0 if (r.applicability_level or "") == "mandatory_default" else 1, r.standard_code),
+    )
+    return [_standard_out(r) for r in rows_sorted]
+
+
+@router.put("/{project_id}/standards", response_model=list[ProjectStandardOut])
+async def update_project_standards(
+    project_id: int,
+    payload: ProjectStandardsUpdate,
+    db: AsyncSession = Depends(get_db),
+) -> list[ProjectStandardOut]:
+    project = await _get_project(db, project_id)
+    updates = [(item.standard_code, item.is_selected) for item in payload.items]
+    rows = await apply_user_standard_selection(db, project, updates)
+    rows_sorted = sorted(
+        rows,
+        key=lambda r: (0 if r.is_selected else 1, r.standard_code),
+    )
+    return [_standard_out(r) for r in rows_sorted]
 
 
 @router.post("/{project_id}/documents", response_model=UploadBatchOut)
@@ -278,11 +339,27 @@ async def analyze_project(
     else:
         ptype = ProjectType.INFRASTRUCTURE
 
+    result = await db.execute(select(ProjectStandard).where(ProjectStandard.project_id == project.id))
+    std_rows = list(result.scalars().all())
+    if not std_rows:
+        std_rows = await ensure_project_standards(db, project, lang=project.ui_language.value)
+    selected_standards = [
+        {
+            "code": r.standard_code,
+            "title": r.title or r.standard_code,
+            "standard_class": r.standard_class or "technical",
+            "is_selected": bool(r.is_selected),
+        }
+        for r in std_rows
+        if r.is_selected
+    ]
+
     result = analyze_project_documents(
         country=project.country,
         report_language=report_language,
         documents=docs_payload,
         project_type=ptype,
+        selected_standards=selected_standards,
     )
 
     analysis = Analysis(

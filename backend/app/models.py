@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import DateTime, Enum, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -101,6 +101,28 @@ class Project(Base):
 
     documents: Mapped[list["Document"]] = relationship(back_populates="project", cascade="all, delete-orphan")
     analyses: Mapped[list["Analysis"]] = relationship(back_populates="project", cascade="all, delete-orphan")
+    project_standards: Mapped[list["ProjectStandard"]] = relationship(
+        back_populates="project", cascade="all, delete-orphan"
+    )
+
+
+class ProjectStandard(Base):
+    """Per-project standard selection (catalog codes + user overrides)."""
+
+    __tablename__ = "project_standards"
+    __table_args__ = (UniqueConstraint("project_id", "standard_code", name="uq_project_standard"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    project_id: Mapped[int] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"))
+    standard_code: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_selected: Mapped[bool] = mapped_column(Boolean, default=True)
+    selected_by: Mapped[str] = mapped_column(String(32), default="system_default")
+    applicability_level: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    standard_class: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    project: Mapped["Project"] = relationship(back_populates="project_standards")
 
 
 class Document(Base):
