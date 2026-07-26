@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import re
 import tempfile
+import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 
@@ -18,6 +21,24 @@ def storage_mode() -> str:
     return "local"
 
 
+def _storage_object_name(filename: str) -> str:
+    """
+    Supabase Storage rejects non-ASCII / invalid object keys (InvalidKey).
+    Keep a readable ASCII stem when possible; always unique; preserve extension.
+    Display name stays in Document.original_name.
+    """
+    raw = Path(filename).name or "unnamed"
+    suffix = Path(raw).suffix.lower()
+    if not re.fullmatch(r"\.[a-z0-9]{1,12}", suffix or ""):
+        suffix = ""
+    stem = Path(raw).stem
+    ascii_stem = re.sub(r"[^a-zA-Z0-9._-]+", "_", stem).strip("._-")
+    if not ascii_stem or ascii_stem == "_":
+        ascii_stem = "file"
+    ascii_stem = ascii_stem[:80]
+    return f"{ascii_stem}_{uuid.uuid4().hex[:12]}{suffix}"
+
+
 async def save_upload(
     *,
     project_id: int,
@@ -32,7 +53,7 @@ async def save_upload(
     Returns (stored_path_reference, local_path_for_extraction).
     For Supabase mode, a temp local copy is also written so OCR can run.
     """
-    safe_name = Path(filename).name or "unnamed"
+    safe_name = _storage_object_name(filename)
     object_key = f"project_{project_id}/{category}/{safe_name}"
 
     if settings.supabase_enabled:
@@ -44,16 +65,6 @@ async def save_upload(
 
     dest = settings.storage_dir / f"project_{project_id}" / category / safe_name
     dest.parent.mkdir(parents=True, exist_ok=True)
-    # Avoid overwrite collisions
-    if dest.exists():
-        stem, suffix = dest.stem, dest.suffix
-        i = 1
-        while True:
-            candidate = dest.with_name(f"{stem}_{i}{suffix}")
-            if not candidate.exists():
-                dest = candidate
-                break
-            i += 1
     dest.write_bytes(data)
     return str(dest), dest
 
@@ -93,11 +104,14 @@ async def delete_stored(stored_path: str) -> None:
         path.unlink()
 
 
+def _supabase_object_url(bucket: str, object_key: str) -> str:
+    # Encode each path segment so keys stay valid in the URL.
+    encoded_key = "/".join(quote(part, safe="") for part in object_key.split("/"))
+    return f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{bucket}/{encoded_key}"
+
+
 async def _supabase_upload(object_key: str, data: bytes, content_type: str | None) -> None:
-    url = (
-        f"{settings.supabase_url.rstrip('/')}/storage/v1/object/"
-        f"{settings.supabase_bucket}/{object_key}"
-    )
+    url = _supabase_object_url(settings.supabase_bucket, object_key)
     headers = {
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
         "apikey": settings.supabase_service_role_key or "",
@@ -112,7 +126,7 @@ async def _supabase_upload(object_key: str, data: bytes, content_type: str | Non
 
 
 async def _supabase_download(bucket: str, object_key: str) -> bytes:
-    url = f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{bucket}/{object_key}"
+    url = _supabase_object_url(bucket, object_key)
     headers = {
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
         "apikey": settings.supabase_service_role_key or "",
@@ -125,7 +139,7 @@ async def _supabase_download(bucket: str, object_key: str) -> bytes:
 
 
 async def _supabase_delete(bucket: str, object_key: str) -> None:
-    url = f"{settings.supabase_url.rstrip('/')}/storage/v1/object/{bucket}/{object_key}"
+    url = _supabase_object_url(bucket, object_key)
     headers = {
         "Authorization": f"Bearer {settings.supabase_service_role_key}",
         "apikey": settings.supabase_service_role_key or "",
