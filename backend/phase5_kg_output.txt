@@ -1,0 +1,112 @@
+﻿knowledge_graph_enabled= True
+[init_db] alter warning: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type VARCHAR(64) DEFAULT 'infrastructure']
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+SHARED_ELEMENT 1 wall:wall-a 3IrX$WsiL5Zhh9E9TkG2hC
+
+LINK_STATS {
+  "linked_findings": 4,
+  "edges_added": 16,
+  "finding_count": 4,
+  "element_count": 1
+}
+CHAIN_COUNT=3
+
+========== ACTUAL MULTI-HOP RISK CHAIN ==========
+{
+  "anchor_finding_id": 1,
+  "anchor_finding_code": "BOQ-SEED-002",
+  "anchor_title": "Item on Drawing absent in BOQ (or vice versa)",
+  "shared_element": {
+    "id": 1,
+    "element_type": "Wall",
+    "type_mark": "Wall-A",
+    "name_label": "Wall-A",
+    "match_key": "wall:wall-a",
+    "ifc_global_id": "3IrX$WsiL5Zhh9E9TkG2hC",
+    "drawing_ref": "A-101"
+  },
+  "documents": [
+    "phase5_boq.X83",
+    "phase5_contract.txt",
+    "phase5_schedule.txt",
+    "phase5_wall.ifc"
+  ],
+  "related_findings": [
+    {
+      "finding_id": 2,
+      "code": "CON-SEED-001",
+      "title": "Ambiguous Employer vs Contractor responsibility for Wall-A",
+      "severity": "high",
+      "via_element_id": 1,
+      "path": [
+        {
+          "node": "Finding:1",
+          "predicate": null
+        },
+        {
+          "node": "ProjectElement:1",
+          "predicate": "affects"
+        },
+        {
+          "node": "Finding:2",
+          "predicate": "inv:affects"
+        }
+      ],
+      "path_summary": "Finding:1 ΓÇöaffectsΓåÆ ProjectElement:1 ΓÇöaffectsΓåÆ Finding:2"
+    },
+    {
+      "finding_id": 3,
+      "code": "SCH-SEED-002",
+      "title": "Zero duration on Wall-A exterior envelope activity",
+      "severity": "high",
+      "via_element_id": 1,
+      "path": [
+        {
+          "node": "Finding:1",
+          "predicate": null
+        },
+        {
+          "node": "ProjectElement:1",
+          "predicate": "affects"
+        },
+        {
+          "node": "Finding:3",
+          "predicate": "inv:affects"
+        }
+      ],
+      "path_summary": "Finding:1 ΓÇöaffectsΓåÆ ProjectElement:1 ΓÇöaffectsΓåÆ Finding:3"
+    },
+    {
+      "finding_id": 4,
+      "code": "DRAW-SEED-001",
+      "title": "Drawing revision risk near Wall-A",
+      "severity": "high",
+      "via_element_id": 1,
+      "path": [
+        {
+          "node": "Finding:1",
+          "predicate": null
+        },
+        {
+          "node": "ProjectElement:1",
+          "predicate": "affects"
+        },
+        {
+          "node": "Finding:4",
+          "predicate": "inv:affects"
+        }
+      ],
+      "path_summary": "Finding:1 ΓÇöaffectsΓåÆ ProjectElement:1 ΓÇöaffectsΓåÆ Finding:4"
+    }
+  ],
+  "hop_count": 3,
+  "narrative": "This BOQ-SEED-002 finding (#1: Item on Drawing absent in BOQ (or vice versa)) connects to CON-SEED-001 (#2: Ambiguous Employer vs Contractor responsibility for Wall-A); SCH-SEED-002 (#3: Zero duration on Wall-A exterior envelope activity); DRAW-SEED-001 (#4: Drawing revision risk near Wall-A) via shared Element Wall-A (id=1, match_key=wall:wall-a) [IFC 3IrX$WsiL5Zhh9E9TkG2hC] across documents: phase5_boq.X83, phase5_contract.txt, phase5_schedule.txt, phase5_wall.ifc."
+}
+
+NARRATIVE:
+This BOQ-SEED-002 finding (#1: Item on Drawing absent in BOQ (or vice versa)) connects to CON-SEED-001 (#2: Ambiguous Employer vs Contractor responsibility for Wall-A); SCH-SEED-002 (#3: Zero duration on Wall-A exterior envelope activity); DRAW-SEED-001 (#4: Drawing revision risk near Wall-A) via shared Element Wall-A (id=1, match_key=wall:wall-a) [IFC 3IrX$WsiL5Zhh9E9TkG2hC] across documents: phase5_boq.X83, phase5_contract.txt, phase5_schedule.txt, phase5_wall.ifc.
+
+MVP findings= 1
+PASS Phase 5 related_findings_chain on shared Wall-A
+PASS MVP unaffected

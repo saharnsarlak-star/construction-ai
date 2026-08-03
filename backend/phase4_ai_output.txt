@@ -1,0 +1,258 @@
+﻿PROVIDER_STATUS:
+  preconfigured_llm_in_repo = NONE (confirmed Phase 4)
+  ai_rule_engine_enabled = True
+  llm_provider = local_semantic
+  llm_model = gpt-4o-mini
+  openai_api_key_set = False
+
+AI_HYBRID_RULES=24
+  SCH-SEED-004	HYBRID	schedule_cp_outlier
+  SCH-SEED-006	HYBRID	schedule_lag_lead
+  SCH-SEED-008	HYBRID	schedule_overlap_duplicate
+  CON-SEED-001	AI	contract_responsibility_ambiguity
+  CON-SEED-002	HYBRID	contract_vs_itt_deadlines
+  CON-SEED-003	AI	contract_bond_ambiguity
+  CON-SEED-004	HYBRID	contract_vs_boq_scope
+  SPEC-SEED-001	HYBRID	specs_standards_vs_project_type
+  SPEC-SEED-002	AI	specs_missing_sensitive_grades
+  SPEC-SEED-003	HYBRID	specs_vs_drawings
+  BOQ-SEED-005	HYBRID	boq_qty_vs_area
+  DRAW-SEED-002	HYBRID	drawing_scale_vs_dimensions
+  DRAW-SEED-003	AI	drawing_missing_connection_detail
+  DRAW-SEED-004	AI	drawing_plan_vs_section
+  TEN-SEED-002	AI	itt_evaluation_unclear
+  STD-SEED-003	HYBRID	standard_clause_semantic_compliance
+  STD-SEED-004	HYBRID	standard_framework_conflict
+  GEO-SEED-002	AI	geotech_groundwater_content
+  GEO-SEED-003	HYBRID	geotech_vs_foundation_drawings
+  GEO-SEED-005	HYBRID	geotech_borehole_density
+  REQ-SEED-001	HYBRID	er_vs_technical_specs
+  REQ-SEED-003	AI	er_vague_performance
+  REQ-SEED-004	HYBRID	er_vs_standard_clause
+  ADD-SEED-001	AI	addendum_implicit_contradiction
+Included real PDF: 0001_Finalized Stu-Evolve 5.pdf
+
+HYBRID_PYTHON_FIRST contract_vs_itt_deadlines = Contract vs Tender deadline mismatch: completion contract=2026-12-15 itt=2026-10-01 delta=75d; start contract=2026-02-01 itt=2026-03-01 delta=-28d
+
+=== AI/HYBRID METRICS ===
+{
+  "provider": "local_semantic",
+  "model": "gpt-4o-mini",
+  "calls": 10,
+  "skipped_no_llm": 0,
+  "skipped_no_discrepancy": 5,
+  "skipped_no_excerpt": 0,
+  "hybrid_python_hits": 4,
+  "total_latency_ms": 1.8,
+  "total_prompt_tokens": 3482,
+  "total_completion_tokens": 1549,
+  "estimated_cost_usd": 0.0,
+  "truncated": true,
+  "per_document": {
+    "avg_latency_ms": 0.2,
+    "avg_cost_usd": 0.0,
+    "calls_per_document": 1.25
+  }
+}
+per_call_sample= [
+  {
+    "code": "CON-SEED-001",
+    "check": "contract_responsibility_ambiguity",
+    "tag": "AI",
+    "latency_ms": 0.2,
+    "prompt_tokens": 523,
+    "completion_tokens": 191,
+    "estimated_cost_usd": 0.0
+  },
+  {
+    "code": "CON-SEED-002",
+    "check": "contract_vs_itt_deadlines",
+    "tag": "HYBRID",
+    "latency_ms": 0.1,
+    "prompt_tokens": 325,
+    "completion_tokens": 220,
+    "estimated_cost_usd": 0.0
+  },
+  {
+    "code": "CON-SEED-003",
+    "check": "contract_bond_ambiguity",
+    "tag": "AI",
+    "latency_ms": 0.6,
+    "prompt_tokens": 343,
+    "completion_tokens": 154,
+    "estimated_cost_usd": 0.0
+  },
+  {
+    "code": "CON-SEED-004",
+    "check": "contract_vs_boq_scope",
+    "tag": "HYBRID",
+    "latency_ms": 0.1,
+    "prompt_tokens": 253,
+    "completion_tokens": 179,
+    "estimated_cost_usd": 0.0
+  },
+  {
+    "code": "SPEC-SEED-002",
+    "check": "specs_missing_sensitive_grades",
+    "tag": "AI",
+    "latency_ms": 0.5,
+    "prompt_tokens": 543,
+    "completion_tokens": 103,
+    "estimated_cost_usd": 0.0
+  }
+]
+
+AI_HYBRID_FINDINGS=7
+
+========== ACTUAL AI/HYBRID FINDINGS ==========
+{
+  "code": "CON-SEED-001",
+  "source_layer": "llm_based",
+  "confidence_score": 88,
+  "severity": "high",
+  "title": "Ambiguous Employer vs Contractor responsibility in a clause",
+  "description": "Clause allocates drainage/work using non-measurable language ('if necessary' / similar), leaving Employer vs Contractor responsibility ambiguous and claim-prone. Reasoning: Ambiguous modality without acceptance criteria for drainage obligation.",
+  "source_excerpt": "Clause 8.4 ΓÇö Site Drainage\nThe Contractor shall provide temporary site drainage if necessary to keep the works dry.",
+  "evidence": "(contract_drainage.txt) [unit=cu-0002; page=None]: Clause 8.4 ΓÇö Site Drainage\nThe Contractor shall provide temporary site drainage if necessary to keep the works dry.",
+  "recommendation": "Replace 'if necessary' with objective triggers (e.g. rainfall intensity, geotech water table) and name the responsible party explicitly.",
+  "cause_effect_chain": [
+    "risk_id=RISK-CON-RESP-AMBIG-001",
+    "check=contract_responsibility_ambiguity",
+    "source_layer=llm_based",
+    "confidence_score=88",
+    "document=contract_drainage.txt",
+    "location=unit=cu-0002; page=None"
+  ]
+}
+---
+{
+  "code": "CON-SEED-002",
+  "source_layer": "hybrid",
+  "confidence_score": 82,
+  "severity": "high",
+  "title": "Contract clauses contradict Tender Documents (duration/deadlines)",
+  "description": "Python detected: Contract vs Tender deadline mismatch: completion contract=2026-12-15 itt=2026-10-01 delta=75d; start contract=2026-02-01 itt=2026-03-01 delta=-28d. This creates claim/delay exposure because tender parties may rely on inconsistent baselines. Evidence: completion contract=2026-12-15 itt=2026-10-01 delta=75d; start contract=2026-02-01 itt=2026-03-01 delta=-28d. Reasoning: HYBRID path: LLM/local explainer did not re-detect; explained Python discrepancy only.",
+  "source_excerpt": "completion=2026-12-15 start=2026-02-01",
+  "evidence": "(contract) [python_discrepancy]: completion=2026-12-15 start=2026-02-01",
+  "recommendation": "Reconcile the conflicting values before bid submission and issue a clarifying addendum stating which document governs.",
+  "cause_effect_chain": [
+    "risk_id=RISK-CON-VS-ITT-001",
+    "check=contract_vs_itt_deadlines",
+    "source_layer=hybrid",
+    "confidence_score=82",
+    "document=contract",
+    "location=python_discrepancy"
+  ]
+}
+---
+{
+  "code": "CON-SEED-003",
+  "source_layer": "llm_based",
+  "confidence_score": 84,
+  "severity": "high",
+  "title": "Ambiguous or legally contradictory guarantee/bond clauses",
+  "description": "Guarantee/bond wording is internally inconsistent or waivable without clear conditions (observed percentages=[]). Reasoning: Contradictory or discretionary bond language.",
+  "source_excerpt": "Clause 12.1 ΓÇö Performance Bond\nThe Contractor shall provide a performance bond of 10% of the Contract Price.",
+  "evidence": "(contract_drainage.txt) [unit=cu-0003; page=None]: Clause 12.1 ΓÇö Performance Bond\nThe Contractor shall provide a performance bond of 10% of the Contract Price.",
+  "recommendation": "State a single mandatory bond percentage, form, and issuer requirements.",
+  "cause_effect_chain": [
+    "risk_id=RISK-CON-BOND-AMBIG-001",
+    "check=contract_bond_ambiguity",
+    "source_layer=llm_based",
+    "confidence_score=84",
+    "document=contract_drainage.txt",
+    "location=unit=cu-0003; page=None"
+  ]
+}
+---
+{
+  "code": "CON-SEED-004",
+  "source_layer": "hybrid",
+  "confidence_score": 82,
+  "severity": "high",
+  "title": "Stated scope/work volume contradicts BOQ quantities",
+  "description": "Python detected: Contract stated area/volume=2500.0 vs BOQ m2 sum=80120.0 (ratio=32.05). This creates claim/delay exposure because tender parties may rely on inconsistent baselines. Evidence: stated=2500.0; boq_m2_sum=80120.0; ratio=32.048. Reasoning: HYBRID path: LLM/local explainer did not re-detect; explained Python discrepancy only.",
+  "source_excerpt": "Total gross floor area:",
+  "evidence": "(contract) [python_discrepancy]: Total gross floor area:",
+  "recommendation": "Reconcile the conflicting values before bid submission and issue a clarifying addendum stating which document governs.",
+  "cause_effect_chain": [
+    "risk_id=RISK-CON-VS-BOQ-SCOPE-001",
+    "check=contract_vs_boq_scope",
+    "source_layer=hybrid",
+    "confidence_score=82",
+    "document=contract",
+    "location=python_discrepancy"
+  ]
+}
+---
+{
+  "code": "SPEC-SEED-003",
+  "source_layer": "hybrid",
+  "confidence_score": 82,
+  "severity": "high",
+  "title": "Specification requirements inconsistent with Engineering Drawings",
+  "description": "Python detected: Specification vs drawing numeric conflicts: fire_rating spec=['10', '60'] drawing=['90']. This creates claim/delay exposure because tender parties may rely on inconsistent baselines. Evidence: fire_rating spec=['10', '60'] drawing=['90']. Reasoning: HYBRID path: LLM/local explainer did not re-detect; explained Python discrepancy only.",
+  "source_excerpt": "fire_rating spec=['10', '60'] drawing=['90']",
+  "evidence": "(spec/drawing) [python_discrepancy]: fire_rating spec=['10', '60'] drawing=['90']",
+  "recommendation": "Reconcile the conflicting values before bid submission and issue a clarifying addendum stating which document governs.",
+  "cause_effect_chain": [
+    "risk_id=RISK-SPEC-VS-DRAW-001",
+    "check=specs_vs_drawings",
+    "source_layer=hybrid",
+    "confidence_score=82",
+    "document=spec/drawing",
+    "location=python_discrepancy"
+  ]
+}
+---
+{
+  "code": "DRAW-SEED-002",
+  "source_layer": "hybrid",
+  "confidence_score": 82,
+  "severity": "medium",
+  "title": "Scale inconsistent with stated dimensions",
+  "description": "Python detected: Unusual stated scale 1:75 on drawing set ΓÇö verify against annotated dimensions.. This creates claim/delay exposure because tender parties may rely on inconsistent baselines. Evidence: scale=1:75. Reasoning: HYBRID path: LLM/local explainer did not re-detect; explained Python discrepancy only.",
+  "source_excerpt": "Scale 1:75",
+  "evidence": "(drawing) [python_discrepancy]: Scale 1:75",
+  "recommendation": "Reconcile the conflicting values before bid submission and issue a clarifying addendum stating which document governs.",
+  "cause_effect_chain": [
+    "risk_id=RISK-DRAW-SCALE-001",
+    "check=drawing_scale_vs_dimensions",
+    "source_layer=hybrid",
+    "confidence_score=82",
+    "document=drawing",
+    "location=python_discrepancy"
+  ]
+}
+---
+{
+  "code": "TEN-SEED-002",
+  "source_layer": "llm_based",
+  "confidence_score": 78,
+  "severity": "high",
+  "title": "Unclear technical-financial evaluation criteria",
+  "description": "Evaluation criteria mentioned without numeric technical/financial weights. Reasoning: Unweighted evaluation criteria.",
+  "source_excerpt": "Evaluation will consider technical and financial proposals.",
+  "evidence": "(itt.txt) [unit=cu-0005; page=None]: Evaluation will consider technical and financial proposals.",
+  "recommendation": "Publish explicit scoring weights and pass/fail gates.",
+  "cause_effect_chain": [
+    "risk_id=RISK-TEN-EVAL-UNCLEAR-001",
+    "check=itt_evaluation_unclear",
+    "source_layer=llm_based",
+    "confidence_score=78",
+    "document=itt.txt",
+    "location=unit=cu-0005; page=None"
+  ]
+}
+---
+
+MVP keyword analyzer: findings= 24 layers= {None}
+
+COST/LATENCY FEASIBILITY:
+  total_latency_ms=1.8
+  estimated_cost_usd=0.0
+  per_document={'avg_latency_ms': 0.2, 'avg_cost_usd': 0.0, 'calls_per_document': 1.25}
+  calls=10 prompt_tokens=3482 completion_tokens=1549
+  estimated_live_gpt4o_mini_usd_if_same_tokens=0.001452
+PASS Phase 4 AI/HYBRID findings with confidence + source_excerpt
+PASS MVP unaffected

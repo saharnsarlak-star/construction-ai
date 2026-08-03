@@ -1,0 +1,157 @@
+﻿cdm_enabled= True
+ontology_enabled= True
+defaults (no env): cdm= False ontology= False
+[init_db] alter warning: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type VARCHAR(64) DEFAULT 'infrastructure']
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INGEST phase2_wall.ifc: {'parties': [], 'elements': [1], 'mention_count': 2}
+INGEST phase2_boq.X83: {'parties': [], 'elements': [1], 'mention_count': 1}
+INGEST phase2_contract.txt: {'parties': [1, 2, 3], 'elements': [1], 'mention_count': 1}
+
+=== SHARED ELEMENT REGISTRY RECORD ===
+{
+  "id": 1,
+  "project_id": 1,
+  "element_type": "Wall",
+  "name_label": "Wall-A",
+  "type_mark": "Wall-A",
+  "ifc_global_id": "0_U_xIClL4KuWireGB2QxN",
+  "match_key": "wall:wall-a",
+  "fire_rating": "REI 90",
+  "host_level": null,
+  "drawing_ref": "A-101",
+  "confidence": 96,
+  "document_refs": [
+    {
+      "id": 2,
+      "document_id": 1,
+      "source_kind": "cdm_text",
+      "source_local_id": "body",
+      "excerpt": "itecture IfcWall  Property highlights (fire/material/load-related):   - IfcWall Wall-A: {'Pset_WallCommon': {'FireRating': 'REI 90', 'LoadBearing': True}} --- ifc: ph",
+      "confidence": 75
+    },
+    {
+      "id": 1,
+      "document_id": 1,
+      "source_kind": "ifc_element",
+      "source_local_id": "0_U_xIClL4KuWireGB2QxN",
+      "excerpt": "{\"type\": \"IfcWall\", \"name\": \"Wall-A\", \"global_id\": \"0_U_xIClL4KuWireGB2QxN\", \"properties\": {\"Pset_WallCommon\": {\"FireRating\": \"REI 90\", \"LoadBearing\": true}}}",
+      "confidence": 96
+    },
+    {
+      "id": 3,
+      "document_id": 2,
+      "source_kind": "boq_item",
+      "source_local_id": "0100",
+      "excerpt": "Exterior masonry wall Wall-A per drawing A-101, fire rating REI 90",
+      "confidence": 90
+    },
+    {
+      "id": 4,
+      "document_id": 3,
+      "source_kind": "contract_clause",
+      "source_local_id": "body",
+      "excerpt": "Clause 5.2 ΓÇö Exterior Envelope The Contractor shall construct the exterior wall Wall-A as shown on drawing A-101 and as quantified in the Bill of Quantities. Wall-A s",
+      "confidence": 75
+    }
+  ]
+}
+
+=== PARTIES ===
+[
+  {
+    "id": 1,
+    "legal_name": "Acme Development GmbH",
+    "party_role": "employer"
+  },
+  {
+    "id": 2,
+    "legal_name": "BuildRight Contracting Ltd",
+    "party_role": "contractor"
+  },
+  {
+    "id": 3,
+    "legal_name": "Structural Partners AG",
+    "party_role": "consultant"
+  }
+]
+
+=== ONTOLOGY EDGES (sample) ===
+[
+  {
+    "predicate": "references",
+    "from": "Document:1",
+    "to": "ProjectElement:1",
+    "origin_kind": "python",
+    "document_id": 1
+  },
+  {
+    "predicate": "references",
+    "from": "Document:2",
+    "to": "ProjectElement:1",
+    "origin_kind": "python",
+    "document_id": 2
+  },
+  {
+    "predicate": "quantifies",
+    "from": "BoqItem:0100",
+    "to": "ProjectElement:1",
+    "origin_kind": "python",
+    "document_id": 2
+  },
+  {
+    "predicate": "references",
+    "from": "Document:3",
+    "to": "Party:1",
+    "origin_kind": "python",
+    "document_id": 3
+  },
+  {
+    "predicate": "allocates_responsibility",
+    "from": "Document:3",
+    "to": "Party:1",
+    "origin_kind": "python",
+    "document_id": 3
+  },
+  {
+    "predicate": "references",
+    "from": "Document:3",
+    "to": "Party:2",
+    "origin_kind": "python",
+    "document_id": 3
+  },
+  {
+    "predicate": "allocates_responsibility",
+    "from": "Document:3",
+    "to": "Party:2",
+    "origin_kind": "python",
+    "document_id": 3
+  },
+  {
+    "predicate": "references",
+    "from": "Document:3",
+    "to": "Party:3",
+    "origin_kind": "python",
+    "document_id": 3
+  },
+  {
+    "predicate": "allocates_responsibility",
+    "from": "Document:3",
+    "to": "Party:3",
+    "origin_kind": "python",
+    "document_id": 3
+  },
+  {
+    "predicate": "references",
+    "from": "Document:3",
+    "to": "ProjectElement:1",
+    "origin_kind": "python",
+    "document_id": 3
+  }
+]
+
+MVP analyzer: status= completed findings= 21
+
+PASS Phase 2: one Wall-A element linked from IFC + GAEB + Contract
+PASS Phase 1 CDM still on documents
+PASS MVP keyword analyzer still runs

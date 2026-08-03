@@ -1,0 +1,171 @@
+﻿PROVIDER_STATUS:
+  openai_api_key_set = True
+  llm_provider = openai_compatible
+  llm_model = gpt-4o-mini
+  llm_base_url = https://api.openai.com/v1
+  ai_rule_engine_enabled = True
+
+AI_HYBRID_RULES=24
+  SCH-SEED-004	HYBRID	schedule_cp_outlier
+  SCH-SEED-006	HYBRID	schedule_lag_lead
+  SCH-SEED-008	HYBRID	schedule_overlap_duplicate
+  CON-SEED-001	AI	contract_responsibility_ambiguity
+  CON-SEED-002	HYBRID	contract_vs_itt_deadlines
+  CON-SEED-003	AI	contract_bond_ambiguity
+  CON-SEED-004	HYBRID	contract_vs_boq_scope
+  SPEC-SEED-001	HYBRID	specs_standards_vs_project_type
+  SPEC-SEED-002	AI	specs_missing_sensitive_grades
+  SPEC-SEED-003	HYBRID	specs_vs_drawings
+  BOQ-SEED-005	HYBRID	boq_qty_vs_area
+  DRAW-SEED-002	HYBRID	drawing_scale_vs_dimensions
+  DRAW-SEED-003	AI	drawing_missing_connection_detail
+  DRAW-SEED-004	AI	drawing_plan_vs_section
+  TEN-SEED-002	AI	itt_evaluation_unclear
+  STD-SEED-003	HYBRID	standard_clause_semantic_compliance
+  STD-SEED-004	HYBRID	standard_framework_conflict
+  GEO-SEED-002	AI	geotech_groundwater_content
+  GEO-SEED-003	HYBRID	geotech_vs_foundation_drawings
+  GEO-SEED-005	HYBRID	geotech_borehole_density
+  REQ-SEED-001	HYBRID	er_vs_technical_specs
+  REQ-SEED-003	AI	er_vague_performance
+  REQ-SEED-004	HYBRID	er_vs_standard_clause
+  ADD-SEED-001	AI	addendum_implicit_contradiction
+Included real PDF: 0001_Finalized Stu-Evolve 5.pdf
+
+HYBRID_PYTHON_FIRST contract_vs_itt_deadlines = Contract vs Tender deadline mismatch: completion contract=2026-12-15 itt=2026-10-01 delta=75d; start contract=2026-02-01 itt=2026-03-01 delta=-28d
+
+LLMClient.provider=openai_compatible model=gpt-4o-mini
+
+=== AI/HYBRID METRICS (REAL LLM) ===
+{
+  "provider": "openai_compatible",
+  "model": "gpt-4o-mini",
+  "calls": 10,
+  "skipped_no_llm": 0,
+  "skipped_no_discrepancy": 5,
+  "skipped_no_excerpt": 0,
+  "hybrid_python_hits": 4,
+  "total_latency_ms": 40013.8,
+  "total_prompt_tokens": 6247,
+  "total_completion_tokens": 2019,
+  "estimated_cost_usd": 0.002148,
+  "truncated": true,
+  "per_document": {
+    "avg_latency_ms": 5001.7,
+    "avg_cost_usd": 0.000269,
+    "calls_per_document": 1.25
+  }
+}
+per_call_sample= [
+  {
+    "code": "CON-SEED-001",
+    "check": "contract_responsibility_ambiguity",
+    "tag": "AI",
+    "latency_ms": 3819.5,
+    "prompt_tokens": 800,
+    "completion_tokens": 214,
+    "estimated_cost_usd": 0.000248
+  },
+  {
+    "code": "CON-SEED-002",
+    "check": "contract_vs_itt_deadlines",
+    "tag": "HYBRID",
+    "latency_ms": 4802.9,
+    "prompt_tokens": 632,
+    "completion_tokens": 271,
+    "estimated_cost_usd": 0.000257
+  },
+  {
+    "code": "CON-SEED-003",
+    "check": "contract_bond_ambiguity",
+    "tag": "AI",
+    "latency_ms": 3600.8,
+    "prompt_tokens": 614,
+    "completion_tokens": 195,
+    "estimated_cost_usd": 0.000209
+  },
+  {
+    "code": "CON-SEED-004",
+    "check": "contract_vs_boq_scope",
+    "tag": "HYBRID",
+    "latency_ms": 4809.8,
+    "prompt_tokens": 552,
+    "completion_tokens": 234,
+    "estimated_cost_usd": 0.000223
+  },
+  {
+    "code": "SPEC-SEED-002",
+    "check": "specs_missing_sensitive_grades",
+    "tag": "AI",
+    "latency_ms": 4012.2,
+    "prompt_tokens": 864,
+    "completion_tokens": 207,
+    "estimated_cost_usd": 0.000254
+  }
+]
+
+AI_HYBRID_FINDINGS=8
+
+========== SAMPLE [AI] FINDING (CON-SEED-001) ==========
+{
+  "code": "CON-SEED-001",
+  "source_layer": "llm_based",
+  "confidence_score": 85,
+  "severity": "high",
+  "title": "Ambiguous Employer vs Contractor responsibility in a clause",
+  "description": "The clause regarding site drainage creates ambiguity in the allocation of responsibilities between the Employer and the Contractor, particularly concerning the permanent drainage connections. This could lead to disputes over liability and obligations, impacting the project's execution and compliance with Gew├ñhrleistung and Verkehrssicherungspflicht. Reasoning: The phrase 'shall be agreed later' introduces uncertainty regarding who is ultimately responsible for the permanent drainage connections, which can lead to conflicting interpretations and potential liability issues under the VOB/B and BGB frameworks.",
+  "source_excerpt": "Responsibility for permanent drainage connections shall be agreed later between the parties as required.",
+  "recommendation": "Clarify the responsibilities for permanent drainage connections in the contract to avoid potential disputes and ensure compliance with legal obligations.",
+  "cause_effect_chain": [
+    "risk_id=RISK-CON-RESP-AMBIG-001",
+    "check=contract_responsibility_ambiguity",
+    "source_layer=llm_based",
+    "rkb_source=python_seed",
+    "confidence_score=85",
+    "document=contract_drainage.txt",
+    "location=unit=cu-0002; page=None"
+  ]
+}
+
+========== SAMPLE [HYBRID] FINDING ==========
+{
+  "code": "CON-SEED-002",
+  "source_layer": "hybrid",
+  "confidence_score": 95,
+  "severity": "high",
+  "title": "Contract clauses contradict Tender Documents (duration/deadlines)",
+  "description": "The contract specifies a completion date of December 15, 2026, while the tender documents indicate a completion date of October 1, 2026. This discrepancy of 75 days poses a significant claim risk, as it may lead to disputes over project timelines and potential penalties for delays. Additionally, the contract's start date of February 1, 2026, is earlier than the tender's start date of March 1, 2026, creating further conflict. Reasoning: The identified discrepancies between the contract and tender documents create a high risk of claims related to delays and costs. Aligning the timelines is crucial to avoid disputes and ensure project continuity.",
+  "source_excerpt": "completion=2026-12-15 start=2026-02-01; completion=2026-10-01 start=2026-03-01",
+  "recommendation": "Review and amend the contract to align with the tender documents to mitigate claim risks. Ensure all parties are aware of the agreed timelines and consider formal communication to document any changes.",
+  "cause_effect_chain": [
+    "risk_id=RISK-CON-VS-ITT-001",
+    "check=contract_vs_itt_deadlines",
+    "source_layer=hybrid",
+    "rkb_source=python_seed",
+    "confidence_score=95",
+    "document=contract",
+    "location=contract clauses"
+  ]
+}
+
+========== ALL AI/HYBRID FINDINGS (summary) ==========
+  CON-SEED-001 | llm_based | conf=85 | excerpt_len=104
+  CON-SEED-002 | hybrid | conf=95 | excerpt_len=78
+  CON-SEED-003 | llm_based | conf=85 | excerpt_len=195
+  CON-SEED-004 | hybrid | conf=95 | excerpt_len=32
+  SPEC-SEED-002 | llm_based | conf=85 | excerpt_len=21
+  SPEC-SEED-003 | hybrid | conf=95 | excerpt_len=44
+  DRAW-SEED-002 | hybrid | conf=85 | excerpt_len=10
+  TEN-SEED-002 | llm_based | conf=85 | excerpt_len=85
+
+MVP keyword analyzer: findings= 24 layers= {None}
+
+COST/LATENCY (REAL OPENAI):
+  provider=openai_compatible model=gpt-4o-mini
+  total_latency_ms=40013.8
+  estimated_cost_usd=0.002148
+  per_document={'avg_latency_ms': 5001.7, 'avg_cost_usd': 0.000269, 'calls_per_document': 1.25}
+  calls=10 prompt_tokens=6247 completion_tokens=2019
+PASS Phase 4 REAL LLM AI/HYBRID findings with confidence + source_excerpt
+PASS MVP unaffected
+Phase 4 REAL-LLM VALIDATION PASS

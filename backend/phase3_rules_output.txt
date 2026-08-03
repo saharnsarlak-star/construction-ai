@@ -1,0 +1,233 @@
+﻿new_rule_engine_enabled= True
+PYTHON_SEED_RULES=23
+  SCH-SEED-001	schedule_orphan_activity
+  SCH-SEED-002	schedule_invalid_duration
+  SCH-SEED-003	schedule_end_before_start
+  SCH-SEED-005	schedule_negative_float
+  SCH-SEED-007	schedule_vs_contract_ntp
+  SCH-SEED-009	schedule_missing_resources
+  SCH-SEED-010	schedule_missing_handover
+  BOQ-SEED-001	boq_unit_mismatch
+  BOQ-SEED-002	boq_vs_drawing_presence
+  BOQ-SEED-003	boq_math_totals
+  BOQ-SEED-004	boq_coding_scheme
+  DRAW-SEED-001	drawing_revision_mismatch
+  TEN-SEED-001	itt_vs_schedule_deadlines
+  TEN-SEED-003	itt_appendix_addenda_xrefs
+  STD-SEED-001	standard_version_is_current
+  STD-SEED-002	mandatory_standard_completeness
+  STD-SEED-005	standard_extraction_confidence
+  GEO-SEED-001	geotech_report_required
+  GEO-SEED-004	geotech_report_staleness
+  REQ-SEED-002	er_vs_boq_drawing_presence
+  ADD-SEED-002	addendum_after_deadline
+  ADD-SEED-003	addendum_orphaned
+  ADD-SEED-004	addendum_sequence_gap
+
+=== PROJECT 1 (schedule/contract) rule findings: 10 ===
+Included real PDF: C:\Users\Aryan Digitai\Desktop\standard\backend\storage\project_5\standard\0001_Finalized Stu-Evolve 5.pdf
+
+=== PROJECT 2 (BOQ/drawings/IFC) rule findings: 8 ===
+
+=== PROJECT 3 (tender/addenda/geotech/ER) rule findings: 16 ===
+
+========== ACTUAL RULE-BASED FINDINGS (sample) ==========
+{
+  "project": "P1",
+  "code": "SCH-SEED-001",
+  "source_layer": "rule_based",
+  "severity": "medium",
+  "title": "Island / floating activity (no predecessor or successor)",
+  "description": "Detected 1 non-milestone activities with neither predecessor nor successor among 6 parsed activities. Examples: A140 (Island floating activity).",
+  "evidence": "1 island/floating activities of 6 total in programme.csv.txt: A140 (Island floating activity)",
+  "risk_score": 60,
+  "cause_effect_chain": [
+    "risk_id=RISK-SCHED-ISLAND-001",
+    "check=schedule_orphan_activity",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "SCH-SEED-002",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "Zero or negative duration on non-milestone activity",
+  "description": "2 non-milestone activities have duration Γëñ 0. Details: A120 duration=0.0; A130 duration=-5.0.",
+  "evidence": "A120 duration=0.0; A130 duration=-5.0",
+  "risk_score": 85,
+  "cause_effect_chain": [
+    "risk_id=RISK-SCHED-DURATION-001",
+    "check=schedule_invalid_duration",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "SCH-SEED-003",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "End date earlier than start date",
+  "description": "1 activities have finish < start. Details: A130 start=2026-05-10 finish=2026-05-01.",
+  "evidence": "A130 start=2026-05-10 finish=2026-05-01",
+  "risk_score": 85,
+  "cause_effect_chain": [
+    "risk_id=RISK-SCHED-DURATION-001",
+    "check=schedule_end_before_start",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "SCH-SEED-005",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "Negative float on activities",
+  "description": "1 activities have negative total float. Details: A110 float=-3.0.",
+  "evidence": "A110 float=-3.0",
+  "risk_score": 80,
+  "cause_effect_chain": [
+    "risk_id=RISK-SCHED-FLOAT-001",
+    "check=schedule_negative_float",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "SCH-SEED-007",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "Programme start vs Contract notice-to-proceed date mismatch",
+  "description": "Programme start (2026-03-01) differs from contract NTP/commencement (2026-01-15) by 45 days.",
+  "evidence": "schedule_start=2026-03-01 ntp/commencement=2026-01-15 delta_days=45",
+  "risk_score": 75,
+  "cause_effect_chain": [
+    "risk_id=RISK-SCHED-NTP-MISMATCH-001",
+    "check=schedule_vs_contract_ntp",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "SCH-SEED-009",
+  "source_layer": "rule_based",
+  "severity": "medium",
+  "title": "No resources assigned to main activities",
+  "description": "1 high-duration activities lack resource assignments while other activities in the same schedule have resources. Examples: A140(dur=14.0).",
+  "evidence": "missing_resources_on_main=A140(dur=14.0)",
+  "risk_score": 55,
+  "cause_effect_chain": [
+    "risk_id=RISK-SCHED-RESOURCE-001",
+    "check=schedule_missing_resources",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "SCH-SEED-010",
+  "source_layer": "rule_based",
+  "severity": "medium",
+  "title": "Missing handover milestones at schedule end",
+  "description": "Parsed 6 schedule activities but found no handover / taking-over / provisional or final acceptance milestone near programme end.",
+  "evidence": "activities_parsed=6; handover_keywords=0",
+  "risk_score": 50,
+  "cause_effect_chain": [
+    "risk_id=RISK-SCHED-HANDOVER-001",
+    "check=schedule_missing_handover",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "TEN-SEED-001",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "Deadline mismatch: invitation vs tender docs vs Construction Schedule",
+  "description": "Deadline mismatch between tender documents and construction schedule: tender_completion=2026-12-01 schedule_completion=2026-07-01 delta=153d",
+  "evidence": "tender_completion=2026-12-01 schedule_completion=2026-07-01 delta=153d",
+  "risk_score": 75,
+  "cause_effect_chain": [
+    "risk_id=RISK-TEN-DEADLINE-MISMATCH-001",
+    "check=itt_vs_schedule_deadlines",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "STD-SEED-002",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "Mandatory applicable Standard not selected/uploaded",
+  "description": "2 mandatory standard(s) for DE/office are not selected/uploaded. Examples: DE_VOB_B, DE_DIN_1045.",
+  "evidence": "missing_mandatory=['DE_VOB_B', 'DE_DIN_1045']; selected_count=0",
+  "risk_score": 80,
+  "cause_effect_chain": [
+    "risk_id=RISK-STD-MANDATORY-MISSING-001",
+    "check=mandatory_standard_completeness",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P1",
+  "code": "GEO-SEED-001",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "No Geotechnical Report uploaded where typically required",
+  "description": "Project type 'office' typically requires a Geotechnical Report, but none was identified among 2 uploaded document(s).",
+  "evidence": "project_type=office; documents=2; geotech_upload=false",
+  "risk_score": 80,
+  "cause_effect_chain": [
+    "risk_id=RISK-GEO-MISSING-001",
+    "check=geotech_report_required",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P2",
+  "code": "BOQ-SEED-001",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "Unit of measurement mismatch with Drawings or Specifications",
+  "description": "1 unit conflict(s) between BOQ and drawings/specs. BOQ 0100 unit=m2 vs text near Wall-A implying m3",
+  "evidence": "BOQ 0100 unit=m2 vs text near Wall-A implying m3",
+  "risk_score": 75,
+  "cause_effect_chain": [
+    "risk_id=RISK-BOQ-UNIT-MISMATCH-001",
+    "check=boq_unit_mismatch",
+    "source_layer=rule_based"
+  ]
+}
+---
+{
+  "project": "P2",
+  "code": "BOQ-SEED-002",
+  "source_layer": "rule_based",
+  "severity": "high",
+  "title": "Item on Drawing absent in BOQ (or vice versa)",
+  "description": "1 drawing/IFC object(s) have no matching BOQ reference. Examples: Wall-B (element_id=2, ifc=GUID-WALL-B).",
+  "evidence": "Wall-B (element_id=2, ifc=GUID-WALL-B)",
+  "risk_score": 80,
+  "cause_effect_chain": [
+    "risk_id=RISK-BOQ-DRAW-ABSENCE-001",
+    "check=boq_vs_drawing_presence",
+    "source_layer=rule_based"
+  ]
+}
+---
+
+MVP keyword analyzer: status= completed findings= 24 engine= {'country_profile': {'code': 'DE_PROFILE_V1', 'country': 'DE', 'version': 1, 'currency': 'EUR', 'primary_standards_system': 'DE_VOB_DIN', 'legal_contract_framework': 'VOB/B + BGB construction contract practice', 'measurement_conventions': 'Metric; GAEB / Leistungsverzeichnis culture', 'default_ruleset_code': 'DE_CORE_V1', 'project_type': 'office', 'config': {'boq_format': 'gaeb', 'contract_keywords_hint': ['VOB/B', 'BGB', 'Leistungsbeschreibung', 'Nachtrag']}}, 'ruleset': 'DE_CORE_V1', 'resolved_rules': ['SCOPE-001', 'BOQ-001', 'TIME-001', 'SCHED-001', 'CLAIM-001', 'PAY-001', 'RESP-001', 'DRAW-001', 'STD-001', 'SCH-SEED-001', 'SCH-SEED-002', 'SCH-SEED-003', 'SCH-SEED-004', 'SCH-SEED-005', 'SCH-SEED-006', 'SCH-SEED-007', 'SCH-SEED-008', 'SCH-SEED-009', 'SCH-SEED-010', 'CON-SEED-001', 'CON-SEED-002', 'CON-SEED-003', 'CON-SEED-004', 'SPEC-SEED-001', 'SPEC-SEED-002', 'SPEC-SEED-003', 'BOQ-SEED-001', 'BOQ-SEED-002', 'BOQ-SEED-003', 'BOQ-SEED-004', 'BOQ-SEED-005', 'DRAW-SEED-001', 'DRAW-SEED-002', 'DRAW-SEED-003', 'DRAW-SEED-004', 'TEN-SEED-001', 'TEN-SEED-002', 'TEN-SEED-003', 'STD-SEED-001', 'STD-SEED-002', 'STD-SEED-003', 'STD-SEED-004', 'STD-SEED-005', 'GEO-SEED-001', 'GEO-SEED-002', 'GEO-SEED-003', 'GEO-SEED-004', 'GEO-SEED-005', 'REQ-SEED-001', 'REQ-SEED-002', 'REQ-SEED-003', 'REQ-SEED-004', 'ADD-SEED-001', 'ADD-SEED-002', 'ADD-SEED-003', 'ADD-SEED-004'], 'document_templates': {'tender': 'BOQ_GAEB', 'drawing': 'DRAWING_GENERIC', 'schedule': 'SCHEDULE_GENERIC', 'standard': 'STD_DE_DIN'}, 'selected_standards': [], 'extraction': {'total': 1, 'text_doc_count': 1, 'drawing_count': 0, 'readable_count': 1, 'failed_count': 0, 'failed_names': [], 'readable_names': ['scope.txt'], 'success_rate': 1.0, 'gate_rate': 1.0}, 'data_completeness_caveat': None, 'prompt_bundle': {'template_code': 'ANALYZE_RESPONSIBILITY_CLAUSES', 'resolved_country_scope': 'DE', 'context_pack': {'statutes': ['BGB', 'VOB/B'], 'terms': ['Gew├ñhrleistung', 'Verkehrssicherung', 'Nachtrag', 'Leistungsbeschreibung']}}}
+
+Unique rule codes fired: ['ADD-SEED-002', 'ADD-SEED-003', 'ADD-SEED-004', 'BOQ-SEED-001', 'BOQ-SEED-002', 'BOQ-SEED-003', 'BOQ-SEED-004', 'DRAW-SEED-001', 'GEO-SEED-001', 'GEO-SEED-004', 'REQ-SEED-002', 'SCH-SEED-001', 'SCH-SEED-002', 'SCH-SEED-003', 'SCH-SEED-005', 'SCH-SEED-007', 'SCH-SEED-009', 'SCH-SEED-010', 'STD-SEED-001', 'STD-SEED-002', 'TEN-SEED-001']
+TOTAL_RULE_FINDINGS=34
+PASS Phase 3 PYTHON runners produce real Findings
+PASS MVP keyword analyzer unaffected

@@ -1,0 +1,377 @@
+﻿python.exe : Tesseract unavailable: tesseract is not installed or it's not in your PATH. See README file for more 
+information.
+At C:\Users\Aryan Digitai\AppData\Local\Temp\ps-script-6e3177ec-f7e1-4f9e-a5a0-1db0c4fd0b70.ps1:104 char:310
++ ... te:///./phase1_cdm.db"; & $py scripts\phase1_cdm_test.py 2>&1 | Out-F ...
++                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Tesseract unava...re information.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+cdm_enabled setting = True
+PDF_PATH= C:\Users\Aryan Digitai\Desktop\standard\backend\storage\project_5\tender\0001_9.pdf
+
+========================================================================
+CDM for PDF: 0001_9.pdf
+========================================================================
+SUMMARY: {"subtype": "tender_document", "method": "rapidocr", "confidence": 35.0, "content_units": 15, "tables": 0, "has_spatial": false, "has_quantities": false, "language_primary": "en", "title": "0001_9"}
+FULL_CDM_JSON_WRITTEN=C:\Users\Aryan Digitai\Desktop\standard\backend\storage\_phase1_cdm_samples\cdm_pdf.json
+FULL_CDM_JSON:
+{
+  "document_id": 9001,
+  "project_id": 5,
+  "category": "tender",
+  "subtype": "tender_document",
+  "language_primary": "en",
+  "languages_detected": [
+    "en"
+  ],
+  "extraction": {
+    "method": "rapidocr",
+    "confidence_score": 35.0,
+    "needs_manual_review": false,
+    "source_formats": [
+      "application/pdf",
+      "pdf",
+      "rapidocr"
+    ]
+  },
+  "identity": {
+    "title": "0001_9",
+    "revision": "IEW",
+    "revision_date": null,
+    "authoring_system": null,
+    "external_ids": []
+  },
+  "content_units": [
+    {
+      "id": "cu-0001",
+      "unit_type": "paragraph",
+      "text": "THINGS\nUNIT OBJECTIVES\nΓûá talk about how your life might be different\nΓûá talk about mistakes\nHAPPEN\nΓûá reassure someone about a problem\nΓûá write an article giving tips\nΓûá talk about key events in your life\n9\nSTART SPEAKING\nA Look at the picture. What do you think the man expected to be doing that day? What happened instead?\nHow could this situation develop?\nEEXXPPEERRTT\nUSEFUL PHRASES B Think of a situation when something very unexpected SSSSPPPPEEEEAAAAKKKKEEEERRRR\ncompletely changed your plans. What happened?\nWas the change for the better or worse? Have you ever had\nan experience similar\nC Do you believe in chance? Or are the best things that\nto CarolinaΓÇÖs?\nhappen to us always planned? Discuss some examples.\nFor ideas, watch CarolinaΓÇÖs video.\n85",
+      "language": "en",
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 1,
+      "confidence": 98.0,
+      "raw_refs": []
+    },
+    {
+      "id": "cu-0002",
+      "unit_type": "paragraph",
+      "text": "9.1 LESSON OBJECTIVE\nTURNING POINTS Γûá talk about how your life might\nbe different\n1 LANGUAGE IN CONTEXT\nA PAIR WORK What is fate? Do you believe in it?\nB Read the online posts. What is each personΓÇÖs opinion about luck?\nComments Account Sign out\nX-ray technician\nLara_Park posted 2 days ago\nDo you believe in fate? My brother says thereΓÇÖs no such thing. But I think everything happens for a reason, and there are no\ncoincidences. When you look back on your life, you can see the path that has led to your life today. For example, I was\nstudying finance and wanted to go into banking. Then my brother accidentally slammed the car door on my finger ΓÇô ouch!\nThe doctor sent me for an X-ray, which was SO COOL! I could see my own bones on the screen, and the X-ray tech explained\neverything and answered all my questions. Totally fascinating! If I could find her, IΓÇÖd thank her because that was a\nlife-changing experience. I dropped finance and enrolled in a radiology course. Now, I say that was fate. I mean, if my\nbrother hadnΓÇÖt broken my finger, I wouldnΓÇÖt be an X-ray technician today. But he says it was just a lucky break!\n(Ha! ThatΓÇÖs a good one.)\nLike Comment\nPracticalGal posted 2 days ago\nI agree with your brother. People make deliberate decisions based on current circumstances, even if thatΓÇÖs just a chance\nencounter. If you hadnΓÇÖt met that X-ray tech, you might have learned about radiology some other way. But you werenΓÇÖt\nunhappy in finance, so even if you were a banker now, youΓÇÖd still be happy.\nLike Comment\nJace_the_Ace posted 2 days ago\nI think life is a combination of luck and determination. Sometimes, like Lara, youΓÇÖre in the right place at the right time,\nbut it takes hard work and skill to turn luck into a real opportunity.\nLike Comment\nC Read the posts again. What events led to LaraΓÇÖs job?\nD GROUP WORK THINK CRITICALLY Say whose opinion you agree with the most. Then talk about someone who\nplayed a part in any of your life-changing experiences.\n2 VOCABULARY: Luck and choice\nA 2.18 Which expressions in the box are about luck, choice, or either luck or choice? Fill in the chart. Then\nlisten and check your work. Which of the expressions are nouns or noun phrases? Which are verb phrases?\nWhich three were not used in the posts in exercise 1A?\nbe fortunate be in the right place at the right time chance encounter\ncoincidence deliberate decision determination\nfate life-changing experience lucky break\n(not) believe my luck path wind up\nAbout luck About choice About luck and choice\nB Now go to page 148. Do the vocabulary exercises for 9.1.\nC Describe a time when you had good luck. What happened? What choices did you make in that situation?\n86",
+      "language": "en",
+      "page_or_sheet": 2,
+      "bbox": null,
+      "reading_order": 2,
+      "confidence": 98.0,
+      "raw_refs": [
+        "enrolled",
+        "encounter"
+      ]
+    },
+    {
+      "id": "cu-0003",
+      "unit_type": "paragraph",
+      "text": "3 GRAMMAR: Unreal conditionals\nA Read the sentences in the grammar box. Which rules are about the if clause? Which are about the result clause?\nUnreal conditionals\nIf I could find her, IΓÇÖd thank her. (IΓÇÖd = I would)\nIf you hadnΓÇÖt met that X-ray tech, you might have learned about radiology some other way.\nIf my brother hadnΓÇÖt broken my finger, I wouldnΓÇÖt be an X-ray technician today.\n1 Present and future unreal conditionals:\nUse the past continuous, simple past, or could in the clause.\nUse would, could, or might + base form in the clause.\n2 Past unreal conditionals:\nUse the past perfect in the clause.\nUse would, could, may, or might with have + past participle in the clause.\n3 Past unreal conditionals can also have an imaginary present result:\nUse would + base form of a verb in the clause.\nB Now go to page 137. Look at the grammar chart and do the grammar exercise for 9.1.\nC Complete the sentences and check your accuracy. Then share\nyour ideas with a partner. Ask questions to find out more. ACCURACY CHECK\n1 If I had more time, I .\nIn past unreal conditionals, the\n2 If I could work anywhere, I . auxiliary have goes in the result\n3 I if I didnΓÇÖt clause only, not in the if clause.\n. If I hadnΓÇÖt have met the doctor, I might\nnot have become an X-ray technician. Γ£ù\n4 If I hadnΓÇÖt , I wouldnΓÇÖt\nIf I hadnΓÇÖt met the doctor, I might not\n.\nhave become an X-ray technician. Γ£ô\n5 If I hadnΓÇÖt , I might have\n.\n6 I couldnΓÇÖt have if I hadnΓÇÖt .\n4 SPEAKING\nA GROUP WORK Think about how your life might be different now in the following situations.\nyou were born in another country you had gone to another school\nyou hadnΓÇÖt met someone you know you could learn without studying\nyou didnΓÇÖt have your present job you had fewer/more siblings\nIf I hadnΓÇÖt convinced my boss to enter\nthe design competition, we wouldnΓÇÖt\nhave won first prize ΓÇô this amazing\nproject that I am now leading. IΓÇÖm\nalso really fortunate that I have such\ngreat coworkers. I might not enjoy\nmy job so much if I werenΓÇÖt working\nwith such fantastic people.\n87",
+      "language": "en",
+      "page_or_sheet": 3,
+      "bbox": null,
+      "reading_order": 3,
+      "confidence": 98.0,
+      "raw_refs": [
+        "enter",
+        "enjoy"
+      ]
+    },
+    {
+      "id": "cu-0004",
+      "unit_type": "paragraph",
+      "text": "9.2 LESSON OBJECTIVE\nWHY DID I DO IT? Γûá talk about mistakes\n1 LANGUAGE IN CONTEXT\nA 2.19 Look at the picture. What do you think the man regrets?\nWhat other kinds of small things do people often regret? Read and\nlisten to a group of friends talking about small regrets. How many\nregrets do they talk about?\n2.19 Audio script\nAnne I was just wondering what kind of things you regret doing.\nNot big things, like, ΓÇ£I wish I wasnΓÇÖt studying psychology.\nI wish I could study art instead!ΓÇ¥ Just little, silly things.\nRuby Oh, I have a good one! Someone once told me that itΓÇÖs better\nto wash your hair with regular soap, rather than shampoo.\nSo I tried that ΓÇª\nSonia Uh-oh, that was a bad move.\nRuby I know! If only youΓÇÖd been there to stop me. I couldnΓÇÖt get the flakes out of my hair\nwhatever I did. And of course I had an interview to go to that day. It was such a silly mistake.\nSonia That was unfortunate. Well, I found myself in an awkward situation the other day: I was on\na date ΓÇô a first date ΓÇô and I was trying so hard to be interesting that I was talking and talking\nand not watching what I was doing. I went to take a bite of my spaghetti and spilled it all\ndown my white top. Ordering spaghetti with tomato sauce was such a dumb thing to do!\nDavid Well, sometimes you have to learn things the hard way. I recently washed my new sweater in\nhot water, and now itΓÇÖs way too small. It was completely my own fault: The label said to use\ncold. I was in too much of a hurry, as usual. If only I had a three-year-old brother, it would fit\nhim perfectly!\nPaulo I once ripped my pants on a dance floor!\nAnne Awkward!\nPaulo Yeah, I was on the floor, doing a breakdance move, when rip! But I saw the funny side of it.\nAnd so did everyone else!\nAnne I bet they did!\nPaulo IΓÇÖm totally incompetent at dancing. I donΓÇÖt even have a sense of rhythm. I donΓÇÖt know what\nI was thinking. I could have kicked myself.\nAnne Well, you could have, but you might have ripped your pants even more.\nINSIDER ENGLISH\nB 2.19 Read and listen again. What were the friendsΓÇÖ regrets?\nWho do you think made the biggest mistake?\nUse I bet to express agreement and\nC PAIR WORK THINK CRITICALLY Discuss the best way to deal show interest in what someone says.\nwith small regrets: laugh, forget them, try again, etc. A I was really scared.\nB I bet! OR I bet you were!\nA SheΓÇÖs so happy.\nB I bet! OR I bet she is!\n88",
+      "language": "en",
+      "page_or_sheet": 4,
+      "bbox": null,
+      "reading_order": 4,
+      "confidence": 98.0,
+      "raw_refs": [
+        "ENGLISH"
+      ]
+    },
+    {
+      "id": "cu-0005",
+      "unit_type": "paragraph",
+      "text": "2 VOCABULARY: Commenting on mistakes\nA 2.20 Look at the expressions from the text in exercise 1A on page 88 in the box. Discuss what each one\nmeans. Use a dictionary or your phone to help you. Then listen and check your work.\nFIND IT\nbe a bad move be a dumb thing to do be a silly mistake\nbe incompetent (at) be in too much of a hurry be unfortunate\nbe your own fault find yourself in an awkward situation kick yourself\nlearn sth the hard way not watch what youΓÇÖre doing see the funny side of sth\nB Now go to page 149. Do the vocabulary exercises for 9.2.\nC PAIR WORK Describe and comment on mistakes people often make involving these things.\ncleaning clothes computers/phones cooking reservations/tickets work\n3 GRAMMAR: Wishes and regrets\nA Read the sentences in the grammar box. Circle the correct options to complete the rules.\nWishes and regrets\nI wish (that) I wasnΓÇÖt studying psychology. I wish I could study art instead.\nIf only youΓÇÖd been there to stop me! If only I had a three-year-old brother.\n1 I wish (that) and if only have a different / the same meaning.\n2 For wishes and regrets about the present, use I wish (that) or if only followed by the simple past, can / could,\nor the past continuous.\n3 For wishes and regrets about the past, use I wish (that) or if only followed by a verb in the\npresent perfect / past perfect.\nB Now go to page 137. Look at the grammar chart and do the grammar exercise for 9.2.\nC Use if only to describe regrets about the problems below. Then tell a partner about similar experiences of your\nown using I wish (that).\n1 I broke it. 2 I canΓÇÖt find it. 5 I donΓÇÖt have time to do it.\nIf only I hadnΓÇÖt broken it. I wish 3 I forgot to do it. 6 I didnΓÇÖt answer it.\nI hadnΓÇÖt broken my favorite\n4 I have to go there.\nmug last week.\n4 SPEAKING\nEEXXPPEERRTT\nSSSSSPPPPPEEEEEAAAAAKKKKKEEEEERRRRR\nA PAIR WORK Are there any little things youΓÇÖve\nAre your regrets similar\ndone, or havenΓÇÖt done, in the last few days that you\nto CarolinaΓÇÖs?\nregret (e.g., when shopping for clothes or groceries,\ndecorating your home, going on vacation)?\nFor ideas, watch CarolinaΓÇÖs video.\nSome things you learn the hard way.\nThe other day I bought lots of\ngroceries, but what I hadnΓÇÖt noticed\nwas that the bag had a hole in it. If\nonly IΓÇÖd checked it more carefully ΓÇª\n89",
+      "language": "en",
+      "page_or_sheet": 5,
+      "bbox": 
+... [truncated for display] ...
+
+========================================================================
+CDM for IFC
+========================================================================
+SUMMARY: {"subtype": "ifc_model", "method": "ifc_native", "confidence": 96.0, "content_units": 4, "tables": 0, "has_spatial": true, "has_quantities": true, "language_primary": null, "title": "TenderRisk Test Project"}
+FULL_CDM_JSON_WRITTEN=C:\Users\Aryan Digitai\Desktop\standard\backend\storage\_phase1_cdm_samples\cdm_ifc.json
+FULL_CDM_JSON:
+{
+  "document_id": 9002,
+  "project_id": 5,
+  "category": "drawing",
+  "subtype": "ifc_model",
+  "language_primary": null,
+  "languages_detected": [],
+  "extraction": {
+    "method": "ifc_native",
+    "confidence_score": 96.0,
+    "needs_manual_review": false,
+    "source_formats": [
+      "application/x-step",
+      "ifc",
+      "ifc_native"
+    ]
+  },
+  "identity": {
+    "title": "TenderRisk Test Project",
+    "revision": null,
+    "revision_date": null,
+    "authoring_system": "IFC",
+    "external_ids": [
+      "IFC4",
+      "0AviyQvGrAxwSwBq3cJS0_",
+      "0WULW_FPDEyeJCU7BVqlS9",
+      "0nriuooh115hPPjS_NZ0Vp",
+      "1fObuG2QrCFww6ziJ4MmE5"
+    ]
+  },
+  "content_units": [
+    {
+      "id": "cu-0001",
+      "unit_type": "paragraph",
+      "text": "--- ifc: phase1.ifc (IFC_NATIVE) ---\nSchema: IFC4\nElements (typed count): 1\nGeometry: not processed (metadata only)",
+      "language": null,
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 1,
+      "confidence": 96.0,
+      "raw_refs": []
+    },
+    {
+      "id": "cu-0002",
+      "unit_type": "paragraph",
+      "text": "Spatial hierarchy:\n  - IfcProject: TenderRisk Test Project\n  - IfcSite: Test Site\n  - IfcBuilding: Test Building\n  - IfcBuildingStorey: Level 01",
+      "language": null,
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 2,
+      "confidence": 96.0,
+      "raw_refs": []
+    },
+    {
+      "id": "cu-0003",
+      "unit_type": "paragraph",
+      "text": "Elements by discipline:\n  [architecture] IfcWall=1\n  keywords: architecture IfcWall",
+      "language": null,
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 3,
+      "confidence": 96.0,
+      "raw_refs": []
+    },
+    {
+      "id": "cu-0004",
+      "unit_type": "paragraph",
+      "text": "Property highlights (fire/material/load-related):\n  - IfcWall Wall-A: {'Pset_WallCommon': {'FireRating': 'REI 90', 'LoadBearing': True}}",
+      "language": null,
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 4,
+      "confidence": 96.0,
+      "raw_refs": []
+    }
+  ],
+  "tables": [],
+  "spatial": {
+    "nodes": [
+      {
+        "type": "IfcProject",
+        "name": "TenderRisk Test Project",
+        "external_id": "0AviyQvGrAxwSwBq3cJS0_",
+        "parent_id": null
+      },
+      {
+        "type": "IfcSite",
+        "name": "Test Site",
+        "external_id": "0WULW_FPDEyeJCU7BVqlS9",
+        "parent_id": null
+      },
+      {
+        "type": "IfcBuilding",
+        "name": "Test Building",
+        "external_id": "0nriuooh115hPPjS_NZ0Vp",
+        "parent_id": null
+      },
+      {
+        "type": "IfcBuildingStorey",
+        "name": "Level 01",
+        "external_id": "1fObuG2QrCFww6ziJ4MmE5",
+        "parent_id": null
+      }
+    ],
+    "element_counts": {
+      "architecture": {
+        "IfcWall": 1
+      }
+    }
+  },
+  "quantities_summary": {
+    "kind": "ifc_element_counts",
+    "element_counts": {
+      "architecture": {
+        "IfcWall": 1
+      }
+    },
+    "property_highlights": [
+      {
+        "type": "IfcWall",
+        "name": "Wall-A",
+        "global_id": "0kM_agiRX4EwJLN0rrvxT8",
+        "properties": {
+          "Pset_WallCommon": {
+            "FireRating": "REI 90",
+            "LoadBearing": true
+          }
+        }
+      }
+    ]
+  },
+  "links_out": [],
+  "provenance": {
+    "parser_version": "cdm-1.0.0",
+    "normalized_at": "2026-08-02T05:47:54.589786+00:00",
+    "content_hash": "f15455825bb4b81f787172f2889bae2cafdfdadb4cbb4578ea7142060b355e0f"
+  }
+}
+
+========================================================================
+CDM for GAEB X83
+========================================================================
+SUMMARY: {"subtype": "gaeb_lv", "method": "gaeb_native", "confidence": 96.0, "content_units": 3, "tables": 1, "has_spatial": false, "has_quantities": true, "language_primary": null, "title": "phase1"}
+FULL_CDM_JSON_WRITTEN=C:\Users\Aryan Digitai\Desktop\standard\backend\storage\_phase1_cdm_samples\cdm_gaeb.json
+FULL_CDM_JSON:
+{
+  "document_id": 9003,
+  "project_id": 5,
+  "category": "tender",
+  "subtype": "gaeb_lv",
+  "language_primary": null,
+  "languages_detected": [],
+  "extraction": {
+    "method": "gaeb_native",
+    "confidence_score": 96.0,
+    "needs_manual_review": false,
+    "source_formats": [
+      "application/xml",
+      "x83",
+      "gaeb_native"
+    ]
+  },
+  "identity": {
+    "title": "phase1",
+    "revision": null,
+    "revision_date": null,
+    "authoring_system": "GAEB",
+    "external_ids": [
+      "0010",
+      "0020"
+    ]
+  },
+  "content_units": [
+    {
+      "id": "cu-0001",
+      "unit_type": "paragraph",
+      "text": "--- gaeb: phase1.X83 (GAEB_NATIVE) ---\nSource version: 3.2\nExchange phase: X83\nGrand total: 0\nItems: 2",
+      "language": null,
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 1,
+      "confidence": 96.0,
+      "raw_refs": []
+    },
+    {
+      "id": "cu-0002",
+      "unit_type": "paragraph",
+      "text": "Leistungsverzeichnis / BOQ positions:\n  0010 | Mauerwerk Innenwand | qty=100.000 m2\n  keywords: Leistungsverzeichnis LV GAEB Position Mengen BOQ\n  0020 | Stahlbeton C30/37 | qty=25.500 m3\n  keywords: Leistungsverzeichnis LV GAEB Position Mengen BOQ",
+      "language": null,
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 2,
+      "confidence": 96.0,
+      "raw_refs": []
+    },
+    {
+      "id": "cu-0003",
+      "unit_type": "paragraph",
+      "text": "Validation issues:\n  [INFO] XSD validation skipped: no schema directory configured",
+      "language": null,
+      "page_or_sheet": 1,
+      "bbox": null,
+      "reading_order": 3,
+      "confidence": 96.0,
+      "raw_refs": []
+    }
+  ],
+  "tables": [
+    {
+      "id": "tbl-gaeb-001",
+      "name": "GAEB BoQ items",
+      "headers": [
+        "code",
+        "description",
+        "qty",
+        "unit",
+        "unit_price",
+        "total_price"
+      ],
+      "rows": [
+        [
+          "0010",
+          "Mauerwerk Innenwand",
+          "100.000",
+          "m2",
+          "",
+          ""
+        ],
+        [
+          "0020",
+          "Stahlbeton C30/37",
+          "25.500",
+          "m3",
+          "",
+          ""
+        ]
+      ],
+      "role_hint": "boq_like",
+      "confidence": 96.0
+    }
+  ],
+  "spatial": null,
+  "quantities_summary": {
+    "kind": "gaeb_boq",
+    "item_count": 2,
+    "grand_total": "0",
+    "source_version": "3.2",
+    "exchange_phase": "X83",
+    "format_family": "gaeb"
+  },
+  "links_out": [],
+  "provenance": {
+    "parser_version": "cdm-1.0.0",
+    "normalized_at": "2026-08-02T05:47:55.442906+00:00",
+    "content_hash": "70c30852be3c7346dd4fe9b8fe1ac01abf1a4463367f320191cc5fb95f917633"
+  }
+}
+
+PASS merge_extraction_meta keeps extraction + adds canonical
+
+MVP analyzer status= completed
+MVP findings_count= 26
+MVP readiness= 100
+PASS keyword MVP analyzer still runs
+
+ALL PHASE1 CDM CHECKS PASSED

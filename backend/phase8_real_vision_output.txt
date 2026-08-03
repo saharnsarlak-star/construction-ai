@@ -1,0 +1,60 @@
+﻿python.exe : Tesseract unavailable: tesseract is not installed or it's not in your PATH. See README file for more 
+information.
+At C:\Users\Aryan Digitai\AppData\Local\Temp\ps-script-8a7f9b63-9e49-4d96-9186-6a03abffd127.ps1:106 char:461
++ ... OLE_KEY=''; & "C:\Users\Aryan Digitai\AppData\Local\Programs\Python\P ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Tesseract unava...re information.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+=== Phase 8 REAL vision validation ===
+llm_provider=openai_compatible
+llm_model=gpt-4o-mini
+vision_llm_model=gpt-4o-mini
+llm_base_url=https://api.openai.com/v1
+openai_api_key_configured=True
+rasterized 918x1188 png_bytes=75702
+direct vision metrics: {
+  "enabled": true,
+  "docs_scanned": 1,
+  "pages_rasterized": 1,
+  "python_hits": 0,
+  "llm_hits": 2,
+  "findings": 2,
+  "vision_llm_called": true,
+  "vision_llm_error": null,
+  "usage": {
+    "latency_ms": 5807.2,
+    "prompt_tokens": 25644,
+    "completion_tokens": 274,
+    "estimated_cost_usd": 0.004011,
+    "model": "gpt-4o-mini",
+    "provider": "openai_compatible"
+  }
+}
+  LLM FINDING DRAW-SEED-004: [Vision] Contradiction between plan view and section/elevation
+    method chain=['risk_id=RISK-DRAW-PLAN-SECTION-001', 'check=drawing_plan_vs_section', 'source_layer=vision_based', 'vision_method=vision_llm', 'confidence_score=1', 'may_use_vision=true']
+    excerpt='Plan conflicts with section: Wall-A height differs'
+  LLM FINDING DRAW-SEED-003: [Vision] Missing execution detail for critical connections
+    method chain=['risk_id=RISK-DRAW-MISSING-DETAIL-001', 'check=drawing_missing_connection_detail', 'source_layer=vision_based', 'vision_method=vision_llm', 'confidence_score=1', 'may_use_vision=true']
+    excerpt='STEEL CONNECTION at grid B/3 - connection TBD'
+[init_db] alter warning: (sqlite3.OperationalError) near "EXISTS": syntax error
+[SQL: ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_type VARCHAR(64) DEFAULT 'infrastructure']
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[init_db] RKB seed: inserted=0 table_count=46 unique_seed=46
+project_id=2
+uploaded doc_id=2
+process_document_extraction finished
+db stored_path='C:\\Users\\Aryan Digitai\\Desktop\\standard\\backend\\storage\\project_2\\drawing\\sample_drawing_sheet_7256cd4cd78a.pdf' extracted_text_len=425 exists=True
+analyze vision findings=3
+  SURFACED DRAW-SEED-004: [Vision] Contradiction between plan view and section/elevation
+    confidence=1 excerpt='Plan conflicts with section: Wall-A height differs'
+    chain=['risk_id=RISK-DRAW-PLAN-SECTION-001', 'check=drawing_plan_vs_section', 'source_layer=vision_based', 'vision_method=vision_llm', 'confidence_score=1', 'may_use_vision=true']
+  SURFACED DRAW-SEED-003: [Vision] Missing execution detail for critical connections
+    confidence=1 excerpt='STEEL CONNECTION at grid B/3 - connection TBD'
+    chain=['risk_id=RISK-DRAW-MISSING-DETAIL-001', 'check=drawing_missing_connection_detail', 'source_layer=vision_based', 'vision_method=vision_llm', 'confidence_score=1', 'may_use_vision=true']
+  SURFACED DRAW-SEED-002: [Vision] Scale inconsistent with stated dimensions
+    confidence=70 excerpt='Scale: 1:75'
+    chain=['risk_id=RISK-DRAW-SCALE-001', 'check=drawing_scale_vs_dimensions', 'source_layer=vision_based', 'vision_method=vision_python', 'confidence_score=70', 'may_use_vision=true']
+analyze findings with vision_method=vision_llm: 2/3
+
+PHASE 8 REAL VISION VALIDATION PASS (llm_hits>0, upload->extract->analyze).
