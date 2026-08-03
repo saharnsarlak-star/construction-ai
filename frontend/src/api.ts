@@ -72,7 +72,7 @@ export interface FindingOut {
   financial_impact: string | null;
   schedule_impact: string | null;
   evidence: string | null;
-  finding_category?: "risk" | "limitation" | "methodology";
+  finding_category?: "risk" | "limitation" | "methodology" | "experience";
   risk_score?: number | null;
   source_excerpt?: string | null;
   cause_effect_chain?: string[];
@@ -89,6 +89,7 @@ export interface AnalysisOut {
   readiness_score: number;
   counts: Record<string, number>;
   counts_risk?: Record<string, number>;
+  counts_experience?: number | null;
   aggregate_risk_score?: number | null;
   documents_with_limitations?: number | null;
   text_extraction_success_rate?: number | null;
@@ -105,6 +106,93 @@ export interface ProjectStandardOut {
   is_selected: boolean;
   selected_by: string;
   check_target: string;
+  has_pdf?: boolean;
+}
+
+export interface ExperienceOut {
+  id: number;
+  experience_id: string;
+  title: string;
+  description: string;
+  category: string;
+  origin_kind: string;
+  source: string | null;
+  author: string | null;
+  validation_status: string;
+  confidence_level: string;
+  related_risk_id: string | null;
+  related_risk_category: string | null;
+  related_project_types: string[];
+  recommended_prevention: string | null;
+  related_documents: string[];
+  related_outcomes: string[];
+  match_keywords: string[];
+  version: number;
+  is_active: boolean;
+}
+
+export interface ExperienceCreateBody {
+  title: string;
+  description?: string;
+  category?: string;
+  related_project_types?: string[];
+  recommended_prevention?: string;
+  match_keywords?: string[];
+  confidence_level?: string;
+  experience_id?: string;
+}
+
+export interface ExperienceBulkOut {
+  created: ExperienceOut[];
+  created_count: number;
+  skipped: number;
+}
+
+export interface AuthMeOut {
+  username: string;
+  role: UserRole;
+  is_admin: boolean;
+}
+
+export interface CatalogStandardOut {
+  standard_code: string;
+  title: string;
+  standard_class: string;
+  publisher: string | null;
+  original_name: string;
+  content_type: string | null;
+  size_bytes: number;
+  has_pdf: boolean;
+  created_at: string;
+}
+
+const TOKEN_KEY = "tenderrisk_api_token";
+
+export function getApiToken(): string {
+  return localStorage.getItem(TOKEN_KEY) || "";
+}
+
+export function setApiToken(token: string) {
+  if (token) localStorage.setItem(TOKEN_KEY, token);
+  else localStorage.removeItem(TOKEN_KEY);
+}
+
+function authHeaders(extra?: HeadersInit): HeadersInit {
+  const token = getApiToken();
+  const base: Record<string, string> = {};
+  if (token) base["X-API-Token"] = token;
+  if (extra) {
+    if (extra instanceof Headers) {
+      extra.forEach((v, k) => {
+        base[k] = v;
+      });
+    } else if (Array.isArray(extra)) {
+      for (const [k, v] of extra) base[k] = v;
+    } else {
+      Object.assign(base, extra);
+    }
+  }
+  return base;
 }
 
 export interface UploadErrorOut {
@@ -138,11 +226,15 @@ export const FILE_ACCEPT_BY_CATEGORY: Record<DocumentCategory, string> = {
 export { FILE_ACCEPT };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, init);
+  const headers = authHeaders(init?.headers);
+  const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || res.statusText);
   }
+  if (res.status === 204) return undefined as T;
+  const ct = res.headers.get("content-type") || "";
+  if (!ct.includes("application/json")) return undefined as T;
   return res.json() as Promise<T>;
 }
 
@@ -178,6 +270,7 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  authMe: () => request<AuthMeOut>("/auth/me"),
   uploadDocuments: async (projectId: number, category: DocumentCategory, files: FileList | File[]) => {
     const form = new FormData();
     form.append("category", category);
@@ -186,6 +279,48 @@ export const api = {
       method: "POST",
       body: form,
     });
+  },
+  uploadCatalogStandard: async (params: {
+    file: File;
+    standard_code: string;
+    title: string;
+    project_id?: number;
+    standard_class?: string;
+    publisher?: string;
+  }) => {
+    const form = new FormData();
+    form.append("file", params.file, params.file.name);
+    form.append("standard_code", params.standard_code);
+    form.append("title", params.title);
+    form.append("standard_class", params.standard_class || "technical");
+    if (params.publisher) form.append("publisher", params.publisher);
+    if (params.project_id != null) form.append("project_id", String(params.project_id));
+    return request<CatalogStandardOut>("/standards/catalog", {
+      method: "POST",
+      body: form,
+    });
+  },
+  downloadProjectStandardPdf: async (projectId: number, standardCode: string) => {
+    const res = await fetch(
+      `${API_BASE}/projects/${projectId}/standards/${encodeURIComponent(standardCode)}/download`,
+      { headers: authHeaders() },
+    );
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    const blob = await res.blob();
+    const cd = res.headers.get("content-disposition") || "";
+    const match = /filename="?([^";]+)"?/i.exec(cd);
+    const filename = match?.[1] || `${standardCode}.pdf`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   },
   listProjectStandards: (projectId: number) =>
     request<ProjectStandardOut[]>(`/projects/${projectId}/standards`),
@@ -226,4 +361,54 @@ export const api = {
     }),
   latestAnalysis: (projectId: number) =>
     request<AnalysisOut>(`/projects/${projectId}/analyses/latest`),
+  listExperience: (params?: { active_only?: boolean; category?: string; q?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.active_only != null) qs.set("active_only", String(params.active_only));
+    if (params?.category) qs.set("category", params.category);
+    if (params?.q) qs.set("q", params.q);
+    const suffix = qs.toString() ? `?${qs}` : "";
+    return request<ExperienceOut[]>(`/experience${suffix}`);
+  },
+  createExperience: (body: ExperienceCreateBody) =>
+    request<ExperienceOut>("/experience", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  bulkCreateExperience: (body: {
+    raw_text?: string;
+    items?: ExperienceCreateBody[];
+    default_category?: string;
+    default_project_types?: string[];
+    auto_categorize?: boolean;
+  }) =>
+    request<ExperienceBulkOut>("/experience/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  patchExperience: (
+    experienceId: string,
+    body: Partial<ExperienceCreateBody> & { is_active?: boolean },
+  ) =>
+    request<ExperienceOut>(`/experience/${encodeURIComponent(experienceId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  deleteExperience: (experienceId: string) =>
+    request<void>(`/experience/${encodeURIComponent(experienceId)}`, {
+      method: "DELETE",
+    }),
+  suggestExperience: (text: string) =>
+    request<{ category: string; match_keywords: string[]; title_suggestion: string | null }>(
+      "/experience/suggest",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      },
+    ),
+  listExperienceCategories: () =>
+    request<{ categories: { code: string; keywords_sample: string[] }[] }>("/experience/categories"),
 };

@@ -1,0 +1,47 @@
+%PDF-1.4
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 555 >>
+stream
+BT
+/F1 14 Tf
+50 780 Td
+(ENGINEERING DRAWING - Sheet A-101) Tj
+0 -24 Td
+(Title: Hospital Wing Exterior Wall Wall-A) Tj
+0 -20 Td
+(Scale: 1:75) Tj
+0 -20 Td
+(Also marked SCALE 1:100 on section bubble) Tj
+0 -24 Td
+(PLAN VIEW - Level +3.20 FFL) Tj
+0 -20 Td
+(Wall-A length 12.50 m) Tj
+0 -24 Td
+(SECTION A-A - Level +2.80 FFL) Tj
+0 -20 Td
+(Plan conflicts with section: Wall-A height differs) Tj
+0 -24 Td
+(STEEL CONNECTION at grid B/3 - connection TBD) Tj
+0 -20 Td
+(Missing execution detail for critical junction) Tj
+0 -24 Td
+(Revision: B  Date: 2026-03-01) Tj
+ET
+
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000056 00000 n 
+0000000111 00000 n 
+0000000235 00000 n 
+0000000840 00000 n 
+trailer<< /Size 6 /Root 1 0 R >>
+startxref
+908
+%%EOF

@@ -43,6 +43,64 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_service_role_key: str | None = None
     supabase_bucket: str = "project-documents"
+    # Local/dev: ignore Supabase credentials and write uploads to disk
+    force_local_storage: bool = False
+
+    # Phase 0 minimal auth tokens (bootstrap; also seeded into app_users)
+    admin_api_token: str = "dev-admin-token"
+    user_api_token: str = "dev-user-token"
+
+    # Phase 1 — Canonical Document Model writer (default OFF = production-safe)
+    cdm_enabled: bool = False
+
+    # Phase 2 — Party / Element Registry / OntologyEdge (default OFF)
+    ontology_enabled: bool = False
+
+    # Phase 3 — PYTHON seed rule runners (default OFF; keyword analyzer remains default)
+    new_rule_engine_enabled: bool = False
+
+    # Phase 4 — AI / HYBRID seed runners (default OFF)
+    # No provider was previously configured; OpenAI-compatible Chat Completions via httpx.
+    ai_rule_engine_enabled: bool = False
+    openai_api_key: str | None = None
+    llm_base_url: str = "https://api.openai.com/v1"
+    llm_model: str = "gpt-4o-mini"
+    llm_provider: str = "openai_compatible"  # openai_compatible | replay
+    llm_replay_path: str | None = None
+    ai_max_calls_per_analysis: int = 12
+
+    # Phase 5 — Knowledge Graph risk chains (default OFF)
+    knowledge_graph_enabled: bool = False
+
+    # Phase 6 — Risk Knowledge Base in DB (default OFF; fallback to Python seed dicts)
+    rkb_db_enabled: bool = False
+
+    # Phase 7 — Human Construction Experience Knowledge layer (default OFF)
+    experience_layer_enabled: bool = False
+
+    # Phase 8 — Vision drawing checks + GAEB 90 fixed-width (default OFF)
+    vision_drawing_checks_enabled: bool = False
+    gaeb90_enabled: bool = False
+    vision_llm_model: str = "gpt-4o-mini"
+    vision_max_pages_per_doc: int = 2
+
+    @field_validator(
+        "cdm_enabled",
+        "ontology_enabled",
+        "new_rule_engine_enabled",
+        "ai_rule_engine_enabled",
+        "knowledge_graph_enabled",
+        "rkb_db_enabled",
+        "experience_layer_enabled",
+        "vision_drawing_checks_enabled",
+        "gaeb90_enabled",
+        mode="before",
+    )
+    @classmethod
+    def _bool_flag(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip().lower() in {"1", "true", "yes", "on"}
+        return value
 
     @field_validator("database_url", mode="before")
     @classmethod
@@ -72,6 +130,8 @@ class Settings(BaseSettings):
 
     @property
     def supabase_enabled(self) -> bool:
+        if self.force_local_storage:
+            return False
         return bool(self.supabase_url and self.supabase_service_role_key)
 
 

@@ -1,0 +1,24 @@
+00 83L 12P00000090                                                        000001
+01Musterdatei GAEB 90 DA 83 05.12.07 X                                    000002
+02MWM Muster aus MWM-Primo                                                000003
+03MWM                                                                     000004
+08EURO EURO                                                               000005
+111 N                                                                     000006
+12L O S : 1                                                               000007
+1110 N                                                                    000008
+12Abwasserleitung                                                         000009
+21101 NNN 00000093000m                                                    000010
+23101 00000125040 000001162873                                            000011
+25Entwaesserungsleitung aus Kunststoffrohren nach sta-                    000012
+25tischen Erfordernissen nach DIN 4033 herstellen                         000013
+25einschl. Erdarbeiten in Boden der Klassen 3 bis 5                       000014
+26 sowie ggf. einschl. Verbau.                                            000015
+26 Ggf. erforderliche Wasserhaltung bis zu einer Pumpen-                  000016
+21102 NNN 00000001000m                                                    000017
+23102 00000134170 000000013417                                            000018
+25wie vor beschrieben, jedoch DN 125                                      000019
+21103 NNN 00000072000st                                                   000020
+23103 00000071250 000000513000                                            000021
+25Zulage fuer Formstuecke zu entsprechender Entwaesse-                    000022
+25rungsleitung                                                            000023
+99                                                                        000024

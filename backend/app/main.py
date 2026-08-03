@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import projects
+from app.routers import experience, projects, risks, standards
 from app.schemas import HealthOut
 from app.services.storage import storage_mode
 
@@ -27,6 +27,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(projects.router, prefix=settings.api_prefix)
+app.include_router(standards.router, prefix=settings.api_prefix)
+app.include_router(risks.router, prefix=settings.api_prefix)
+app.include_router(experience.router, prefix=settings.api_prefix)
 
 
 @app.get("/api/health", response_model=HealthOut)

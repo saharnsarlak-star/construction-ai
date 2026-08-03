@@ -7,9 +7,20 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from app.auth import Principal, get_principal
 from app.config import settings
 from app.database import get_db
-from app.models import Analysis, Document, DocumentCategory, Finding, LanguageCode, Project, ProjectStandard, ProjectType
+from app.models import (
+    Analysis,
+    CatalogStandardAsset,
+    Document,
+    DocumentCategory,
+    Finding,
+    LanguageCode,
+    Project,
+    ProjectStandard,
+    ProjectType,
+)
 from app.schemas import (
     AnalysisOut,
     AnalyzeRequest,
@@ -23,12 +34,17 @@ from app.schemas import (
     ProjectStandardOut,
     ProjectStandardsUpdate,
     ProjectUpdate,
+    RelatedFindingsChain,
+    RelatedFindingHop,
     UploadBatchOut,
     UploadErrorOut,
 )
 from app.services.analyzer import analyze_project_documents
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
 from app.services.extraction_jobs import process_document_extraction, queued_meta
+from app.services.rule_engine import run_python_seed_rules
+from app.services.rule_engine.ai_engine import run_ai_hybrid_seed_rules
+from app.services.knowledge_graph import build_chains_for_analysis
 from app.services import storage as file_storage
 from app.services.project_standards import (
     ensure_project_standards,
@@ -196,7 +212,12 @@ async def delete_project(project_id: int, db: AsyncSession = Depends(get_db)) ->
     return {"ok": True}
 
 
-def _standard_out(row: ProjectStandard, lang: str = "fa") -> ProjectStandardOut:
+def _standard_out(
+    row: ProjectStandard,
+    lang: str = "fa",
+    *,
+    pdf_codes: set[str] | None = None,
+) -> ProjectStandardOut:
     std = get_standard(row.standard_code)
     sclass = row.standard_class or (std.standard_class if std else "technical")
     if sclass == "contractual":
@@ -206,6 +227,7 @@ def _standard_out(row: ProjectStandard, lang: str = "fa") -> ProjectStandardOut:
     else:
         check_target = "drawings+boq+specifications"
     title = std.title_for(lang) if std else (row.title or row.standard_code)
+    has_pdf = bool(pdf_codes and row.standard_code in pdf_codes)
     return ProjectStandardOut(
         standard_code=row.standard_code,
         title=title,
@@ -215,7 +237,13 @@ def _standard_out(row: ProjectStandard, lang: str = "fa") -> ProjectStandardOut:
         is_selected=bool(row.is_selected),
         selected_by=row.selected_by or "system_default",
         check_target=check_target,
+        has_pdf=has_pdf,
     )
+
+
+async def _catalog_pdf_codes(db: AsyncSession) -> set[str]:
+    result = await db.execute(select(CatalogStandardAsset.standard_code))
+    return set(result.scalars().all())
 
 
 def _project_lang(project: Project) -> str:
@@ -230,6 +258,7 @@ async def list_project_standards(
     project = await _get_project_meta(db, project_id)
     lang = _project_lang(project)
     rows = await list_or_seed_project_standards(db, project, lang=lang)
+    pdf_codes = await _catalog_pdf_codes(db)
     rows_sorted = sorted(
         rows,
         key=lambda r: (
@@ -238,7 +267,7 @@ async def list_project_standards(
             r.standard_code,
         ),
     )
-    return [_standard_out(r, lang) for r in rows_sorted]
+    return [_standard_out(r, lang, pdf_codes=pdf_codes) for r in rows_sorted]
 
 
 @router.put("/{project_id}/standards", response_model=list[ProjectStandardOut])
@@ -250,6 +279,7 @@ async def update_project_standards(
     """Fast path: toggle without loading project documents (avoids multi-second hangs)."""
     project = await _get_project_meta(db, project_id)
     lang = _project_lang(project)
+    pdf_codes = await _catalog_pdf_codes(db)
     # Prefer single-item toggle path used by the UI
     if len(payload.items) == 1:
         item = payload.items[0]
@@ -260,7 +290,7 @@ async def update_project_standards(
             is_selected=item.is_selected,
         )
         if row is not None:
-            return [_standard_out(row, lang)]
+            return [_standard_out(row, lang, pdf_codes=pdf_codes)]
     # Fallback: seed then toggle
     rows = await list_or_seed_project_standards(db, project, lang=lang)
     by_code = {r.standard_code: r for r in rows}
@@ -277,7 +307,7 @@ async def update_project_standards(
         row = by_code.get(item.standard_code)
         if row is not None:
             await db.refresh(row)
-            out.append(_standard_out(row, lang))
+            out.append(_standard_out(row, lang, pdf_codes=pdf_codes))
     return out
 
 
@@ -288,11 +318,19 @@ async def upload_documents(
     files: Annotated[list[UploadFile], File()],
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_principal),
 ) -> UploadBatchOut:
     """
     Accept many files quickly. Text/OCR runs asynchronously via DocumentPipeline
     so scanned PDFs and drawings do not block the upload request.
+
+    category=standard requires Admin. Prefer POST /api/standards/catalog for PDF retention.
     """
+    if category == DocumentCategory.STANDARD and not principal.is_admin:
+        raise HTTPException(
+            status_code=403,
+            detail="Admin role required to upload standards. Users may only view/select and download PDFs.",
+        )
     project = await _get_project(db, project_id)
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
@@ -546,39 +584,64 @@ async def analyze_project(
         await db.commit()
         await db.refresh(project)
 
-    # Before analysis: OCR any tender/schedule/standard that still lacks usable text.
-    # Drawings: run CAD extract (DWG/DXF/Revit) when still empty — do not OCR CAD binaries.
-    refreshed = 0
+    # Before analysis: finish extraction for ANY document still empty/queued so
+    # newly uploaded drawings/docs are included in this run (full re-analysis).
+    pending_ids: list[int] = []
     for doc in project.documents:
-        if refreshed >= 12:
-            break
-        if has_usable_text(doc.extracted_text or ""):
-            continue
+        text = doc.extracted_text or ""
+        phase = None
+        if doc.meta_json:
+            try:
+                meta = json.loads(doc.meta_json)
+                phase = (meta.get("extraction") or {}).get("phase")
+            except json.JSONDecodeError:
+                phase = None
+        needs = False
+        if phase in {"queued", "converting", "ocr", "extracting", "merging"}:
+            needs = True
+        elif phase is None and not (text or "").strip():
+            # Never extracted yet
+            needs = True
+        # completed/failed drawings may legitimately have little text — do not re-OCR every analyze
+        if needs:
+            pending_ids.append(doc.id)
+
+    for doc_id in pending_ids:
         try:
-            path = await file_storage.open_for_read(doc.stored_path)
-            if doc.category == DocumentCategory.DRAWING:
-                text = await asyncio.to_thread(
-                    extract_text_from_file, path, allow_ocr=False, treat_as_drawing=True
-                )
-            else:
-                text = await asyncio.to_thread(
-                    extract_text_from_file, path, allow_ocr=True
-                )
-            doc.extracted_text = text
-            refreshed += 1
+            await process_document_extraction(doc_id)
         except Exception:  # noqa: BLE001
-            continue
-    if refreshed:
+            # Fall back to synchronous light extract so analysis still sees something.
+            try:
+                doc = next((d for d in project.documents if d.id == doc_id), None)
+                if not doc:
+                    continue
+                path = await file_storage.open_for_read(doc.stored_path)
+                if doc.category == DocumentCategory.DRAWING:
+                    text = await asyncio.to_thread(
+                        extract_text_from_file, path, allow_ocr=False, treat_as_drawing=True
+                    )
+                else:
+                    text = await asyncio.to_thread(
+                        extract_text_from_file, path, allow_ocr=True
+                    )
+                doc.extracted_text = text
+                await db.commit()
+            except Exception:  # noqa: BLE001
+                continue
+
+    if pending_ids:
         await db.commit()
-        await db.refresh(project)
-        # reload documents after commit
         project = await _get_project(db, project_id)
 
     docs_payload = [
         {
-            "category": d.category,
+            "id": d.id,
+            "category": d.category.value if hasattr(d.category, "value") else d.category,
             "original_name": d.original_name,
+            "stored_path": d.stored_path,
             "extracted_text": d.extracted_text or "",
+            "content_type": d.content_type,
+            "meta_json": d.meta_json,
         }
         for d in project.documents
     ]
@@ -622,6 +685,167 @@ async def analyze_project(
         selected_standards=selected_standards,
     )
 
+    # Phase 3/4 rule engines (default OFF). Keyword analyzer always runs first unchanged.
+    rule_engine_count = 0
+    ai_engine_count = 0
+    ai_metrics: dict = {}
+    if settings.new_rule_engine_enabled or settings.ai_rule_engine_enabled:
+        element_payload: list[dict] = []
+        try:
+            from app.models import ElementDocumentRef, ProjectElement
+
+            el_rows = (
+                await db.execute(
+                    select(ProjectElement).where(ProjectElement.project_id == project.id)
+                )
+            ).scalars().all()
+            for el in el_rows:
+                refs = (
+                    await db.execute(
+                        select(ElementDocumentRef).where(ElementDocumentRef.element_id == el.id)
+                    )
+                ).scalars().all()
+                element_payload.append(
+                    {
+                        "id": el.id,
+                        "element_type": el.element_type,
+                        "name_label": el.name_label,
+                        "type_mark": el.type_mark,
+                        "ifc_global_id": el.ifc_global_id,
+                        "match_key": el.match_key,
+                        "document_ids": [r.document_id for r in refs],
+                    }
+                )
+        except Exception:  # noqa: BLE001
+            element_payload = []
+
+        by_code = {f.code: f for f in result.get("findings") or []}
+
+        rkb_catalog = None
+        if settings.rkb_db_enabled:
+            from app.knowledge.rkb import load_rkb_catalog_for_runners
+
+            rkb_catalog = await load_rkb_catalog_for_runners(db)
+
+        if settings.new_rule_engine_enabled:
+            rule_findings = run_python_seed_rules(
+                country=project.country,
+                report_language=report_language,
+                documents=docs_payload,
+                project_type=ptype,
+                selected_standards=selected_standards,
+                elements=element_payload,
+                project_id=project.id,
+                rkb_catalog=rkb_catalog,
+            )
+            rule_engine_count = len(rule_findings)
+            for rf in rule_findings:
+                by_code[rf.code] = rf
+
+        # Phase 4: AI / HYBRID. HYBRID python-detects first inside ai_engine, then LLM explains.
+        if settings.ai_rule_engine_enabled:
+            ai_findings, ai_metrics = run_ai_hybrid_seed_rules(
+                country=project.country,
+                report_language=report_language,
+                documents=docs_payload,
+                project_type=ptype,
+                selected_standards=selected_standards,
+                elements=element_payload,
+                project_id=project.id,
+                rkb_catalog=rkb_catalog,
+            )
+            ai_engine_count = len(ai_findings)
+            for af in ai_findings:
+                by_code[af.code] = af
+
+        merged = list(by_code.values())
+        result["findings"] = merged
+        risks = [f for f in merged if getattr(f, "finding_category", "risk") == "risk"]
+        result["counts_risk"] = {
+            "high": sum(1 for f in risks if f.severity.value == "high"),
+            "medium": sum(1 for f in risks if f.severity.value == "medium"),
+            "low": sum(1 for f in risks if f.severity.value == "low"),
+            "total": len(risks),
+        }
+        engines = [result.get("engine") or "keyword"]
+        if settings.new_rule_engine_enabled:
+            engines.append("python_seed_rules")
+        if settings.ai_rule_engine_enabled:
+            engines.append("ai_hybrid_seed_rules")
+        result["engine"] = "+".join(dict.fromkeys(str(e) for e in engines))
+
+    # Phase 7 — Human Construction Experience (advisory; default OFF)
+    experience_count = 0
+    if settings.experience_layer_enabled:
+        from app.services.experience_layer import match_experience_findings
+
+        corpus_bits = [
+            str(d.get("extracted_text") or "")
+            for d in docs_payload
+            if (d.get("extracted_text") or "").strip()
+        ]
+        exp_findings = await match_experience_findings(
+            db,
+            project_type=ptype,
+            existing_findings=list(result.get("findings") or []),
+            document_corpus="\n".join(corpus_bits)[:200_000],
+            lang=report_language,
+        )
+        experience_count = len(exp_findings)
+        if exp_findings:
+            by_code_exp = {f.code: f for f in (result.get("findings") or [])}
+            for ef in exp_findings:
+                by_code_exp[ef.code] = ef
+            merged_exp = list(by_code_exp.values())
+            result["findings"] = merged_exp
+            engines = [result.get("engine") or "keyword"]
+            engines.append("experience_layer")
+            result["engine"] = "+".join(dict.fromkeys(str(e) for e in engines))
+            # Experience findings are not mandatory risks — keep counts_risk on risk-only
+            risks_only = [f for f in merged_exp if getattr(f, "finding_category", "risk") == "risk"]
+            result["counts_risk"] = {
+                "high": sum(1 for f in risks_only if f.severity.value == "high"),
+                "medium": sum(1 for f in risks_only if f.severity.value == "medium"),
+                "low": sum(1 for f in risks_only if f.severity.value == "low"),
+                "total": len(risks_only),
+            }
+            result["counts_experience"] = experience_count
+
+    # Phase 8 — Vision drawing checks (DRAW-SEED-002..004); default OFF
+    vision_count = 0
+    vision_metrics: dict = {}
+    if settings.vision_drawing_checks_enabled:
+        from app.services.vision_drawing_checks import run_vision_drawing_checks
+
+        drawing_docs = [
+            d
+            for d in docs_payload
+            if str(d.get("category") or "").lower() in {"drawing", DocumentCategory.DRAWING.value}
+        ]
+        vision_findings, vision_metrics = run_vision_drawing_checks(
+            drawing_docs=drawing_docs,
+            report_language=report_language,
+            max_pages_per_doc=max(1, int(settings.vision_max_pages_per_doc or 2)),
+        )
+        vision_count = len(vision_findings)
+        if vision_findings:
+            by_code_v = {f.code: f for f in (result.get("findings") or [])}
+            for vf in vision_findings:
+                by_code_v[vf.code] = vf
+            result["findings"] = list(by_code_v.values())
+            engines = [result.get("engine") or "keyword"]
+            engines.append("vision_drawing")
+            result["engine"] = "+".join(dict.fromkeys(str(e) for e in engines))
+            risks_only = [
+                f for f in result["findings"] if getattr(f, "finding_category", "risk") == "risk"
+            ]
+            result["counts_risk"] = {
+                "high": sum(1 for f in risks_only if f.severity.value == "high"),
+                "medium": sum(1 for f in risks_only if f.severity.value == "medium"),
+                "low": sum(1 for f in risks_only if f.severity.value == "low"),
+                "total": len(risks_only),
+            }
+
     analysis = Analysis(
         project_id=project.id,
         status=result.get("analysis_status") or "completed",
@@ -632,10 +856,23 @@ async def analyze_project(
                 "readiness_score": result["readiness_score"],
                 "counts": result["counts"],
                 "counts_risk": result.get("counts_risk") or result["counts"],
+                "counts_experience": result.get("counts_experience") or experience_count,
+                "counts_vision": vision_count,
                 "aggregate_risk_score": result.get("aggregate_risk_score"),
                 "documents_with_limitations": result.get("documents_with_limitations"),
                 "text_extraction_success_rate": result.get("text_extraction_success_rate"),
                 "engine": result.get("engine"),
+                "python_rule_findings": rule_engine_count,
+                "ai_rule_findings": ai_engine_count,
+                "experience_findings": experience_count,
+                "vision_findings": vision_count,
+                "vision_metrics": vision_metrics,
+                "ai_metrics": ai_metrics,
+                "analyzed_document_ids": sorted(
+                    int(d["id"]) for d in docs_payload if d.get("id") is not None
+                ),
+                "analyzed_document_count": len(docs_payload),
+                "prepared_extractions": len(pending_ids),
             },
             ensure_ascii=False,
         ),
@@ -668,8 +905,40 @@ async def analyze_project(
                 ),
                 data_completeness_caveat=getattr(item, "data_completeness_caveat", None),
                 estimated_impact=getattr(item, "estimated_impact", None),
+                source_layer=getattr(item, "source_layer", None),
+                confidence_score=getattr(item, "confidence_score", None),
             )
         )
+
+    # Phase 5: Knowledge Graph risk chains (additive; default OFF)
+    related_chains: list = []
+    kg_stats: dict = {}
+    if settings.knowledge_graph_enabled:
+        try:
+            await db.flush()
+            kg_payload = await build_chains_for_analysis(
+                db,
+                project_id=project.id,
+                analysis_id=analysis.id,
+                documents=list(project.documents),
+            )
+            related_chains = kg_payload.get("related_findings_chain") or []
+            kg_stats = kg_payload.get("link_stats") or {}
+            # Persist chains on analysis result_json without touching Finding rows
+            payload = json.loads(analysis.result_json or "{}")
+            payload["related_findings_chain"] = related_chains
+            payload["knowledge_graph"] = {
+                "enabled": True,
+                "chain_count": len(related_chains),
+                "link_stats": kg_stats,
+            }
+            engines = str(payload.get("engine") or "keyword")
+            if "knowledge_graph" not in engines:
+                payload["engine"] = f"{engines}+knowledge_graph"
+            analysis.result_json = json.dumps(payload, ensure_ascii=False)
+        except Exception:  # noqa: BLE001
+            logger = __import__("logging").getLogger(__name__)
+            logger.exception("Knowledge graph chain build failed for analysis %s", analysis.id)
 
     await db.commit()
     return await _analysis_out(db, analysis.id)
@@ -753,6 +1022,8 @@ def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
                 cause_effect_chain=chain,
                 data_completeness_caveat=getattr(f, "data_completeness_caveat", None),
                 estimated_impact=getattr(f, "estimated_impact", None),
+                source_layer=getattr(f, "source_layer", None),
+                confidence_score=getattr(f, "confidence_score", None),
             )
         )
     counts = payload.get("counts_risk") or payload.get("counts") or {
@@ -761,6 +1032,38 @@ def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
         "low": 0,
         "total": 0,
     }
+    raw_chains = payload.get("related_findings_chain") or []
+    chains_out: list[RelatedFindingsChain] = []
+    for c in raw_chains:
+        if not isinstance(c, dict):
+            continue
+        hops = []
+        for h in c.get("related_findings") or []:
+            if not isinstance(h, dict):
+                continue
+            hops.append(
+                RelatedFindingHop(
+                    finding_id=int(h.get("finding_id") or 0),
+                    code=str(h.get("code") or ""),
+                    title=str(h.get("title") or ""),
+                    severity=h.get("severity"),
+                    via_element_id=h.get("via_element_id"),
+                    path=list(h.get("path") or []),
+                    path_summary=str(h.get("path_summary") or ""),
+                )
+            )
+        chains_out.append(
+            RelatedFindingsChain(
+                anchor_finding_id=int(c.get("anchor_finding_id") or 0),
+                anchor_finding_code=str(c.get("anchor_finding_code") or ""),
+                anchor_title=c.get("anchor_title"),
+                shared_element=dict(c.get("shared_element") or {}),
+                documents=list(c.get("documents") or []),
+                related_findings=hops,
+                hop_count=int(c.get("hop_count") or len(hops)),
+                narrative=str(c.get("narrative") or ""),
+            )
+        )
     return AnalysisOut(
         id=analysis.id,
         project_id=analysis.project_id,
@@ -774,5 +1077,6 @@ def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
         documents_with_limitations=payload.get("documents_with_limitations"),
         text_extraction_success_rate=payload.get("text_extraction_success_rate"),
         findings=findings_out,
+        related_findings_chain=chains_out,
         created_at=analysis.created_at,
     )

@@ -69,6 +69,31 @@ async def save_upload(
     return str(dest), dest
 
 
+async def save_catalog_standard(
+    *,
+    standard_code: str,
+    filename: str,
+    data: bytes,
+    content_type: str | None,
+) -> tuple[str, Path]:
+    """Persist original catalog standard file (PDF etc.) for later download."""
+    safe_name = _storage_object_name(filename)
+    code_safe = re.sub(r"[^a-zA-Z0-9._-]+", "_", standard_code).strip("._-") or "standard"
+    object_key = f"catalog_standards/{code_safe}/{safe_name}"
+
+    if settings.supabase_enabled:
+        await _supabase_upload(object_key, data, content_type)
+        tmp = Path(tempfile.gettempdir()) / "tenderrisk" / object_key.replace("/", "_")
+        tmp.parent.mkdir(parents=True, exist_ok=True)
+        tmp.write_bytes(data)
+        return f"supabase://{settings.supabase_bucket}/{object_key}", tmp
+
+    dest = settings.storage_dir / "catalog_standards" / code_safe / safe_name
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_bytes(data)
+    return str(dest), dest
+
+
 async def open_for_read(stored_path: str) -> Path:
     """Return a local filesystem path for extraction/OCR."""
     if stored_path.startswith("supabase://"):

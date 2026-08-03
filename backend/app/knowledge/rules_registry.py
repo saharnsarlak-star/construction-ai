@@ -792,13 +792,23 @@ COUNTRY_OVERRIDES: list[RuleDef] = [
     ),
 ]
 
+# Seed Batch 1+2 — all 10 canonical document types.
+# Execution of graph-backed checks may still be pending; metadata lives in logic_config.
+from app.knowledge.seed_rules_batch1 import build_seed_batch1_rules  # noqa: E402
+from app.knowledge.seed_rules_batch2 import build_seed_batch2_rules  # noqa: E402
+
+GLOBAL_RULES.extend(build_seed_batch1_rules())
+GLOBAL_RULES.extend(build_seed_batch2_rules())
+
+
+_ALL_GLOBAL_CODES = [r.code for r in GLOBAL_RULES]
 
 RULESETS: dict[str, list[str]] = {
-    "GLOBAL_BASE": [r.code for r in GLOBAL_RULES],
-    "IR_CORE_V1": [r.code for r in GLOBAL_RULES],
-    "DE_CORE_V1": [r.code for r in GLOBAL_RULES],
-    "CA_CORE_V1": [r.code for r in GLOBAL_RULES],
-    "EU_CORE_V1": [r.code for r in GLOBAL_RULES],
+    "GLOBAL_BASE": list(_ALL_GLOBAL_CODES),
+    "IR_CORE_V1": list(_ALL_GLOBAL_CODES),
+    "DE_CORE_V1": list(_ALL_GLOBAL_CODES),
+    "CA_CORE_V1": list(_ALL_GLOBAL_CODES),
+    "EU_CORE_V1": list(_ALL_GLOBAL_CODES),
 }
 
 

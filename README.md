@@ -4,7 +4,16 @@
 
 ## معماری پیشنهادی (ساده و عملی)
 
-شرح کامل و به‌روز معماری (استخراج، OCR/CAD، IFC/GAEB طراحی‌شده، موتور تحلیل): **[ARCHITECTURE.md](./ARCHITECTURE.md)**
+شرح کامل و به‌روز معماری (استخراج، OCR/CAD، IFC/GAEB، موتور تحلیل): **[ARCHITECTURE.md](./ARCHITECTURE.md)**  
+
+پایهٔ تحلیلی بعدی (Pipeline + Normalization + Ontology — Part 1): **[docs/ARCHITECTURE-PART1-FOUNDATION.md](./docs/ARCHITECTURE-PART1-FOUNDATION.md)**  
+عمق تحلیلی Contract / BOQ / Drawings — Part 2: **[docs/ARCHITECTURE-PART2-CONTRACT-BOQ-DRAWINGS.md](./docs/ARCHITECTURE-PART2-CONTRACT-BOQ-DRAWINGS.md)**  
+Tender / Specs / Standards — Part 3: **[docs/ARCHITECTURE-PART3-TENDER-SPECS-STANDARDS.md](./docs/ARCHITECTURE-PART3-TENDER-SPECS-STANDARDS.md)**  
+Schedule / Geotech / ER / Addenda — Part 4: **[docs/ARCHITECTURE-PART4-SCHEDULE-GEOTECH-ER-ADDENDA.md](./docs/ARCHITECTURE-PART4-SCHEDULE-GEOTECH-ER-ADDENDA.md)**  
+Knowledge Graph / Risk KB / Explainable Findings — Part 5: **[docs/ARCHITECTURE-PART5-GRAPH-RISK-XAI.md](./docs/ARCHITECTURE-PART5-GRAPH-RISK-XAI.md)**  
+Ontology (authoritative) — Part 6: **[docs/ARCHITECTURE-PART6-ONTOLOGY.md](./docs/ARCHITECTURE-PART6-ONTOLOGY.md)**  
+Seed rules Batch 1 (6 document types → `rules_registry`): **[docs/SEED-RULES-BATCH1.md](./docs/SEED-RULES-BATCH1.md)**  
+Seed rules Batch 2 (remaining 4 types → `rules_registry`): **[docs/SEED-RULES-BATCH2.md](./docs/SEED-RULES-BATCH2.md)**
 
 | بخش | کجا | نقش |
 |-----|-----|-----|

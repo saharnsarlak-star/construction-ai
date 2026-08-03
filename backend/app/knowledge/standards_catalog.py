@@ -1,6 +1,7 @@
 """Platform standards catalog + applicability (Country × ProjectType).
 
-Catalog lives in code for MVP; ProjectStandard rows store per-project selection.
+Catalog lives in code as metadata hints only. Project checklists show admin-uploaded
+CatalogStandardAsset PDFs; users select and download those files.
 """
 
 from __future__ import annotations

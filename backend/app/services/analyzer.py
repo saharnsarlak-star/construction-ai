@@ -12,7 +12,11 @@ from app.knowledge.prompt_templates import render_prompt_bundle
 from app.knowledge.rules_registry import RuleDef, resolve_rules_for_project
 from app.knowledge.standards_catalog import get_standard
 from app.models import CountryCode, DocumentCategory, LanguageCode, ProjectType, RiskSeverity
-from app.services.extractor import has_usable_text
+from app.services.extractor import (
+    document_has_extraction_limitation,
+    has_low_extraction_confidence,
+    has_usable_text,
+)
 
 # Below this success rate → block full analysis (no confident risk claims).
 _EXTRACTION_HARD_GATE = 0.50
@@ -31,12 +35,16 @@ class RiskFinding:
     financial_impact: str | None = None
     schedule_impact: str | None = None
     evidence: str | None = None
-    finding_category: str = "risk"  # risk | limitation | methodology
+    finding_category: str = "risk"  # risk | limitation | methodology | experience
     risk_score: int | None = None
     source_excerpt: str | None = None
     cause_effect_chain: list[str] = field(default_factory=list)
     data_completeness_caveat: str | None = None
     estimated_impact: str | None = None
+    # Phase 3+: rule_based | llm_based | hybrid | experience_based (None = legacy keyword)
+    source_layer: str | None = None
+    # Phase 4: model confidence 0–100 (distinct from risk_score severity proxy)
+    confidence_score: int | None = None
 
 
 def _lang(map_: dict[LanguageCode, str], lang: LanguageCode) -> str:
@@ -74,9 +82,86 @@ def _impact_label(level: str | None, lang: LanguageCode) -> str | None:
     return _lang(bucket, lang)
 
 
-def _contains_any(text: str, keywords: list[str]) -> bool:
-    lower = text.lower()
-    return any(k.lower() in lower for k in keywords)
+# ---------------------------------------------------------------------------
+# Risk composition model (likelihood × impact)
+#
+# Three UI fields are related — not independent — as follows:
+#
+#   likelihood  = how strongly the triggered pattern / detection prior ranks
+#                 (rule severity, or a 0–100 detection score mapped to a band)
+#   impact      = consequence magnitude = max(financial_impact, schedule_impact)
+#   risk_score  = round(100 × L × I / 9)   with L,I ∈ {1,2,3} for low/med/high
+#   severity    = HIGH if score≥70; MEDIUM if score≥40; else LOW
+#   estimated_impact = financial (cost) axis only — shown separately so readers
+#                      see consequence size without confusing it with priority
+#
+# Example: likelihood=high (3), financial=low (1), schedule=medium (2)
+#   → I=max(1,2)=2 → score=round(100*3*2/9)=67 → severity=MEDIUM
+#   → estimated_impact displays "low" (financial)
+# ---------------------------------------------------------------------------
+
+_LEVEL_RANK: dict[str, int] = {"low": 1, "medium": 2, "high": 3}
+_RANK_ALIASES: dict[str, str] = {
+    "بالا": "high",
+    "متوسط": "medium",
+    "پایین": "low",
+    "hoch": "high",
+    "mittel": "medium",
+    "niedrig": "low",
+    "élevé": "high",
+    "eleve": "high",
+    "moyen": "medium",
+    "faible": "low",
+}
+
+
+def _normalize_level_key(level: object | None) -> str | None:
+    if level is None:
+        return None
+    if isinstance(level, RiskSeverity):
+        return level.value
+    if isinstance(level, (int, float)):
+        score = int(round(float(level)))
+        if score >= 70:
+            return "high"
+        if score >= 40:
+            return "medium"
+        return "low"
+    key = str(level).strip().lower()
+    if key in _LEVEL_RANK:
+        return key
+    return _RANK_ALIASES.get(key) or _RANK_ALIASES.get(str(level).strip())
+
+
+def _level_rank(level: object | None, *, default: int = 2) -> int:
+    key = _normalize_level_key(level)
+    if key is None:
+        return default
+    return _LEVEL_RANK.get(key, default)
+
+
+def compose_finding_risk(
+    *,
+    likelihood: RiskSeverity | str | int | float | None,
+    financial_impact: str | None = None,
+    schedule_impact: str | None = None,
+) -> tuple[int, RiskSeverity, str | None]:
+    """Return (risk_score 0–100, severity badge, estimated_impact level key).
+
+    See module comment above for the likelihood × impact formula.
+    """
+    L = _level_rank(likelihood, default=2)
+    fin_r = _level_rank(financial_impact, default=0) if financial_impact else 0
+    sch_r = _level_rank(schedule_impact, default=0) if schedule_impact else 0
+    if fin_r or sch_r:
+        I = max(fin_r, sch_r)
+    else:
+        I = 2
+    score = int(round(100 * L * I / 9))
+    score = max(0, min(100, score))
+    severity = _severity_from_score(score)
+    impact_key = _normalize_level_key(financial_impact) or _normalize_level_key(schedule_impact)
+    return score, severity, impact_key
 
 
 def _severity_from_score(score: int) -> RiskSeverity:
@@ -94,6 +179,34 @@ def _with_score(finding: RiskFinding, score: int | None) -> RiskFinding:
     if finding.finding_category == "risk":
         finding.severity = _severity_from_score(finding.risk_score)
     return finding
+
+
+def apply_composed_risk(
+    finding: RiskFinding,
+    *,
+    likelihood: RiskSeverity | str | int | float | None,
+    financial_impact: str | None,
+    schedule_impact: str | None,
+    lang: LanguageCode,
+) -> RiskFinding:
+    """Set score / severity / estimated_impact from the shared composition model."""
+    score, severity, impact_key = compose_finding_risk(
+        likelihood=likelihood,
+        financial_impact=financial_impact,
+        schedule_impact=schedule_impact,
+    )
+    finding.risk_score = score
+    if finding.finding_category == "risk":
+        finding.severity = severity
+    finding.financial_impact = _impact_label(financial_impact, lang) if financial_impact else finding.financial_impact
+    finding.schedule_impact = _impact_label(schedule_impact, lang) if schedule_impact else finding.schedule_impact
+    finding.estimated_impact = _impact_label(impact_key, lang) if impact_key else finding.estimated_impact
+    return finding
+
+
+def _contains_any(text: str, keywords: list[str]) -> bool:
+    lower = text.lower()
+    return any(k.lower() in lower for k in keywords)
 
 
 def _extraction_stats(documents: list[dict]) -> dict:
@@ -115,6 +228,10 @@ def _extraction_stats(documents: list[dict]) -> dict:
     readable_all = [d for d in documents if has_usable_text(d.get("extracted_text") or "")]
     overall = (len(readable_all) / total) if total else 0.0
 
+    # Same criterion as STD-SEED-005 / OCR empty-text limitations (drawings excluded
+    # unless they have an explicit low confidence score).
+    limitation_docs = [d for d in documents if document_has_extraction_limitation(d)]
+
     return {
         "total": total,
         "text_doc_count": len(text_docs),
@@ -123,9 +240,65 @@ def _extraction_stats(documents: list[dict]) -> dict:
         "failed_count": len(failed_text),
         "failed_names": [d.get("original_name") or "unnamed" for d in failed_text],
         "readable_names": [d.get("original_name") or "unnamed" for d in readable_text],
+        "limitation_count": len(limitation_docs),
+        "limitation_names": [d.get("original_name") or "unnamed" for d in limitation_docs],
+        "low_confidence_count": sum(1 for d in documents if has_low_extraction_confidence(d)),
         "success_rate": overall,
         "gate_rate": gate_rate,
     }
+
+
+def _extraction_readiness_clause(stats: dict, readiness_pct: int, lang: LanguageCode) -> str:
+    """Two clear numbers: how many files were text-processed, and success among those."""
+    total = int(stats.get("total") or 0)
+    text_n = int(stats.get("text_doc_count") or 0)
+    ok_n = int(stats.get("readable_count") or 0)
+    drawings = int(stats.get("drawing_count") or 0)
+    if lang == LanguageCode.FA:
+        if text_n <= 0:
+            return (
+                f"از {total} فایل، سند متنی برای استخراج وجود نداشت"
+                + (f" ({drawings} نقشه جدا از محاسبهٔ متن)" if drawings else "")
+                + "."
+            )
+        return (
+            f"{text_n} از {total} فایل برای استخراج متن پردازش شد؛ "
+            f"از این تعداد {readiness_pct}٪ با موفقیت استخراج شدند "
+            f"({ok_n}/{text_n})"
+            + (f"؛ {drawings} نقشه در محاسبهٔ استخراج متن لحاظ نشد" if drawings else "")
+            + "."
+        )
+    if lang == LanguageCode.DE:
+        if text_n <= 0:
+            return f"Von {total} Dateien keine Textdokumente zur Extraktion."
+        return (
+            f"{text_n} von {total} Dateien für Textextraktion verarbeitet; "
+            f"davon {readiness_pct}% erfolgreich ({ok_n}/{text_n})"
+            + (f"; {drawings} Pläne nicht in der Textquote" if drawings else "")
+            + "."
+        )
+    if lang == LanguageCode.FR:
+        if text_n <= 0:
+            return f"Sur {total} fichiers, aucun document texte à extraire."
+        return (
+            f"{text_n} fichiers sur {total} traités pour l'extraction texte ; "
+            f"dont {readiness_pct}% réussis ({ok_n}/{text_n})"
+            + (f" ; {drawings} plans exclus du taux texte" if drawings else "")
+            + "."
+        )
+    # EN default
+    if text_n <= 0:
+        return (
+            f"Of {total} files, no text documents were available for extraction"
+            + (f" ({drawings} drawings excluded from text rate)" if drawings else "")
+            + "."
+        )
+    return (
+        f"{text_n} of {total} files were processed for text extraction; "
+        f"of those, {readiness_pct}% extracted successfully ({ok_n}/{text_n})"
+        + (f"; {drawings} drawings excluded from the text rate" if drawings else "")
+        + "."
+    )
 
 
 # Subject-matter topics for semantic coverage (NOT standard title strings).
@@ -249,7 +422,7 @@ def _analyze_selected_standards_semantic(
         preview = "؛ ".join(unverifiable[:12])
         more = f" (+{len(unverifiable) - 12})" if len(unverifiable) > 12 else ""
         findings.append(
-            _with_score(
+            apply_composed_risk(
                 RiskFinding(
                     code="STD-TOPIC-GAP-001",
                     category="compliance",
@@ -294,8 +467,6 @@ def _analyze_selected_standards_semantic(
                             "Ajouter des sections mesurables pour chaque domaine non couvert, puis citer la norme."
                         ),
                     }[lang],
-                    financial_impact=_impact_label("medium", lang),
-                    schedule_impact=_impact_label("medium", lang),
                     evidence=preview,
                     source_excerpt=preview[:500],
                     cause_effect_chain=[
@@ -325,9 +496,11 @@ def _analyze_selected_standards_semantic(
                         }[lang],
                     ],
                     data_completeness_caveat=caveat,
-                    estimated_impact=_impact_label("medium", lang),
                 ),
-                55,
+                likelihood=RiskSeverity.MEDIUM,
+                financial_impact="medium",
+                schedule_impact="medium",
+                lang=lang,
             )
         )
 
@@ -383,8 +556,23 @@ def _apply_rule(
             return None
 
     if rule.requires_category:
+        cfg = rule.logic_config or {}
+        ownership = str(cfg.get("ownership_tag") or "").upper()
+        check = str(cfg.get("check") or "").strip()
+        # Pattern / seed rules must NEVER invent per-pattern findings when the
+        # base document category is absent. Completeness engines emit at most
+        # one "document X missing" finding (SCHED-001 / DRAW-001 / STD-001).
+        is_pattern_rule = ownership in {"PYTHON", "AI", "HYBRID"} or (
+            check
+            and check
+            not in {
+                "missing_category",
+                "keywords_missing",
+            }
+        )
         if not by_cat.get(rule.requires_category):
-            score = 75 if rule.severity == RiskSeverity.HIGH else 50 if rule.severity == RiskSeverity.MEDIUM else 25
+            if is_pattern_rule:
+                return None
             chain = []
             if rule.severity in {RiskSeverity.HIGH, RiskSeverity.MEDIUM}:
                 chain = [
@@ -407,7 +595,7 @@ def _apply_rule(
                         LanguageCode.FR: "Réclamation / retard / surcoût",
                     }[lang],
                 ]
-            return _with_score(
+            return apply_composed_risk(
                 RiskFinding(
                     code=rule.code,
                     category=rule.category,
@@ -416,20 +604,21 @@ def _apply_rule(
                     title=_lang(rule.title, lang),
                     description=_lang(rule.description, lang),
                     recommendation=_lang(rule.recommendation, lang),
-                    financial_impact=_impact_label(rule.financial_impact, lang),
-                    schedule_impact=_impact_label(rule.schedule_impact, lang),
                     cause_effect_chain=chain,
                     data_completeness_caveat=caveat,
-                    estimated_impact=_impact_label(rule.financial_impact, lang),
                 ),
-                score,
+                likelihood=rule.severity,
+                financial_impact=rule.financial_impact,
+                schedule_impact=rule.schedule_impact,
+                lang=lang,
             )
+        # Category present: completeness-only rules do not fire; pattern rules
+        # are owned by the PYTHON/AI engines (skipped in the keyword loop).
         return None
 
     keywords = rule.keywords_any or []
     if keywords and not _contains_any(corpus, keywords):
-        score = 70 if rule.severity == RiskSeverity.HIGH else 48 if rule.severity == RiskSeverity.MEDIUM else 22
-        return _with_score(
+        return apply_composed_risk(
             RiskFinding(
                 code=rule.code,
                 category=rule.category,
@@ -438,8 +627,6 @@ def _apply_rule(
                 title=_lang(rule.title, lang),
                 description=_lang(rule.description, lang),
                 recommendation=_lang(rule.recommendation, lang),
-                financial_impact=_impact_label(rule.financial_impact, lang),
-                schedule_impact=_impact_label(rule.schedule_impact, lang),
                 cause_effect_chain=[
                     {
                         LanguageCode.FA: "الزام قراردادی/فنی در متن دیده نشد",
@@ -463,9 +650,11 @@ def _apply_rule(
                 if rule.severity != RiskSeverity.LOW
                 else [],
                 data_completeness_caveat=caveat,
-                estimated_impact=_impact_label(rule.financial_impact, lang),
             ),
-            score,
+            likelihood=rule.severity,
+            financial_impact=rule.financial_impact,
+            schedule_impact=rule.schedule_impact,
+            lang=lang,
         )
     return None
 
@@ -558,24 +747,21 @@ def analyze_project_documents(
             source_excerpt=failed_list[:400],
             risk_score=None,
         )
+        blocked_pct = int(round(gate_rate * 100))
         summary = {
             LanguageCode.FA: (
-                f"تحلیل مسدود شد: استخراج اسناد متنی {int(gate_rate * 100)}٪ "
-                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])}؛ "
-                f"نقشه={stats.get('drawing_count', 0)}). ریسک محتوایی ادعا نشد."
+                f"تحلیل مسدود شد. {_extraction_readiness_clause(stats, blocked_pct, LanguageCode.FA)} "
+                f"ریسک محتوایی ادعا نشد."
             ),
             LanguageCode.EN: (
-                f"Analysis blocked: text-doc extraction {int(gate_rate * 100)}% "
-                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])}; "
-                f"drawings={stats.get('drawing_count', 0)}). No content risks claimed."
+                f"Analysis blocked. {_extraction_readiness_clause(stats, blocked_pct, LanguageCode.EN)} "
+                f"No content risks claimed."
             ),
             LanguageCode.DE: (
-                f"Analyse blockiert: {int(gate_rate * 100)}% "
-                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])})."
+                f"Analyse blockiert. {_extraction_readiness_clause(stats, blocked_pct, LanguageCode.DE)}"
             ),
             LanguageCode.FR: (
-                f"Analyse bloquée: {int(gate_rate * 100)}% "
-                f"({stats['readable_count']}/{stats.get('text_doc_count', stats['total'])})."
+                f"Analyse bloquée. {_extraction_readiness_clause(stats, blocked_pct, LanguageCode.FR)}"
             ),
         }[lang]
         return {
@@ -586,7 +772,7 @@ def analyze_project_documents(
             "counts": {"high": 0, "medium": 0, "low": 0, "total": 0},
             "counts_risk": {"high": 0, "medium": 0, "low": 0, "total": 0},
             "aggregate_risk_score": None,
-            "documents_with_limitations": stats["failed_count"],
+            "documents_with_limitations": stats["limitation_count"],
             "findings": [block],
             "engine": {
                 "country_profile": profile_snapshot(country, ptype),
@@ -693,6 +879,11 @@ def analyze_project_documents(
     for rule in rules:
         if rule.code == "STD-001" and selected_standards:
             continue
+        # Seed/pattern rules are executed by the PYTHON / AI engines — never by
+        # the keyword completeness path (avoids N fabricated "doc missing" hits).
+        ownership = str((rule.logic_config or {}).get("ownership_tag") or "").upper()
+        if ownership in {"PYTHON", "AI", "HYBRID"}:
+            continue
         hit = _apply_rule(rule, by_cat=by_cat, corpus=corpus_for_rules, lang=lang, caveat=caveat)
         if hit:
             findings.append(hit)
@@ -707,7 +898,7 @@ def analyze_project_documents(
         )
         if tender_has_duration and not schedule_has_dates and has_usable_text(schedule_text):
             findings.append(
-                _with_score(
+                apply_composed_risk(
                     RiskFinding(
                         code="XR-TIME-001",
                         category="schedule",
@@ -752,14 +943,11 @@ def analyze_project_documents(
                             }[lang],
                         ],
                         data_completeness_caveat=caveat,
-                        estimated_impact={
-                            LanguageCode.FA: "ریسک تمدید مدت و جریمه/تأخیر",
-                            LanguageCode.EN: "EOT / delay exposure",
-                            LanguageCode.DE: "Verlängerungs-/Verzugsrisiko",
-                            LanguageCode.FR: "Exposition prolongation/retard",
-                        }[lang],
                     ),
-                    52,
+                    likelihood=RiskSeverity.MEDIUM,
+                    financial_impact="medium",
+                    schedule_impact="high",
+                    lang=lang,
                 )
             )
 
@@ -771,33 +959,40 @@ def analyze_project_documents(
     low = sum(1 for f in risks if f.severity == RiskSeverity.LOW)
     scores = [f.risk_score for f in risks if f.risk_score is not None]
     aggregate = int(round(sum(scores) / len(scores))) if scores else 0
-    # Readiness = extraction success (honest), not inverted risk penalty
+    # Readiness = success among text docs only (drawings excluded from the gate)
     readiness = int(round(gate_rate * 100))
+    extract_clause = _extraction_readiness_clause(stats, readiness, lang)
 
     summary = {
         LanguageCode.FA: (
-            f"آمادگی استخراج متن: {readiness}٪ ({stats['readable_count']}/{stats['total']} فایل). "
+            f"{extract_clause} "
             f"ریسک‌های واقعی: {high} بالا، {medium} متوسط، {low} پایین "
             f"(میانگین امتیاز ریسک: {aggregate}). "
-            f"محدودیت اسناد: {stats['failed_count']} فایل. "
+            f"اسناد با محدودیت استخراج: {stats['limitation_count']} فایل"
+            f" (بدون متن قابل‌استفاده: {stats['failed_count']}؛ اطمینان پایین: {stats.get('low_confidence_count', 0)}). "
             f"پروفایل: {profile.code}."
         ),
         LanguageCode.EN: (
-            f"Text extraction readiness: {readiness}% ({stats['readable_count']}/{stats['total']} files). "
+            f"{extract_clause} "
             f"Real risks: {high} high, {medium} medium, {low} low "
             f"(avg risk score: {aggregate}). "
-            f"Document limitations: {stats['failed_count']} files. "
+            f"Documents with extraction limitations: {stats['limitation_count']} files"
+            f" (unusable text: {stats['failed_count']}; low confidence: {stats.get('low_confidence_count', 0)}). "
             f"Profile: {profile.code}."
         ),
         LanguageCode.DE: (
-            f"Textextraktion: {readiness}% ({stats['readable_count']}/{stats['total']}). "
+            f"{extract_clause} "
             f"Echte Risiken: {high}/{medium}/{low} (Ø {aggregate}). "
-            f"Limitierungen: {stats['failed_count']}. Profil: {profile.code}."
+            f"Extraktions-Limitierungen: {stats['limitation_count']} "
+            f"(ohne Text: {stats['failed_count']}; niedrige Konfidenz: {stats.get('low_confidence_count', 0)}). "
+            f"Profil: {profile.code}."
         ),
         LanguageCode.FR: (
-            f"Extraction: {readiness}% ({stats['readable_count']}/{stats['total']}). "
+            f"{extract_clause} "
             f"Risques réels: {high}/{medium}/{low} (moy. {aggregate}). "
-            f"Limitations: {stats['failed_count']}. Profil: {profile.code}."
+            f"Limitations d'extraction: {stats['limitation_count']} "
+            f"(texte inutilisable: {stats['failed_count']}; confiance basse: {stats.get('low_confidence_count', 0)}). "
+            f"Profil: {profile.code}."
         ),
     }[lang]
 
@@ -816,7 +1011,7 @@ def analyze_project_documents(
         "counts": {"high": high, "medium": medium, "low": low, "total": len(risks)},
         "counts_risk": {"high": high, "medium": medium, "low": low, "total": len(risks)},
         "aggregate_risk_score": aggregate,
-        "documents_with_limitations": stats["failed_count"],
+        "documents_with_limitations": stats["limitation_count"],
         "findings": findings,
         "engine": {
             "country_profile": profile_snapshot(country, ptype),

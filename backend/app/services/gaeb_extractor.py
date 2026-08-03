@@ -30,8 +30,29 @@ GAEB_EXTENSIONS = {
 
 
 def extract_gaeb(path: str | Path) -> NormalizedExtractionResult:
-    """Parse a GAEB DA XML (or auto-detected) file into structured BOQ items + corpus text."""
+    """Parse a GAEB DA XML (or GAEB 90 fixed-width when enabled) file into BOQ items."""
     path = Path(path)
+
+    # Phase 8: GAEB 90 fixed-width fallback (default OFF)
+    from app.config import settings
+    from app.services.gaeb90_parser import extract_gaeb90, looks_like_gaeb90
+
+    is_gaeb90 = looks_like_gaeb90(path)
+    if is_gaeb90:
+        if settings.gaeb90_enabled:
+            return extract_gaeb90(path)
+        return NormalizedExtractionResult(
+            merged_text=(
+                f"[GAEB90_DISABLED] {path.name}\n"
+                "File looks like GAEB 90 fixed-width. Set GAEB90_ENABLED=true to parse."
+            ),
+            extraction_method="gaeb90_fixed",
+            confidence_score=0.0,
+            structured={"format_family": "gaeb", "gaeb_dialect": "gaeb90_fixed", "disabled": True},
+            needs_manual_review=True,
+            error="GAEB90_ENABLED is false",
+            notes=["sniffed=gaeb90"],
+        )
 
     try:
         from pygaeb import GAEBParser
@@ -51,6 +72,9 @@ def extract_gaeb(path: str | Path) -> NormalizedExtractionResult:
         doc = GAEBParser.parse(str(path))
     except Exception as exc:  # noqa: BLE001
         logger.exception("GAEB parse failed: %s", path.name)
+        # Last-chance: if sniff was wrong but content is fixed-width, try GAEB90 when enabled
+        if settings.gaeb90_enabled and looks_like_gaeb90(path):
+            return extract_gaeb90(path)
         return NormalizedExtractionResult(
             merged_text=f"[GAEB_ERROR] {path.name}\nFailed to parse GAEB: {exc}",
             extraction_method="gaeb_native",

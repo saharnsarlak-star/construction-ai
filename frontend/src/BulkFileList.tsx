@@ -184,37 +184,37 @@ export function BulkFileList({
               {t(uiLang, "filesInCategory").replace("{n}", String(files.length))}
             </strong>
           </label>
-          {selectedCount > 0 && (
+          {selectedCount > 0 ? (
             <span className="docs-selected-count">
               {t(uiLang, "filesSelectedBanner").replace("{n}", String(selectedCount))}
             </span>
-          )}
+          ) : null}
         </div>
 
         <div className="bulk-primary-actions">
-          <button type="button" className="btn-sm" disabled={disabled || allSelected} onClick={selectAll}>
-            {t(uiLang, "stagingSelectAll")}
-          </button>
+          {!allSelected ? (
+            <button type="button" className="linkish" disabled={disabled} onClick={selectAll}>
+              {t(uiLang, "stagingSelectAll")}
+            </button>
+          ) : (
+            <button type="button" className="linkish" disabled={disabled} onClick={deselectAll}>
+              {t(uiLang, "stagingDeselectAll")}
+            </button>
+          )}
+          {selectedCount > 0 ? (
+            <button
+              type="button"
+              className="btn-danger-quiet"
+              disabled={disabled}
+              onClick={deleteSelected}
+            >
+              {t(uiLang, "deleteSelected")}
+              {` (${selectedCount})`}
+            </button>
+          ) : null}
           <button
             type="button"
-            className="btn-sm"
-            disabled={disabled || selectedCount === 0}
-            onClick={deselectAll}
-          >
-            {t(uiLang, "stagingDeselectAll")}
-          </button>
-          <button
-            type="button"
-            className="btn-danger-solid"
-            disabled={disabled || selectedCount === 0}
-            onClick={deleteSelected}
-          >
-            {t(uiLang, "deleteSelected")}
-            {selectedCount > 0 ? ` (${selectedCount})` : ""}
-          </button>
-          <button
-            type="button"
-            className="btn-danger-solid"
+            className="linkish danger"
             disabled={disabled}
             onClick={deleteAllInSection}
           >

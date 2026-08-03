@@ -6,11 +6,14 @@ import json
 import logging
 from pathlib import Path
 
+from app.config import settings
 from app.database import SessionLocal
 from app.models import Document, DocumentCategory
 from app.services import storage as file_storage
+from app.services.cdm_writer import build_canonical_from_meta_json
 from app.services.extractor import extract_document_full, merge_extraction_meta
 from app.services.ocr.types import ExtractionPhase
+from app.services.ontology_writer import ingest_document_ontology
 
 logger = logging.getLogger(__name__)
 
@@ -58,14 +61,25 @@ async def process_document_extraction(document_id: int) -> None:
 
             path = await file_storage.open_for_read(doc.stored_path)
             treat_drawing = doc.category == DocumentCategory.DRAWING
+            suffix = Path(path).suffix.lower()
+            # Drawings: prefer fast native/CAD extract. Full OCR on large drawing PDFs
+            # is too slow for upload→analyze; user can re-extract if needed.
+            image_exts = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
+            if treat_drawing:
+                allow_ocr = suffix in image_exts
+                max_pages = 2
+            else:
+                allow_ocr = True
+                max_pages = 40
 
             import asyncio
 
             def _run():
                 return extract_document_full(
                     Path(path),
-                    allow_ocr=True,
+                    allow_ocr=allow_ocr,
                     treat_as_drawing=treat_drawing,
+                    max_pages=max_pages,
                     on_progress=lambda phase, done, total, note: None,
                 )
 
@@ -81,6 +95,66 @@ async def process_document_extraction(document_id: int) -> None:
             meta["extraction"]["progressPercent"] = 100
             meta["extraction"]["message"] = "Completed"
             doc.meta_json = merge_extraction_meta(doc.meta_json, meta)
+
+            # Phase 1: additive CDM (feature-flagged; does not alter extracted_text)
+            canonical: dict | None = None
+            meta_obj: dict = {}
+            try:
+                meta_obj = json.loads(doc.meta_json or "{}")
+            except json.JSONDecodeError:
+                meta_obj = {}
+
+            if settings.cdm_enabled:
+                category = (
+                    doc.category.value
+                    if isinstance(doc.category, DocumentCategory)
+                    else str(doc.category)
+                )
+                canonical = build_canonical_from_meta_json(
+                    document_id=doc.id,
+                    project_id=doc.project_id,
+                    category=category,
+                    original_name=doc.original_name,
+                    content_type=doc.content_type,
+                    extracted_text=doc.extracted_text or "",
+                    meta=meta_obj,
+                )
+                doc.meta_json = merge_extraction_meta(doc.meta_json, {"canonical": canonical})
+                meta_obj = {**meta_obj, "canonical": canonical}
+
+            # Phase 2: Party / Element Registry / OntologyEdge (feature-flagged)
+            if settings.ontology_enabled:
+                if canonical is None and isinstance(meta_obj.get("canonical"), dict):
+                    canonical = meta_obj["canonical"]
+                # Build a light CDM on the fly if ontology is on but CDM flag is off
+                if canonical is None:
+                    category = (
+                        doc.category.value
+                        if isinstance(doc.category, DocumentCategory)
+                        else str(doc.category)
+                    )
+                    canonical = build_canonical_from_meta_json(
+                        document_id=doc.id,
+                        project_id=doc.project_id,
+                        category=category,
+                        original_name=doc.original_name,
+                        content_type=doc.content_type,
+                        extracted_text=doc.extracted_text or "",
+                        meta=meta_obj,
+                    )
+                try:
+                    await ingest_document_ontology(
+                        db,
+                        document=doc,
+                        canonical=canonical,
+                        meta=meta_obj,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception(
+                        "Ontology ingest failed for document %s (extraction kept)",
+                        document_id,
+                    )
+
             await db.commit()
         except Exception as exc:  # noqa: BLE001
             logger.exception("Extraction job failed for document %s", document_id)

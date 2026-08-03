@@ -133,17 +133,20 @@ def extract_document_full(
     *,
     allow_ocr: bool = True,
     treat_as_drawing: bool = False,
+    max_pages: int | None = None,
     on_progress=None,
 ):
     """Full structured extraction (pages JSON + merged text + optional structured meta)."""
     suffix = path.suffix.lower()
     if suffix == ".pdf":
-        return extract_document(
-            path,
-            allow_ocr=allow_ocr,
-            treat_as_drawing=treat_as_drawing,
-            on_progress=on_progress,
-        )
+        kwargs = {
+            "allow_ocr": allow_ocr,
+            "treat_as_drawing": treat_as_drawing,
+            "on_progress": on_progress,
+        }
+        if max_pages is not None:
+            kwargs["max_pages"] = max_pages
+        return extract_document(path, **kwargs)
     if suffix == ".ifc":
         from app.services.ifc_extractor import extract_ifc
 
@@ -220,6 +223,116 @@ def has_usable_text(text: str | None) -> bool:
     cleaned = re.sub(r"\[NEEDS_MANUAL_REVIEW\]", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return len(cleaned) >= _MIN_NATIVE_TEXT_CHARS
+
+
+# Same threshold used by STD-SEED-005 / standard_extraction_confidence.
+EXTRACTION_CONFIDENCE_LIMITATION_THRESHOLD = 50.0
+
+
+def _coerce_confidence(val: object) -> float | None:
+    if val is None or val == "":
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+def get_extraction_confidence(doc: object) -> float | None:
+    """Read extraction confidence from DocView, document dict, or meta blobs.
+
+    Missing confidence stays None — never invent 0 (that falsely flags limitations).
+    Does not read a `.confidence` property (avoids recursion with DocView).
+    """
+    if doc is None:
+        return None
+
+    meta: dict = {}
+    canonical: dict = {}
+    top: object = None
+
+    if isinstance(doc, dict):
+        top = doc.get("confidence_score", doc.get("confidence"))
+        raw_meta = doc.get("meta_json", doc.get("meta"))
+        if isinstance(raw_meta, dict):
+            meta = raw_meta
+        elif isinstance(raw_meta, str) and raw_meta.strip():
+            try:
+                parsed = json.loads(raw_meta)
+                if isinstance(parsed, dict):
+                    meta = parsed
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+        can = doc.get("canonical")
+        if isinstance(can, dict):
+            canonical = can
+        elif isinstance(meta.get("canonical"), dict):
+            canonical = meta["canonical"]
+    else:
+        top = getattr(doc, "confidence_score", None)
+        raw_meta = getattr(doc, "meta", None)
+        if raw_meta is None:
+            raw_meta = getattr(doc, "meta_json", None)
+        if isinstance(raw_meta, dict):
+            meta = raw_meta
+        elif isinstance(raw_meta, str) and raw_meta.strip():
+            try:
+                parsed = json.loads(raw_meta)
+                if isinstance(parsed, dict):
+                    meta = parsed
+            except (json.JSONDecodeError, TypeError):
+                meta = {}
+        can = getattr(doc, "canonical", None)
+        if isinstance(can, dict):
+            canonical = can
+        elif isinstance(meta.get("canonical"), dict):
+            canonical = meta["canonical"]
+
+    conf = _coerce_confidence(top)
+    if conf is not None:
+        return conf
+
+    for blob in (canonical.get("extraction"), meta.get("extraction"), meta):
+        if not isinstance(blob, dict):
+            continue
+        conf = _coerce_confidence(blob.get("confidence_score") or blob.get("confidenceScore"))
+        if conf is not None:
+            return conf
+    return None
+
+
+def has_low_extraction_confidence(doc: object) -> bool:
+    """True when confidence is known and below the shared limitation threshold."""
+    conf = get_extraction_confidence(doc)
+    return conf is not None and conf < EXTRACTION_CONFIDENCE_LIMITATION_THRESHOLD
+
+
+def document_has_extraction_limitation(
+    doc: object,
+    *,
+    category: object | None = None,
+    extracted_text: str | None = None,
+) -> bool:
+    """Unified limitation flag: unusable text (non-drawings) OR low extraction confidence.
+
+    Empty drawings do not count as limitations (they are excluded from the text gate).
+    """
+    from app.models import DocumentCategory
+
+    if category is None:
+        category = getattr(doc, "category", None) if not isinstance(doc, dict) else doc.get("category")
+    cat_val = category.value if isinstance(category, DocumentCategory) else str(category or "")
+
+    if extracted_text is None:
+        if isinstance(doc, dict):
+            extracted_text = doc.get("extracted_text") or ""
+        else:
+            extracted_text = getattr(doc, "extracted_text", None) or ""
+
+    is_drawing = cat_val == DocumentCategory.DRAWING.value
+    if not is_drawing and not has_usable_text(extracted_text):
+        return True
+    return has_low_extraction_confidence(doc)
 
 
 def ocr_status() -> dict:
@@ -323,6 +436,7 @@ def _extract_excel(path: Path) -> str:
 
 
 def merge_extraction_meta(existing_meta: str | None, extraction_meta: dict) -> str:
+    """Shallow merge at top level; deep-merge `extraction` so CDM/canonical is not wiped."""
     base: dict = {}
     if existing_meta:
         try:
@@ -331,5 +445,15 @@ def merge_extraction_meta(existing_meta: str | None, extraction_meta: dict) -> s
                 base = parsed
         except json.JSONDecodeError:
             base = {}
-    base.update(extraction_meta)
+    for key, value in (extraction_meta or {}).items():
+        if (
+            key == "extraction"
+            and isinstance(value, dict)
+            and isinstance(base.get("extraction"), dict)
+        ):
+            merged = dict(base["extraction"])
+            merged.update(value)
+            base["extraction"] = merged
+        else:
+            base[key] = value
     return json.dumps(base, ensure_ascii=False)
