@@ -4,6 +4,9 @@
 !.env.example
 !**/.env.example
 
+# database backups (keep local only)
+backups/
+
 # python
 backend/.venv/
 backend/**/__pycache__/

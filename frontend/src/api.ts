@@ -32,6 +32,7 @@ export type ProjectType =
   | "other";
 export type DocumentCategory = "tender" | "drawing" | "schedule" | "standard";
 export type RiskSeverity = "high" | "medium" | "low";
+export type UserRole = "admin" | "user";
 
 export interface DocumentOut {
   id: number;
@@ -57,6 +58,7 @@ export interface ProjectOut {
   ui_language: LanguageCode;
   report_language: LanguageCode;
   description: string | null;
+  is_demo?: boolean;
   created_at: string;
   documents: DocumentOut[];
 }
@@ -78,6 +80,10 @@ export interface FindingOut {
   cause_effect_chain?: string[];
   data_completeness_caveat?: string | null;
   estimated_impact?: string | null;
+  source_layer?: string | null;
+  confidence_score?: number | null;
+  source_document_name?: string | null;
+  source_page?: number | null;
 }
 
 export interface AnalysisOut {
@@ -152,6 +158,58 @@ export interface AuthMeOut {
   username: string;
   role: UserRole;
   is_admin: boolean;
+  status?: "pending" | "approved" | "rejected";
+  demo_project_id?: number | null;
+  demo?: DemoLimitsOut | null;
+}
+
+export interface LoginOut {
+  api_token: string;
+  username: string;
+  role: UserRole;
+  is_admin: boolean;
+  status?: "pending" | "approved" | "rejected";
+  demo_project_id?: number | null;
+  demo?: DemoLimitsOut | null;
+}
+
+export interface DemoLimitsOut {
+  is_demo: boolean;
+  expires_at: string | null;
+  expired: boolean;
+  days_left: number | null;
+  max_documents: number;
+  documents_used: number;
+  documents_remaining: number;
+  max_analyses: number;
+  analyses_used: number;
+  analyses_remaining: number;
+  max_file_mb: number;
+  max_total_mb: number;
+  can_create_project: boolean;
+  can_upload: boolean;
+  can_analyze: boolean;
+  locks: string[];
+}
+
+export interface DemoRequestOut {
+  id: number;
+  username: string;
+  email: string | null;
+  full_name: string | null;
+  company: string | null;
+  phone: string | null;
+  message: string | null;
+  status: "pending" | "approved" | "rejected";
+  demo_project_id: number | null;
+  created_at: string;
+}
+
+export interface DemoRequestActionOut {
+  id: number;
+  status: "pending" | "approved" | "rejected";
+  demo_project_id: number | null;
+  detail: string | null;
 }
 
 export interface CatalogStandardOut {
@@ -225,6 +283,21 @@ export const FILE_ACCEPT_BY_CATEGORY: Record<DocumentCategory, string> = {
 
 export { FILE_ACCEPT };
 
+export function parseApiError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const msg = err.message;
+  try {
+    const parsed = JSON.parse(msg) as { detail?: string | { msg?: string }[] };
+    if (typeof parsed.detail === "string") return parsed.detail;
+    if (Array.isArray(parsed.detail)) {
+      return parsed.detail.map((d) => d.msg || String(d)).join(", ");
+    }
+  } catch {
+    /* plain text */
+  }
+  return msg;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const headers = authHeaders(init?.headers);
   const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
@@ -271,6 +344,39 @@ export const api = {
       body: JSON.stringify(body),
     }),
   authMe: () => request<AuthMeOut>("/auth/me"),
+  login: (email: string, password: string) =>
+    request<LoginOut>("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }),
+  requestDemo: (body: {
+    full_name: string;
+    email: string;
+    password: string;
+    company?: string;
+    phone?: string;
+    message?: string;
+  }) =>
+    request<DemoRequestOut>("/auth/demo-request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  listDemoRequests: () => request<DemoRequestOut[]>("/auth/demo-requests"),
+  approveDemoRequest: (userId: number) =>
+    request<DemoRequestActionOut>(`/auth/demo-requests/${userId}/approve`, { method: "POST" }),
+  rejectDemoRequest: (userId: number) =>
+    request<DemoRequestActionOut>(`/auth/demo-requests/${userId}/reject`, { method: "POST" }),
+  deleteDemoRequests: (userIds: number[]) =>
+    request<{ deleted_count: number; deleted_ids: number[]; detail: string | null }>(
+      "/auth/demo-requests/delete",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_ids: userIds }),
+      },
+    ),
   uploadDocuments: async (projectId: number, category: DocumentCategory, files: FileList | File[]) => {
     const form = new FormData();
     form.append("category", category);

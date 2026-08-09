@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models import AppUser, UserRole
+from app.models import AccountStatus, AppUser, UserRole
 
 
 @dataclass(frozen=True)
@@ -53,6 +53,15 @@ async def get_principal(
         user = None
 
     if user is not None:
+        raw_status = (getattr(user, "status", None) or AccountStatus.APPROVED.value).strip().lower()
+        if (
+            user.role != UserRole.ADMIN
+            and raw_status in {AccountStatus.PENDING.value, AccountStatus.REJECTED.value}
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account is not approved yet" if raw_status == "pending" else "Account was rejected",
+            )
         return Principal(id=user.id, username=user.username, role=user.role)
 
     if token == settings.admin_api_token:

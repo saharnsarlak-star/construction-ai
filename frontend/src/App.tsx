@@ -5,9 +5,12 @@ import {
   FILE_ACCEPT_BY_CATEGORY,
   UPLOAD_CHUNK_SIZE,
   getApiToken,
+  parseApiError,
   setApiToken,
   type AnalysisOut,
   type CountryCode,
+  type DemoLimitsOut,
+  type DemoRequestOut,
   type DocumentCategory,
   type LanguageCode,
   type ProjectOut,
@@ -20,6 +23,19 @@ import { BulkFileList } from "./BulkFileList";
 import { ExperiencePanel } from "./ExperiencePanel";
 import { ReportDashboard } from "./ReportDashboard";
 import "./App.css";
+
+function codeFromStandardFileName(fileName: string): string {
+  return fileName
+    .replace(/\.[^.]+$/, "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 64);
+}
+
+function titleFromStandardFileName(fileName: string): string {
+  return fileName.replace(/\.[^.]+$/, "").trim() || fileName;
+}
 
 const uploadCategories: { key: DocumentCategory; labelKey: string; optional?: boolean }[] = [
   { key: "tender", labelKey: "tenderDocs" },
@@ -40,10 +56,265 @@ function findingTier(
   return "risk";
 }
 
+/** Visual severity — aligned with backend compose_finding_risk (≥70 high, ≥40 medium). */
+function severityFromRiskScore(
+  score: number | null | undefined,
+  fallback?: string | null,
+  opts?: { capAtMedium?: boolean },
+): "high" | "medium" | "low" {
+  let band: "high" | "medium" | "low" = "medium";
+  if (score != null && Number.isFinite(score)) {
+    const n = Math.round(Number(score));
+    if (n >= 70) band = "high";
+    else if (n >= 40) band = "medium";
+    else band = "low";
+  } else {
+    const fb = (fallback || "").toLowerCase();
+    if (fb === "high" || fb === "medium" || fb === "low") band = fb;
+  }
+  if (opts?.capAtMedium && band === "high") return "medium";
+  return band;
+}
+
+function countSeverityMix(
+  findings: {
+    risk_score?: number | null;
+    severity?: string | null;
+    finding_category?: string | null;
+    code?: string;
+  }[],
+): { high: number; medium: number; low: number } {
+  let high = 0;
+  let medium = 0;
+  let low = 0;
+  for (const f of findings) {
+    const tier = findingTier(f);
+    if (tier !== "risk" && tier !== "experience") continue;
+    const sev = severityFromRiskScore(f.risk_score, f.severity, {
+      capAtMedium: tier === "experience",
+    });
+    if (sev === "high") high += 1;
+    else if (sev === "medium") medium += 1;
+    else low += 1;
+  }
+  return { high, medium, low };
+}
+
 function shortenText(text: string, max = 280): string {
   const t = (text || "").trim();
   if (t.length <= max) return t;
   return `${t.slice(0, max)}…`;
+}
+
+/** Strip OCR/page chrome only — never rewrite document wording. */
+function cleanQuoteForDisplay(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  let s = raw
+    .replace(/---\s*page\s+\d+\s*\([^)]*\)\s*---(?:\s*\[[^\]]*\])?/gi, "")
+    .replace(/---\s*(?:page|sheet|ocr|cad|ifc|gaeb)[^\n-]*---/gi, "")
+    .replace(/\[(?:OCR_TRUNCATED|OCR_APPLIED|NEEDS_MANUAL_REVIEW|STAMP|SIGNATURE|DRAWING)[^\]]*\]/gi, "")
+    .replace(/\[(?:DWG|DXF|Revit|DXF-fallback)[^\]]*\]/gi, "")
+    .replace(/^\s+|\s+$/g, "");
+  return s || null;
+}
+
+function humanCauseSteps(chain: string[] | undefined): string[] {
+  if (!chain?.length) return [];
+  return chain.filter((s) => {
+    const t = s.trim();
+    if (!t) return false;
+    if (t.includes("=") && /^(risk_id|check|source_layer|rkb_|confidence|document|location|score_)/i.test(t)) {
+      return false;
+    }
+    return true;
+  });
+}
+
+function looksLikeStandardCodeList(text: string): boolean {
+  const t = (text || "").trim();
+  if (!t) return false;
+  // e.g. 102-1321-56-4437؛ 105-735-54-201؛ ...
+  const parts = t.split(/[؛;|]/).map((p) => p.trim()).filter(Boolean);
+  if (parts.length < 2) return false;
+  const codeish = parts.filter((p) => /^[\w.\-]{6,}$/i.test(p) || /\d{2,}[-_]\d+/i.test(p));
+  return codeish.length >= Math.max(2, Math.floor(parts.length * 0.6));
+}
+
+function resolveFindingSource(
+  f: {
+    code?: string;
+    title?: string;
+    description?: string;
+    source_document_name?: string | null;
+    source_page?: number | null;
+    source_excerpt?: string | null;
+    evidence?: string | null;
+    cause_effect_chain?: string[];
+  },
+  projectDocs?: { original_name: string; category: string }[],
+): {
+  fileName: string | null;
+  page: number | null;
+  quote: string | null;
+  isMissingCategory: boolean;
+  quoteKind: "sentence" | "explanation" | "standards_list";
+} {
+  let quote = (f.source_excerpt || "").trim() || null;
+  let page = typeof f.source_page === "number" && f.source_page > 0 ? f.source_page : null;
+  let fileName = (f.source_document_name || "").trim() || null;
+  let isMissingCategory = false;
+  let quoteKind: "sentence" | "explanation" | "standards_list" = "sentence";
+  const code = (f.code || "").toUpperCase();
+  const isStandardsGap =
+    code.startsWith("STD-TOPIC-") || code.startsWith("STD-CITE-") || code.startsWith("STD-CONTENT-");
+
+  for (const step of f.cause_effect_chain || []) {
+    if (!fileName && step.startsWith("document=")) {
+      fileName = step.slice("document=".length).trim() || null;
+    }
+    if (page == null && step.startsWith("location=")) {
+      const loc = step.slice("location=".length);
+      const m = loc.match(/(?:page|صفحه|p\.?|pg\.?)\s*[:=\-]?\s*(\d+)/i) || loc.match(/^\s*(\d+)\s*$/);
+      if (m) page = Number(m[1]);
+    }
+    if (/موجود نیست|missing|fehlt|manquant/i.test(step)) {
+      isMissingCategory = true;
+    }
+  }
+
+  const evidence = (f.evidence || "").trim();
+  if (!fileName && evidence && !looksLikeStandardCodeList(evidence) && !isStandardsGap) {
+    const m =
+      evidence.match(/^\s*\(([^)]+)\)/) ||
+      evidence.match(/\b([\w.\-]+\.(?:pdf|docx?|xlsx?|txt|dwg|dxf|ifc))\b/i);
+    if (m) fileName = (m[1] || "").trim() || null;
+  }
+  if (quote && looksLikeStandardCodeList(quote)) {
+    quoteKind = "standards_list";
+  } else if (isStandardsGap && quote) {
+    quoteKind = "explanation";
+    page = null;
+    if (fileName && /شرایط|خصوص|اختصاص|special|particular|tender|مناقصه/i.test(fileName)) {
+      // keep optional file context without pretending a page quote
+    }
+  } else if (!quote && evidence) {
+    if (looksLikeStandardCodeList(evidence) || isStandardsGap) {
+      quote = null;
+      quoteKind = "standards_list";
+    } else {
+      const stripped = evidence
+        .replace(/^\s*\([^)]+\)\s*/, "")
+        .replace(/\s*\[[^\]]*\]\s*:?\s*/, "")
+        .trim();
+      quote = stripped || evidence;
+    }
+  }
+
+  const blob = `${f.code || ""} ${f.title || ""} ${f.description || ""} ${fileName || ""}`.toLowerCase();
+  if (
+    /بارگذاری نشده|موجود نیست|no .*uploaded|missing|fehlt|aucun fichier|استاندارد مرجعی/.test(blob) ||
+    isMissingCategory
+  ) {
+    isMissingCategory = true;
+  }
+
+  // Fallback for older analyses: derive actionable file list from project documents
+  if (projectDocs && projectDocs.length > 0) {
+    const byCat = (cat: string) =>
+      projectDocs.filter((d) => d.category === cat).map((d) => d.original_name).filter(Boolean);
+    const allNames = projectDocs.map((d) => d.original_name).filter(Boolean);
+    let missingLabel: string | null = null;
+    if (/standard|استاندارد|std-001/i.test(blob) && byCat("standard").length === 0) {
+      missingLabel = "standard";
+    } else if (/schedule|زمان|sched/i.test(blob) && byCat("schedule").length === 0) {
+      missingLabel = "schedule";
+    } else if (/drawing|نقشه|draw/i.test(blob) && byCat("drawing").length === 0) {
+      missingLabel = "drawing";
+    }
+
+    if (missingLabel) {
+      isMissingCategory = true;
+      const present = allNames.slice(0, 6).join("، ") || "—";
+      if (!fileName || fileName === "—" || /نامشخص|unknown|اسناد فعلی/i.test(fileName)) {
+        fileName = `— (فایل «${missingLabel}» بارگذاری نشده)`;
+      }
+      if (!quote) {
+        quote = `در بین اسناد پروژه، فایلی در دسته «${missingLabel}» نیست. اسناد فعلی: ${present}`;
+      }
+    } else if (!isStandardsGap && (!fileName || /[،,]/.test(fileName))) {
+      // Exactly one file — prefer tender file whose name matches the finding topic
+      const tender = byCat("tender");
+      const pool = tender.length ? tender : allNames;
+      const titleBits = `${f.title || ""} ${f.description || ""}`.toLowerCase();
+      const scored = pool
+        .map((n) => {
+          const nl = n.toLowerCase();
+          let s = 0;
+          for (const hint of ["شرح", "محدوده", "خصوص", "اختصاص", "scope", "شرایط", "فنی", "ایمنی", "پیمان"]) {
+            if (nl.includes(hint)) s += 5;
+            if (titleBits.includes(hint) && nl.includes(hint)) s += 3;
+          }
+          return { n, s };
+        })
+        .sort((a, b) => b.s - a.s);
+      fileName = scored[0]?.n || pool[0] || null;
+    }
+  }
+
+  // Never show a comma-separated list in the file badge
+  if (fileName && /[،,]/.test(fileName) && !/بارگذاری نشده|uploaded|aucun|keine/i.test(fileName)) {
+    fileName = fileName.split(/\s*[،,]\s*/)[0]?.trim() || fileName;
+  }
+
+  if (isStandardsGap) {
+    page = null;
+    if (!fileName) fileName = null;
+    if (quote && looksLikeStandardCodeList(quote)) {
+      quoteKind = "standards_list";
+    } else if (quote) {
+      quoteKind = "explanation";
+    }
+  }
+
+  // Sentence quotes: keep wording exact (strip only OCR/page chrome markers).
+  if (quoteKind === "sentence") {
+    quote = cleanQuoteForDisplay(quote);
+  } else {
+    quote = (quote || "").trim() || null;
+  }
+
+  return { fileName, page, quote: quote || null, isMissingCategory, quoteKind };
+}
+
+function cleanFindingTitle(title: string): string {
+  return (title || "")
+    .replace(/^\s*\[(تجربه|Experience|Erfahrung|Expérience)\]\s*/i, "")
+    .trim();
+}
+
+function cleanFindingDescription(description: string): string {
+  return (description || "")
+    .replace(/^\s*(مبتنی بر تجربه \(قاعده اجباری نیست\)\.|EXPERIENCE-BASED \(not a mandatory rule\)\.|ERFAHRUNGSBASIERT \(keine Pflichtregel\)\.|BASÉ SUR L'EXPÉRIENCE \(pas une règle obligatoire\)\.)\s*/i, "")
+    .replace(/\s*\[[^\]]*(validation_status|origin_kind|confidence)[^\]]*\]\s*$/i, "")
+    .trim();
+}
+
+function analysisReferenceLabel(
+  f: { source_layer?: string | null; finding_category?: string | null; code?: string },
+  lang: LanguageCode,
+): string {
+  const layer = (f.source_layer || "").toLowerCase();
+  const cat = (f.finding_category || "").toLowerCase();
+  const code = (f.code || "").toUpperCase();
+  if (cat === "experience" || layer === "experience_based" || code.startsWith("EXP-")) {
+    return t(lang, "refExperience");
+  }
+  if (layer === "llm_based" || layer === "ai") return t(lang, "refAi");
+  if (layer === "hybrid") return t(lang, "refHybrid");
+  if (layer === "rule_based" || layer === "vision_based") return t(lang, "refRules");
+  if (cat === "methodology") return t(lang, "refMethodology");
+  if (cat === "limitation") return t(lang, "refExtraction");
+  return t(lang, "refRules");
 }
 
 type StagingItem = { key: string; file: File; selected: boolean };
@@ -73,6 +344,30 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [apiRole, setApiRole] = useState<UserRole>("user");
   const [isAdmin, setIsAdmin] = useState(false);
+  /** Landing gate: create-project / list only after explicit login. */
+  const [homeLoggedIn, setHomeLoggedIn] = useState(false);
+  /** home = marketing; features = capabilities page; login = sign-in; demo = demo registration */
+  const [landingPage, setLandingPage] = useState<"home" | "features" | "login" | "demo">("home");
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [authUsername, setAuthUsername] = useState("");
+  const [demoFullName, setDemoFullName] = useState("");
+  const [demoEmail, setDemoEmail] = useState("");
+  const [demoPassword, setDemoPassword] = useState("");
+  const [demoCompany, setDemoCompany] = useState("");
+  const [demoPhone, setDemoPhone] = useState("");
+  const [demoMessage, setDemoMessage] = useState("");
+  const [demoBusy, setDemoBusy] = useState(false);
+  const [demoError, setDemoError] = useState<string | null>(null);
+  const [demoDone, setDemoDone] = useState(false);
+  const [demoRequests, setDemoRequests] = useState<DemoRequestOut[]>([]);
+  const [demoAdminBusyId, setDemoAdminBusyId] = useState<number | null>(null);
+  const [demoSelectedIds, setDemoSelectedIds] = useState<number[]>([]);
+  const [demoDeleteBusy, setDemoDeleteBusy] = useState(false);
+  const [demoLimits, setDemoLimits] = useState<DemoLimitsOut | null>(null);
+  const [demoProjectId, setDemoProjectId] = useState<number | null>(null);
   const [catalogCode, setCatalogCode] = useState("");
   const [catalogTitle, setCatalogTitle] = useState("");
   const [workspaceTab, setWorkspaceTab] = useState<"docs" | "standards" | "report" | "admin">(
@@ -93,22 +388,203 @@ function App() {
       const me = await api.authMe();
       setApiRole(me.role);
       setIsAdmin(me.is_admin);
+      setAuthUsername(me.username);
+      setDemoLimits(me.demo?.is_demo ? me.demo : null);
+      setDemoProjectId(me.demo_project_id ?? null);
+      return true;
     } catch {
       setApiRole("user");
       setIsAdmin(false);
+      setAuthUsername("");
+      setDemoLimits(null);
+      setDemoProjectId(null);
+      return false;
     }
   }
 
-  function applyRolePreset(role: UserRole) {
-    const token = role === "admin" ? "dev-admin-token" : "dev-user-token";
-    setApiToken(token);
-    void refreshAuth();
+  function openLoginPage(kind: "user" | "admin" | "demo" = "user") {
+    if (kind === "demo") {
+      setDemoError(null);
+      setDemoDone(false);
+      setLandingPage("demo");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
+    if (kind === "admin") {
+      setLoginEmail("admin@tenderrisk.local");
+      setLoginPassword("Admin123!");
+    } else {
+      setLoginEmail("user@tenderrisk.local");
+      setLoginPassword("User123!");
+    }
+    setLoginError(null);
+    setLandingPage("login");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function refreshDemoRequests() {
+    try {
+      const list = await api.listDemoRequests();
+      setDemoRequests(list);
+      setDemoSelectedIds((prev) => prev.filter((id) => list.some((r) => r.id === id)));
+    } catch {
+      setDemoRequests([]);
+      setDemoSelectedIds([]);
+    }
+  }
+
+  function toggleDemoSelected(id: number) {
+    setDemoSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function toggleDemoSelectAll() {
+    if (demoSelectedIds.length === demoRequests.length) {
+      setDemoSelectedIds([]);
+    } else {
+      setDemoSelectedIds(demoRequests.map((r) => r.id));
+    }
+  }
+
+  async function deleteSelectedDemos(ids?: number[]) {
+    const target = ids && ids.length ? ids : demoSelectedIds;
+    if (!target.length) return;
+    if (!window.confirm(t(uiLang, "demoAdminDeleteConfirm"))) return;
+    setDemoDeleteBusy(true);
+    try {
+      const res = await api.deleteDemoRequests(target);
+      setNotice({
+        text: `${t(uiLang, "demoAdminDeleted")} (${res.deleted_count})`,
+        kind: "success",
+      });
+      setDemoSelectedIds([]);
+      await refreshDemoRequests();
+      await refreshProjects();
+    } catch (err) {
+      setNotice({ text: parseApiError(err), kind: "error" });
+    } finally {
+      setDemoDeleteBusy(false);
+    }
+  }
+
+  async function submitDemoRequest(e: React.FormEvent) {
+    e.preventDefault();
+    setDemoBusy(true);
+    setDemoError(null);
+    setDemoDone(false);
+    try {
+      await api.requestDemo({
+        full_name: demoFullName.trim(),
+        email: demoEmail.trim(),
+        password: demoPassword,
+        company: demoCompany.trim() || undefined,
+        phone: demoPhone.trim() || undefined,
+        message: demoMessage.trim() || undefined,
+      });
+      setDemoDone(true);
+      setDemoPassword("");
+    } catch (err) {
+      const msg = parseApiError(err);
+      setDemoError(msg || t(uiLang, "homeLoginError"));
+    } finally {
+      setDemoBusy(false);
+    }
+  }
+
+  async function approveDemo(userId: number) {
+    setDemoAdminBusyId(userId);
+    try {
+      await api.approveDemoRequest(userId);
+      await refreshDemoRequests();
+      setNotice({ text: t(uiLang, "demoAdminApproved"), kind: "success" });
+      await refreshProjects();
+    } catch (err) {
+      setNotice({ text: parseApiError(err), kind: "error" });
+    } finally {
+      setDemoAdminBusyId(null);
+    }
+  }
+
+  async function rejectDemo(userId: number) {
+    setDemoAdminBusyId(userId);
+    try {
+      await api.rejectDemoRequest(userId);
+      await refreshDemoRequests();
+      setNotice({ text: t(uiLang, "demoAdminRejected"), kind: "success" });
+    } catch (err) {
+      setNotice({ text: parseApiError(err), kind: "error" });
+    } finally {
+      setDemoAdminBusyId(null);
+    }
+  }
+
+  async function submitLogin(e: React.FormEvent) {
+    e.preventDefault();
+    setLoginBusy(true);
+    setLoginError(null);
+    setError(null);
+    try {
+      const res = await api.login(loginEmail.trim(), loginPassword);
+      setApiToken(res.api_token);
+      setApiRole(res.role);
+      setIsAdmin(res.is_admin);
+      setAuthUsername(res.username);
+      setHomeLoggedIn(true);
+      setLoginPassword("");
+      setLandingPage("home");
+      setDemoLimits(res.demo?.is_demo ? res.demo : null);
+      setDemoProjectId(res.demo_project_id ?? null);
+      await refreshProjects();
+      if (res.is_admin) await refreshDemoRequests();
+      if (res.demo_project_id) {
+        setSelectedId(res.demo_project_id);
+      } else {
+        window.setTimeout(() => {
+          document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 80);
+      }
+    } catch (err) {
+      const raw = parseApiError(err);
+      if (/pending/i.test(raw)) setLoginError(t(uiLang, "demoPendingLogin"));
+      else if (/rejected/i.test(raw)) setLoginError(t(uiLang, "demoRejectedLogin"));
+      else setLoginError(raw || t(uiLang, "homeLoginError"));
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  function logoutHome() {
+    setHomeLoggedIn(false);
+    setSelectedId(null);
+    setProjects([]);
+    setApiToken("");
+    setApiRole("user");
+    setIsAdmin(false);
+    setAuthUsername("");
+    setLoginEmail("");
+    setLoginPassword("");
+    setLoginError(null);
+    setDemoRequests([]);
+    setDemoSelectedIds([]);
+    setDemoLimits(null);
+    setDemoProjectId(null);
+    setLandingPage("home");
   }
 
   useEffect(() => {
-    if (!getApiToken()) setApiToken("dev-user-token");
-    void refreshAuth();
+    const token = getApiToken();
+    if (!token) return;
+    void (async () => {
+      const ok = await refreshAuth();
+      if (ok) {
+        setHomeLoggedIn(true);
+        await refreshProjects();
+      } else setApiToken("");
+    })();
   }, []);
+
+  useEffect(() => {
+    if (homeLoggedIn && isAdmin) void refreshDemoRequests();
+  }, [homeLoggedIn, isAdmin]);
 
   useEffect(() => {
     if (isAdmin) setStandardsOpen(true);
@@ -130,8 +606,9 @@ function App() {
   }, [uiLang, dir]);
 
   useEffect(() => {
+    if (!homeLoggedIn) return;
     void refreshProjects();
-  }, []);
+  }, [homeLoggedIn]);
 
   useEffect(() => {
     if (selectedId == null) {
@@ -272,6 +749,10 @@ function App() {
 
   async function createProject() {
     if (!name.trim()) return;
+    if (demoLimits?.is_demo && !demoLimits.can_create_project) {
+      setError(t(uiLang, "demoLockedCreate"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -289,14 +770,107 @@ function App() {
       setWorkspaceTab("docs");
       setSelectedId(p.id);
     } catch (e) {
-      setError(String(e));
+      setError(parseApiError(e));
     } finally {
       setBusy(false);
     }
   }
 
+  async function uploadCatalogStandards(files: FileList | File[] | null) {
+    if (!project || !files?.length) return;
+    const list = Array.from(files);
+    const singleCode = catalogCode.trim();
+    const singleTitle = catalogTitle.trim();
+    const usedCodes = new Set<string>();
+
+    setBusy(true);
+    setError(null);
+    setUploadProgress({ done: 0, total: list.length, category: "standard" });
+    const failed: string[] = [];
+    let ok = 0;
+
+    try {
+      for (let i = 0; i < list.length; i += 1) {
+        const file = list[i];
+        const fromName = codeFromStandardFileName(file.name);
+        let code =
+          list.length === 1 && singleCode
+            ? singleCode
+            : fromName || `STD_${Date.now().toString(36).toUpperCase()}_${i + 1}`;
+        code = code
+          .toUpperCase()
+          .replace(/[^A-Z0-9._-]+/g, "_")
+          .replace(/^_+|_+$/g, "")
+          .slice(0, 64);
+        if (!code) code = `STD_${Date.now().toString(36).toUpperCase()}_${i + 1}`;
+        if (usedCodes.has(code)) {
+          code = `${code}_${i + 1}`.slice(0, 64);
+        }
+        usedCodes.add(code);
+        const title =
+          list.length === 1 && singleTitle
+            ? singleTitle
+            : titleFromStandardFileName(file.name) || code;
+
+        try {
+          await api.uploadCatalogStandard({
+            file,
+            standard_code: code,
+            title,
+            project_id: project.id,
+          });
+          ok += 1;
+        } catch (err) {
+          failed.push(`${file.name}: ${parseApiError(err)}`);
+        }
+        setUploadProgress({
+          done: i + 1,
+          total: list.length,
+          category: "standard",
+        });
+      }
+
+      setCatalogCode("");
+      setCatalogTitle("");
+      setStandardsOpen(true);
+      await loadStandards(project.id);
+
+      if (ok && !failed.length) {
+        setNotice({
+          text:
+            ok === 1
+              ? t(uiLang, "catalogUploadOk")
+              : t(uiLang, "catalogUploadBulkOk").replace("{n}", String(ok)),
+          kind: "success",
+        });
+      } else if (ok && failed.length) {
+        setNotice({
+          text: t(uiLang, "catalogUploadPartial")
+            .replace("{ok}", String(ok))
+            .replace("{fail}", String(failed.length)),
+          kind: "success",
+        });
+        setError(failed.slice(0, 5).join("\n"));
+      } else if (failed.length) {
+        const msg = failed[0] || t(uiLang, "catalogUploadFailed");
+        if (/403|Admin role/i.test(msg)) {
+          setError(t(uiLang, "standardsNeedAdmin"));
+        } else {
+          setError(failed.slice(0, 5).join("\n"));
+        }
+      }
+    } finally {
+      setBusy(false);
+      setUploadProgress(null);
+    }
+  }
+
   async function onUpload(category: DocumentCategory, files: FileList | File[] | null) {
     if (!project || !files?.length) return;
+    if (demoLimits?.is_demo && !demoLimits.can_upload) {
+      setError(t(uiLang, "demoLockedUpload"));
+      return;
+    }
     const list = Array.from(files);
     setBusy(true);
     setError(null);
@@ -321,6 +895,7 @@ function App() {
       }
       await loadProject(project.id, { includeAnalysis: false });
       setAnalysisStale(true);
+      await refreshAuth();
       if (failed.length) {
         const preview = failed.slice(0, 5).join("\n");
         const more = failed.length > 5 ? `\n… +${failed.length - 5}` : "";
@@ -329,7 +904,7 @@ function App() {
         setNotice({ text: t(uiLang, "docsChangedReanalyze"), kind: "success" });
       }
     } catch (e) {
-      setError(String(e));
+      setError(parseApiError(e));
     } finally {
       setBusy(false);
       setUploadProgress(null);
@@ -436,6 +1011,10 @@ function App() {
 
   async function runAnalysis() {
     if (!project) return;
+    if (demoLimits?.is_demo && !demoLimits.can_analyze) {
+      setError(t(uiLang, "demoLockedAnalyze"));
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice({ text: t(uiLang, "analyzingPreparing"), kind: "success" });
@@ -447,6 +1026,7 @@ function App() {
       setWorkspaceTab("report");
       const p = await api.getProject(project.id);
       setProject(p);
+      await refreshAuth();
       setNotice({
         text: t(uiLang, "analyzeDone")
           .replace("{n}", String(p.documents.length))
@@ -454,7 +1034,7 @@ function App() {
         kind: "success",
       });
     } catch (e) {
-      setError(String(e));
+      setError(parseApiError(e));
     } finally {
       setBusy(false);
     }
@@ -482,6 +1062,7 @@ function App() {
               setSelectedId(null);
               setWorkspaceTab("docs");
               setDocsDetailCat(null);
+              setLandingPage("home");
             }}
           >
             <span className="brand-mark" aria-hidden="true">
@@ -502,31 +1083,30 @@ function App() {
 
           {!selectedId ? (
             <nav className="landing-nav" aria-label="main">
-              <button type="button" className="is-active">
+              <button
+                type="button"
+                className={landingPage === "home" ? "is-active" : undefined}
+                onClick={() => setLandingPage("home")}
+              >
                 {t(uiLang, "homeNavHome")}
               </button>
               <button
                 type="button"
-                onClick={() => document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth" })}
+                className={landingPage === "features" ? "is-active" : undefined}
+                onClick={() => {
+                  setLandingPage("features");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
               >
                 {t(uiLang, "homeNavFeatures")}
               </button>
-              <button
-                type="button"
-                onClick={() => document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth" })}
-              >
+              <button type="button" onClick={() => setLandingPage("home")}>
                 {t(uiLang, "homeNavPricing")}
               </button>
-              <button
-                type="button"
-                onClick={() => document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth" })}
-              >
+              <button type="button" onClick={() => setLandingPage("home")}>
                 {t(uiLang, "homeNavResources")}
               </button>
-              <button
-                type="button"
-                onClick={() => document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth" })}
-              >
+              <button type="button" onClick={() => setLandingPage("home")}>
                 {t(uiLang, "homeNavAbout")}
               </button>
             </nav>
@@ -550,69 +1130,61 @@ function App() {
                     ))}
                   </select>
                 </label>
-                <button
-                  type="button"
-                  className="landing-login"
-                  onClick={() => document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth" })}
-                >
-                  {t(uiLang, "homeNavLogin")}
-                </button>
-                <button
-                  type="button"
-                  className="landing-demo"
-                  onClick={() => document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth" })}
-                >
+                {homeLoggedIn ? (
+                  <>
+                    <span className="landing-user" title={authUsername}>
+                      {authUsername}
+                      {isAdmin ? ` · ${t(uiLang, "roleAdmin")}` : ""}
+                    </span>
+                    <button type="button" className="landing-login" onClick={logoutHome}>
+                      {t(uiLang, "homeLogout")}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="landing-login"
+                      onClick={() => openLoginPage("user")}
+                    >
+                      {t(uiLang, "homeLoginAsUser")}
+                    </button>
+                    <button
+                      type="button"
+                      className="landing-login landing-login-admin"
+                      onClick={() => openLoginPage("admin")}
+                    >
+                      {t(uiLang, "homeLoginAsAdmin")}
+                    </button>
+                  </>
+                )}
+                <button type="button" className="landing-demo" onClick={() => openLoginPage("demo")}>
                   {t(uiLang, "homeNavDemo")}
                 </button>
               </>
             ) : null}
-            <label className="chrome-control">
-              <span className="visually-hidden">{t(uiLang, "roleLabel")}</span>
-              <select
-                className="chrome-select"
-                value={apiRole}
-                onChange={(e) => applyRolePreset(e.target.value as UserRole)}
-                title={t(uiLang, "roleLabel")}
-              >
-                <option value="user">{t(uiLang, "roleUser")}</option>
-                <option value="admin">{t(uiLang, "roleAdmin")}</option>
-              </select>
-            </label>
           </div>
         </div>
       </header>
 
-      {!selectedId ? (
-        <section className="hero home-hero">
-          <div className="hero-inner home-hero-grid">
-            <div className="home-hero-copy">
+      {!selectedId && landingPage === "home" ? (
+        <section className="hero-section">
+          <div className="hero-container">
+            <div className="hero-image-wrapper">
+              <img
+                className="hero-image"
+                src="/home-hero-bim.png"
+                alt="پروژه ساختمانی"
+                width={1024}
+                height={772}
+                decoding="async"
+                fetchPriority="high"
+                sizes="(max-width: 1280px) 100vw, 1280px"
+              />
+            </div>
+            <div className="hero-text-block">
               <h1>{t(uiLang, "homeHeroTitle")}</h1>
               <p className="tagline">{t(uiLang, "tagline")}</p>
-              <div className="home-cta-row">
-                <button
-                  type="button"
-                  className="home-cta-primary"
-                  onClick={() =>
-                    document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                  }
-                >
-                  {t(uiLang, "homeCtaPrimary")}
-                  <span aria-hidden="true">→</span>
-                </button>
-                <button
-                  type="button"
-                  className="home-cta-secondary"
-                  onClick={() =>
-                    document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth", block: "start" })
-                  }
-                >
-                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-                    <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" strokeWidth="1.8" />
-                    <path d="M10 8.5v7l6-3.5-6-3.5z" fill="currentColor" />
-                  </svg>
-                  {t(uiLang, "homeCtaSecondary")}
-                </button>
-              </div>
               <ul className="home-pillars">
                 <li>
                   <span className="home-pillar-icon" aria-hidden="true">
@@ -671,18 +1243,221 @@ function App() {
                   <span>{t(uiLang, "homePillar4")}</span>
                 </li>
               </ul>
+              {homeLoggedIn ? (
+                <div className="home-cta-row home-hero-auth-row">
+                  <button
+                    type="button"
+                    className="home-cta-primary"
+                    onClick={() =>
+                      document.getElementById("home-start")?.scrollIntoView({ behavior: "smooth", block: "start" })
+                    }
+                  >
+                    {t(uiLang, "homeCta")}
+                    <span aria-hidden="true">→</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="home-cta-row home-hero-auth-row">
+                  <button
+                    type="button"
+                    className="home-cta-primary"
+                    onClick={() => openLoginPage("user")}
+                  >
+                    {t(uiLang, "homeLoginAsUser")}
+                  </button>
+                  <button
+                    type="button"
+                    className="home-cta-secondary"
+                    onClick={() => openLoginPage("admin")}
+                  >
+                    {t(uiLang, "homeLoginAsAdmin")}
+                  </button>
+                </div>
+              )}
             </div>
+          </div>
+        </section>
+      ) : null}
 
-            <div className="home-hero-visual">
-              <img
-                className="home-devices-img"
-                src="/home-devices.png"
-                alt=""
-                width={1536}
-                height={1024}
-                decoding="async"
-              />
+      {!selectedId && landingPage === "features" ? (
+        <section className="home-features home-features-page" id="home-features">
+          <div className="home-features-inner">
+            <button type="button" className="login-page-back linkish" onClick={() => setLandingPage("home")}>
+              ← {t(uiLang, "homeNavHome")}
+            </button>
+            <header className="home-features-head">
+              <h2>{t(uiLang, "homeFeaturesTitle")}</h2>
+              <p>{t(uiLang, "homeFeaturesLead")}</p>
+            </header>
+            <ul className="home-features-grid">
+              {(
+                [
+                  ["homeFeature1Title", "homeFeature1En", "homeFeature1Text"],
+                  ["homeFeature2Title", "homeFeature2En", "homeFeature2Text"],
+                  ["homeFeature3Title", "homeFeature3En", "homeFeature3Text"],
+                  ["homeFeature4Title", "homeFeature4En", "homeFeature4Text"],
+                  ["homeFeature5Title", "homeFeature5En", "homeFeature5Text"],
+                  ["homeFeature6Title", "homeFeature6En", "homeFeature6Text"],
+                ] as const
+              ).map(([titleKey, enKey, textKey], idx) => (
+                <li key={titleKey}>
+                  <span className="home-feature-index" aria-hidden="true">
+                    {String(idx + 1).padStart(2, "0")}
+                  </span>
+                  <div>
+                    <h3>{t(uiLang, titleKey)}</h3>
+                    <p className="home-feature-en">{t(uiLang, enKey)}</p>
+                    <p>{t(uiLang, textKey)}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
+
+      {!selectedId && landingPage === "login" ? (
+        <section className="login-page" id="home-login">
+          <div className="login-page-card panel">
+            <button type="button" className="login-page-back linkish" onClick={() => setLandingPage("home")}>
+              ← {t(uiLang, "homeNavHome")}
+            </button>
+            <h1>{t(uiLang, "homeLoginTitle")}</h1>
+            <p className="muted">{t(uiLang, "homeLoginHint")}</p>
+            <div className="home-login-role-row">
+              <button type="button" className="home-login-role" onClick={() => openLoginPage("user")}>
+                {t(uiLang, "homeLoginAsUser")}
+              </button>
+              <button
+                type="button"
+                className="home-login-role home-login-role-admin"
+                onClick={() => openLoginPage("admin")}
+              >
+                {t(uiLang, "homeLoginAsAdmin")}
+              </button>
             </div>
+            <form className="home-login-form" onSubmit={(e) => void submitLogin(e)}>
+              <label>
+                {t(uiLang, "homeLoginEmail")}
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  required
+                  placeholder="user@tenderrisk.local"
+                />
+              </label>
+              <label>
+                {t(uiLang, "homeLoginPassword")}
+                <input
+                  type="password"
+                  autoComplete="current-password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  required
+                  placeholder="••••••••"
+                />
+              </label>
+              {loginError ? (
+                <p className="home-login-error" role="alert">
+                  {loginError}
+                </p>
+              ) : null}
+              <button type="submit" className="home-cta-primary home-login-submit" disabled={loginBusy}>
+                {loginBusy ? "…" : t(uiLang, "homeLoginSubmit")}
+                <span aria-hidden="true">→</span>
+              </button>
+            </form>
+            <p className="home-login-accounts">{t(uiLang, "homeLoginAccounts")}</p>
+          </div>
+        </section>
+      ) : null}
+
+      {!selectedId && landingPage === "demo" ? (
+        <section className="login-page demo-page" id="home-demo">
+          <div className="login-page-card panel">
+            <button type="button" className="login-page-back linkish" onClick={() => setLandingPage("home")}>
+              ← {t(uiLang, "homeNavHome")}
+            </button>
+            <h1>{t(uiLang, "demoTitle")}</h1>
+            <p className="muted">{t(uiLang, "demoHint")}</p>
+            <p className="muted demo-limits-hint">{t(uiLang, "demoHintLimits")}</p>
+            {demoDone ? (
+              <div className="demo-success" role="status">
+                <p>{t(uiLang, "demoSuccess")}</p>
+                <button
+                  type="button"
+                  className="home-cta-primary"
+                  onClick={() => {
+                    setLoginEmail(demoEmail);
+                    setLoginPassword("");
+                    setLoginError(null);
+                    setLandingPage("login");
+                  }}
+                >
+                  {t(uiLang, "homeLoginSubmit")}
+                </button>
+              </div>
+            ) : (
+              <form className="home-login-form" onSubmit={(e) => void submitDemoRequest(e)}>
+                <label>
+                  {t(uiLang, "demoFullName")}
+                  <input
+                    value={demoFullName}
+                    onChange={(e) => setDemoFullName(e.target.value)}
+                    required
+                    minLength={2}
+                    autoComplete="name"
+                  />
+                </label>
+                <label>
+                  {t(uiLang, "homeLoginEmail")}
+                  <input
+                    type="email"
+                    value={demoEmail}
+                    onChange={(e) => setDemoEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </label>
+                <label>
+                  {t(uiLang, "demoPassword")}
+                  <input
+                    type="password"
+                    value={demoPassword}
+                    onChange={(e) => setDemoPassword(e.target.value)}
+                    required
+                    minLength={8}
+                    autoComplete="new-password"
+                  />
+                </label>
+                <label>
+                  {t(uiLang, "demoCompany")}
+                  <input value={demoCompany} onChange={(e) => setDemoCompany(e.target.value)} />
+                </label>
+                <label>
+                  {t(uiLang, "demoPhone")}
+                  <input value={demoPhone} onChange={(e) => setDemoPhone(e.target.value)} autoComplete="tel" />
+                </label>
+                <label>
+                  {t(uiLang, "demoMessage")}
+                  <textarea
+                    value={demoMessage}
+                    onChange={(e) => setDemoMessage(e.target.value)}
+                    rows={3}
+                  />
+                </label>
+                {demoError ? (
+                  <p className="home-login-error" role="alert">
+                    {demoError}
+                  </p>
+                ) : null}
+                <button type="submit" className="home-cta-primary home-login-submit" disabled={demoBusy}>
+                  {demoBusy ? "…" : t(uiLang, "demoSubmit")}
+                </button>
+              </form>
+            )}
           </div>
         </section>
       ) : null}
@@ -698,55 +1473,108 @@ function App() {
           </div>
         )}
 
-        {!selectedId && (
+        {homeLoggedIn && demoLimits?.is_demo ? (
+          <aside className={`demo-banner${demoLimits.expired ? " is-expired" : ""}`} role="status">
+            <strong>{t(uiLang, "demoBadge")}</strong>
+            <span>{t(uiLang, "demoBannerTitle")}</span>
+            <span>
+              {t(uiLang, "demoBannerQuota")
+                .replace("{docs}", String(demoLimits.documents_used))
+                .replace("{maxDocs}", String(demoLimits.max_documents))
+                .replace("{runs}", String(demoLimits.analyses_used))
+                .replace("{maxRuns}", String(demoLimits.max_analyses))}
+            </span>
+            {demoLimits.expired ? (
+              <span>{t(uiLang, "demoBannerExpired")}</span>
+            ) : (
+              <span>
+                {t(uiLang, "demoBannerExpiry")
+                  .replace(
+                    "{date}",
+                    demoLimits.expires_at
+                      ? new Date(demoLimits.expires_at).toLocaleDateString(uiLang === "fa" ? "fa-IR" : uiLang)
+                      : "—",
+                  )
+                  .replace("{days}", String(demoLimits.days_left ?? 0))}
+              </span>
+            )}
+          </aside>
+        ) : null}
+
+        {!selectedId && homeLoggedIn && (
           <section className="panel home-panel" id="home-start">
-            <div className="home-panel-head">
-              <h2>{t(uiLang, "homeCta")}</h2>
-              <p className="muted">{t(uiLang, "homePanelHint")}</p>
-            </div>
-            <div className="form-grid">
-              <label>
-                {t(uiLang, "projectName")}
-                <input value={name} onChange={(e) => setName(e.target.value)} />
-              </label>
-              <label>
-                {t(uiLang, "country")}
-                <select
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value as CountryCode)}
+            {demoLimits?.is_demo ? (
+              <>
+                <div className="home-panel-head">
+                  <h2>{t(uiLang, "demoBadge")}</h2>
+                  <p className="muted">{t(uiLang, "demoHowToTest")}</p>
+                </div>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={busy || (!demoProjectId && projects.length === 0)}
+                  onClick={() => {
+                    const id = demoProjectId || projects.find((p) => p.is_demo)?.id || projects[0]?.id;
+                    if (id == null) return;
+                    setWorkspaceTab("docs");
+                    setSelectedId(id);
+                  }}
                 >
-                  {countryOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                {t(uiLang, "projectType")}
-                <select
-                  value={projectType}
-                  onChange={(e) => setProjectType(e.target.value as ProjectType)}
-                >
-                  {projectTypeOptions.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {t(uiLang, o.labelKey)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="full">
-                {t(uiLang, "description")}
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                />
-              </label>
-            </div>
-            <button className="primary" disabled={busy} onClick={() => void createProject()}>
-              {t(uiLang, "create")}
-            </button>
+                  {t(uiLang, "demoOpenWorkspace")}
+                  <span aria-hidden="true">→</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="home-panel-head">
+                  <h2>{t(uiLang, "homeCta")}</h2>
+                  <p className="muted">{t(uiLang, "homePanelHint")}</p>
+                </div>
+                <div className="form-grid">
+                  <label>
+                    {t(uiLang, "projectName")}
+                    <input value={name} onChange={(e) => setName(e.target.value)} />
+                  </label>
+                  <label>
+                    {t(uiLang, "country")}
+                    <select
+                      value={country}
+                      onChange={(e) => setCountry(e.target.value as CountryCode)}
+                    >
+                      {countryOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    {t(uiLang, "projectType")}
+                    <select
+                      value={projectType}
+                      onChange={(e) => setProjectType(e.target.value as ProjectType)}
+                    >
+                      {projectTypeOptions.map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {t(uiLang, o.labelKey)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="full">
+                    {t(uiLang, "description")}
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                    />
+                  </label>
+                </div>
+                <button className="primary" disabled={busy} onClick={() => void createProject()}>
+                  {t(uiLang, "create")}
+                </button>
+              </>
+            )}
 
             <h2 className="mt">{t(uiLang, "projectsHeading")}</h2>
             {projects.length === 0 ? (
@@ -779,6 +1607,110 @@ function App() {
           </section>
         )}
 
+        {!selectedId && homeLoggedIn && isAdmin ? (
+          <section className="panel home-panel demo-admin-panel" id="demo-requests">
+            <div className="home-panel-head">
+              <h2>{t(uiLang, "demoAdminTitle")}</h2>
+              <button type="button" className="linkish" onClick={() => void refreshDemoRequests()}>
+                ↻
+              </button>
+            </div>
+            {demoRequests.length === 0 ? (
+              <p className="muted">{t(uiLang, "demoAdminEmpty")}</p>
+            ) : (
+              <>
+                <div className="demo-admin-toolbar">
+                  <label className="demo-select-all">
+                    <input
+                      type="checkbox"
+                      checked={demoSelectedIds.length === demoRequests.length && demoRequests.length > 0}
+                      onChange={toggleDemoSelectAll}
+                    />
+                    <span>
+                      {t(uiLang, "demoAdminSelectAll")}
+                      {demoSelectedIds.length ? ` (${demoSelectedIds.length})` : ""}
+                    </span>
+                  </label>
+                  <button
+                    type="button"
+                    className="demo-delete-btn"
+                    disabled={demoDeleteBusy || demoSelectedIds.length === 0}
+                    onClick={() => void deleteSelectedDemos()}
+                  >
+                    {t(uiLang, "demoAdminDelete")}
+                  </button>
+                </div>
+                <ul className="demo-request-list">
+                  {demoRequests.map((req) => (
+                    <li
+                      key={req.id}
+                      className={`demo-request-item is-${req.status}${
+                        demoSelectedIds.includes(req.id) ? " is-selected" : ""
+                      }`}
+                    >
+                      <label className="demo-request-check">
+                        <input
+                          type="checkbox"
+                          checked={demoSelectedIds.includes(req.id)}
+                          onChange={() => toggleDemoSelected(req.id)}
+                        />
+                      </label>
+                      <div>
+                        <strong>{req.full_name || req.username}</strong>
+                        <span>
+                          {req.email}
+                          {req.company ? ` · ${req.company}` : ""}
+                          {req.phone ? ` · ${req.phone}` : ""}
+                        </span>
+                        {req.message ? <p className="muted">{req.message}</p> : null}
+                        <span className="demo-status-badge">
+                          {t(uiLang, "demoStatus")}:{" "}
+                          {req.status === "pending"
+                            ? t(uiLang, "demoAdminPending")
+                            : req.status === "approved"
+                              ? t(uiLang, "demoAdminApproved")
+                              : t(uiLang, "demoAdminRejected")}
+                          {req.demo_project_id ? ` · #${req.demo_project_id}` : ""}
+                        </span>
+                      </div>
+                      <div className="demo-request-actions">
+                        {req.status === "pending" ? (
+                          <>
+                            <button
+                              type="button"
+                              className="primary soft"
+                              disabled={demoAdminBusyId === req.id || demoDeleteBusy}
+                              onClick={() => void approveDemo(req.id)}
+                            >
+                              {t(uiLang, "demoAdminApprove")}
+                            </button>
+                            <button
+                              type="button"
+                              className="linkish"
+                              disabled={demoAdminBusyId === req.id || demoDeleteBusy}
+                              onClick={() => void rejectDemo(req.id)}
+                            >
+                              {t(uiLang, "demoAdminReject")}
+                            </button>
+                          </>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="linkish demo-delete-one"
+                          disabled={demoDeleteBusy}
+                          onClick={() => void deleteSelectedDemos([req.id])}
+                        >
+                          {t(uiLang, "demoAdminDeleteOne")}
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </section>
+        ) : null}
+
         {selectedId && project && (
           <section className="workspace">
             <div className="workspace-bar">
@@ -794,13 +1726,25 @@ function App() {
                 {dir === "rtl" ? "→" : "←"} {t(uiLang, "back")}
               </button>
               <div className="meta">
-                <strong>{project.name}</strong>
+                <strong>
+                  {project.name}
+                  {project.is_demo || demoLimits?.is_demo ? (
+                    <span className="demo-chip">{t(uiLang, "demoBadge")}</span>
+                  ) : null}
+                </strong>
                 <span>
                   {project.country} · {project.project_type || "infrastructure"}
                   {project.country_profile_code ? ` · ${project.country_profile_code}` : ""}
                 </span>
               </div>
-              <button className="primary analyze-cta" disabled={busy} onClick={() => void runAnalysis()}>
+              <button
+                className="primary analyze-cta"
+                disabled={busy || (demoLimits?.is_demo === true && !demoLimits.can_analyze)}
+                onClick={() => void runAnalysis()}
+                title={
+                  demoLimits?.is_demo && !demoLimits.can_analyze ? t(uiLang, "demoLockedAnalyze") : undefined
+                }
+              >
                 {busy ? t(uiLang, "analyzing") : t(uiLang, "analyze")}
               </button>
             </div>
@@ -1170,63 +2114,48 @@ function App() {
                       />
                     </label>
                   </div>
+                  <p className="muted upload-hint">{t(uiLang, "standardsBulkHint")}</p>
                   <p className="format-line">{t(uiLang, "formatsStandard")}</p>
-                  <label className={`file-btn${busy || !project ? " disabled" : ""}`}>
-                    {busy ? t(uiLang, "uploading") : t(uiLang, "uploadCatalogStandard")}
-                    <input
-                      type="file"
-                      accept=".pdf,.docx,application/pdf"
-                      disabled={busy || !project}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (!file || !project) return;
-                        const fromName = file.name
-                          .replace(/\.[^.]+$/, "")
-                          .toUpperCase()
-                          .replace(/[^A-Z0-9._-]+/g, "_")
-                          .replace(/^_+|_+$/g, "")
-                          .slice(0, 64);
-                        const code = (
-                          catalogCode.trim() ||
-                          fromName ||
-                          `STD_${Date.now().toString(36).toUpperCase()}`
-                        )
-                          .toUpperCase()
-                          .replace(/[^A-Z0-9._-]+/g, "_")
-                          .slice(0, 64);
-                        const title =
-                          catalogTitle.trim() ||
-                          file.name.replace(/\.[^.]+$/, "") ||
-                          code;
-                        setBusy(true);
-                        setError(null);
-                        void api
-                          .uploadCatalogStandard({
-                            file,
-                            standard_code: code,
-                            title,
-                            project_id: project.id,
-                          })
-                          .then(async () => {
-                            setNotice({ text: t(uiLang, "catalogUploadOk"), kind: "success" });
-                            setCatalogCode("");
-                            setCatalogTitle("");
-                            setStandardsOpen(true);
-                            await loadStandards(project.id);
-                          })
-                          .catch((err: Error) => {
-                            const msg = err.message || String(err);
-                            if (/403|Admin role/i.test(msg)) {
-                              setError(t(uiLang, "standardsNeedAdmin"));
-                            } else {
-                              setError(msg);
-                            }
-                          })
-                          .finally(() => setBusy(false));
-                      }}
-                    />
-                  </label>
+                  {busy && uploadProgress?.category === "standard" ? (
+                    <p className="upload-progress" role="status">
+                      {t(uiLang, "uploadingProgress")
+                        .replace("{done}", String(uploadProgress.done))
+                        .replace("{total}", String(uploadProgress.total))}
+                    </p>
+                  ) : null}
+                  <div className="standards-upload-actions">
+                    <label className={`file-btn${busy || !project ? " disabled" : ""}`}>
+                      {busy && uploadProgress?.category === "standard"
+                        ? t(uiLang, "uploading")
+                        : t(uiLang, "uploadCatalogStandard")}
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,application/pdf"
+                        disabled={busy || !project}
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          e.target.value = "";
+                          void uploadCatalogStandards(files);
+                        }}
+                      />
+                    </label>
+                    <label className={`file-btn secondary${busy || !project ? " disabled" : ""}`}>
+                      {busy && uploadProgress?.category === "standard"
+                        ? t(uiLang, "uploading")
+                        : t(uiLang, "uploadCatalogStandardBulk")}
+                      <input
+                        type="file"
+                        accept=".pdf,.docx,application/pdf"
+                        multiple
+                        disabled={busy || !project}
+                        onChange={(e) => {
+                          const files = e.target.files;
+                          e.target.value = "";
+                          void uploadCatalogStandards(files);
+                        }}
+                      />
+                    </label>
+                  </div>
                 </>
               ) : (
                 <p className="muted upload-hint">{t(uiLang, "standardsNeedAdmin")}</p>
@@ -1266,18 +2195,6 @@ function App() {
             {workspaceTab === "report" ? (
               analysis ? (
               <div className="report panel">
-                <ReportDashboard
-                  uiLang={uiLang}
-                  readiness={analysis.readiness_score}
-                  high={(analysis.counts_risk || analysis.counts).high || 0}
-                  medium={(analysis.counts_risk || analysis.counts).medium || 0}
-                  low={(analysis.counts_risk || analysis.counts).low || 0}
-                  avgRisk={analysis.aggregate_risk_score ?? null}
-                  docsLimited={analysis.documents_with_limitations ?? null}
-                  summary={analysis.summary}
-                  blocked={analysis.status === "blocked"}
-                />
-
                 {(() => {
                   const unique = new Map<number, (typeof analysis.findings)[0]>();
                   for (const f of analysis.findings) unique.set(f.id, f);
@@ -1286,8 +2203,21 @@ function App() {
                   const risks = all.filter((f) => findingTier(f) === "risk");
                   const experiences = all.filter((f) => findingTier(f) === "experience");
                   const methodology = all.filter((f) => findingTier(f) === "methodology");
+                  const mix = countSeverityMix([...risks, ...experiences]);
                   return (
                     <>
+                      <ReportDashboard
+                        uiLang={uiLang}
+                        readiness={analysis.readiness_score}
+                        high={mix.high}
+                        medium={mix.medium}
+                        low={mix.low}
+                        avgRisk={analysis.aggregate_risk_score ?? null}
+                        docsLimited={analysis.documents_with_limitations ?? null}
+                        summary={analysis.summary || ""}
+                        blocked={analysis.status === "blocked"}
+                      />
+
                       {limitations.length > 0 && (
                         <div className="limitation-banners">
                           {limitations.map((f) => (
@@ -1312,45 +2242,128 @@ function App() {
                         </p>
                       ) : (
                         <div className="findings">
-                          {risks.map((f) => (
-                            <article key={f.id} className={`finding sev-${f.severity} finding-risk`}>
-                              <header>
-                                <span className="badge score-badge">
-                                  {f.risk_score != null ? f.risk_score : "—"}
-                                </span>
-                                <span className="badge">{t(uiLang, f.severity)}</span>
-                              </header>
-                              <h3>{f.title}</h3>
-                              <p>{f.description}</p>
-                              {(f.source_excerpt || f.evidence) && (
-                                <blockquote className="source-excerpt">
-                                  {shortenText(f.source_excerpt || f.evidence || "", 220)}
-                                </blockquote>
-                              )}
-                              {f.cause_effect_chain && f.cause_effect_chain.length > 0 && (
-                                <div className="cause-chain">
-                                  <span className="chain-label">{t(uiLang, "causeEffect")}</span>
-                                  <ol>
-                                    {f.cause_effect_chain.map((step, i) => (
-                                      <li key={`${f.id}-c-${i}`}>{step}</li>
-                                    ))}
-                                  </ol>
+                          {risks.map((f, idx) => {
+                            const src = resolveFindingSource(
+                              f,
+                              project?.documents.map((d) => ({
+                                original_name: d.original_name,
+                                category: d.category,
+                              })),
+                            );
+                            const steps = humanCauseSteps(f.cause_effect_chain);
+                            const scorePct =
+                              f.risk_score != null && Number.isFinite(f.risk_score)
+                                ? `${Math.round(f.risk_score)}%`
+                                : "—";
+                            const sev = severityFromRiskScore(f.risk_score, f.severity);
+                            const findingNo = idx + 1;
+                            return (
+                              <article key={f.id} className={`finding sev-${sev} finding-risk`}>
+                                <header className="finding-topbar">
+                                  <div className="finding-metrics">
+                                    <span className="badge">
+                                      <span className="metric-label">{t(uiLang, "riskSeverityLabel")}</span>
+                                      <strong>{t(uiLang, sev)}</strong>
+                                    </span>
+                                    <span className="badge score-badge">
+                                      <span className="metric-label">{t(uiLang, "riskScorePercent")}</span>
+                                      <strong>{scorePct}</strong>
+                                    </span>
+                                  </div>
+                                  <span className="finding-ref">{analysisReferenceLabel(f, uiLang)}</span>
+                                </header>
+
+                                <div
+                                  className={`finding-source-file${src.isMissingCategory ? " is-missing" : ""}`}
+                                >
+                                  <span className="source-file-label">{t(uiLang, "sourceFileLabel")}</span>
+                                  <strong className="source-file-name" title={src.fileName || undefined}>
+                                    {src.fileName ||
+                                      (src.quoteKind !== "sentence"
+                                        ? t(uiLang, "sourceFileCorpus")
+                                        : t(uiLang, "sourceFileUnknown"))}
+                                  </strong>
+                                  {!src.isMissingCategory && src.quoteKind === "sentence" ? (
+                                    <span className="source-page-pill">
+                                      {t(uiLang, "sourcePageLabel")}:{" "}
+                                      {src.page != null ? src.page : t(uiLang, "sourcePageUnknown")}
+                                    </span>
+                                  ) : src.isMissingCategory ? (
+                                    <span className="source-page-pill source-missing-pill">
+                                      {t(uiLang, "sourceFileActionUpload")}
+                                    </span>
+                                  ) : null}
                                 </div>
-                              )}
-                              <p>
-                                <strong>{t(uiLang, "recommendation")}:</strong> {f.recommendation}
-                              </p>
-                              {f.estimated_impact && (
-                                <p className="muted">
-                                  <strong>{t(uiLang, "estimatedImpact")}:</strong>{" "}
-                                  {displayImpact(f.estimated_impact, uiLang)}
+
+                                <h3>
+                                  {findingNo}. {cleanFindingTitle(f.title)}
+                                </h3>
+                                <p>{cleanFindingDescription(f.description)}</p>
+
+                                {src.quote ? (
+                                  <div className="source-quote-block">
+                                    <div className="source-quote-head">
+                                      <span>
+                                        {src.quoteKind === "explanation"
+                                          ? t(uiLang, "sourceGapExplainLabel")
+                                          : src.quoteKind === "standards_list"
+                                            ? t(uiLang, "standardsGapListLabel")
+                                            : t(uiLang, "sourceQuoteLabel")}
+                                      </span>
+                                      {src.quoteKind === "sentence" ? (
+                                        <span className="source-quote-page">
+                                          {t(uiLang, "sourcePageLabel")}{" "}
+                                          {src.page != null ? src.page : t(uiLang, "sourcePageUnknown")}
+                                        </span>
+                                      ) : null}
+                                    </div>
+                                    <blockquote className="source-excerpt" dir="auto">
+                                      {src.quoteKind === "sentence" ? "«" : ""}
+                                      {src.quoteKind === "sentence"
+                                        ? src.quote
+                                        : shortenText(src.quote, 420)}
+                                      {src.quoteKind === "sentence" ? "»" : ""}
+                                    </blockquote>
+                                  </div>
+                                ) : null}
+                                {f.evidence &&
+                                looksLikeStandardCodeList(f.evidence) &&
+                                src.quoteKind !== "standards_list" ? (
+                                  <div className="source-quote-block">
+                                    <div className="source-quote-head">
+                                      <span>{t(uiLang, "standardsGapListLabel")}</span>
+                                    </div>
+                                    <blockquote className="source-excerpt" dir="auto">
+                                      {shortenText(f.evidence, 420)}
+                                    </blockquote>
+                                  </div>
+                                ) : null}
+
+                                {steps.length > 0 && (
+                                  <div className="cause-chain">
+                                    <span className="chain-label">{t(uiLang, "causeEffect")}</span>
+                                    <ol>
+                                      {steps.map((step, i) => (
+                                        <li key={`${f.id}-c-${i}`}>{step}</li>
+                                      ))}
+                                    </ol>
+                                  </div>
+                                )}
+                                <p>
+                                  <strong>{t(uiLang, "recommendation")}:</strong> {f.recommendation}
                                 </p>
-                              )}
-                              {f.data_completeness_caveat && (
-                                <p className="caveat">{f.data_completeness_caveat}</p>
-                              )}
-                            </article>
-                          ))}
+                                {f.estimated_impact && (
+                                  <p className="muted">
+                                    <strong>{t(uiLang, "estimatedImpact")}:</strong>{" "}
+                                    {displayImpact(f.estimated_impact, uiLang)}
+                                  </p>
+                                )}
+                                {f.data_completeness_caveat && (
+                                  <p className="caveat">{f.data_completeness_caveat}</p>
+                                )}
+                              </article>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -1358,15 +2371,77 @@ function App() {
                         <>
                           <h2>{t(uiLang, "experienceFindings")}</h2>
                           <div className="findings experience-findings">
-                            {experiences.map((f) => (
-                              <article key={f.id} className="finding finding-experience">
-                                <h3>{f.title}</h3>
-                                <p>{f.description}</p>
-                                <p>
-                                  <strong>{t(uiLang, "recommendation")}:</strong> {f.recommendation}
-                                </p>
-                              </article>
-                            ))}
+                            {experiences.map((f, idx) => {
+                              const src = resolveFindingSource(
+                                f,
+                                project?.documents.map((d) => ({
+                                  original_name: d.original_name,
+                                  category: d.category,
+                                })),
+                              );
+                              const scorePct =
+                                f.risk_score != null && Number.isFinite(f.risk_score)
+                                  ? `${Math.round(f.risk_score)}%`
+                                  : "—";
+                              const sev = severityFromRiskScore(f.risk_score, f.severity, {
+                                capAtMedium: true,
+                              });
+                              const findingNo = risks.length + idx + 1;
+                              return (
+                                <article
+                                  key={f.id}
+                                  className={`finding sev-${sev} finding-experience`}
+                                >
+                                  <header className="finding-topbar">
+                                    <div className="finding-metrics">
+                                      <span className="badge">
+                                        <span className="metric-label">{t(uiLang, "riskSeverityLabel")}</span>
+                                        <strong>{t(uiLang, sev)}</strong>
+                                      </span>
+                                      <span className="badge score-badge">
+                                        <span className="metric-label">{t(uiLang, "riskScorePercent")}</span>
+                                        <strong>{scorePct}</strong>
+                                      </span>
+                                    </div>
+                                    <span className="finding-ref">{analysisReferenceLabel(f, uiLang)}</span>
+                                  </header>
+                                  <div className="finding-source-file">
+                                    <span className="source-file-label">{t(uiLang, "sourceFileLabel")}</span>
+                                    <strong className="source-file-name" title={src.fileName || undefined}>
+                                      {src.fileName || t(uiLang, "sourceFileUnknown")}
+                                    </strong>
+                                    <span className="source-page-pill">
+                                      {t(uiLang, "sourcePageLabel")}:{" "}
+                                      {src.page != null ? src.page : t(uiLang, "sourcePageUnknown")}
+                                    </span>
+                                  </div>
+                                  <h3>
+                                    {findingNo}. {cleanFindingTitle(f.title)}
+                                  </h3>
+                                  <p>{cleanFindingDescription(f.description)}</p>
+                                  {src.quote ? (
+                                    <div className="source-quote-block">
+                                      <div className="source-quote-head">
+                                        <span>{t(uiLang, "sourceQuoteLabel")}</span>
+                                        <span className="source-quote-page">
+                                          {t(uiLang, "sourcePageLabel")}{" "}
+                                          {src.page != null ? src.page : t(uiLang, "sourcePageUnknown")}
+                                        </span>
+                                      </div>
+                                      <blockquote className="source-excerpt" dir="auto">
+                                        «{src.quote}»
+                                      </blockquote>
+                                    </div>
+                                  ) : null}
+                                  <p>
+                                    <strong>{t(uiLang, "recommendation")}:</strong> {f.recommendation}
+                                  </p>
+                                  {f.data_completeness_caveat && (
+                                    <p className="caveat">{f.data_completeness_caveat}</p>
+                                  )}
+                                </article>
+                              );
+                            })}
                           </div>
                         </>
                       )}
@@ -1374,10 +2449,14 @@ function App() {
                       {methodology.length > 0 && (
                         <details className="methodology-footer">
                           <summary>{t(uiLang, "methodologyFooter")}</summary>
-                          {methodology.map((f) => (
+                          {methodology.map((f, idx) => (
                             <div key={f.id} className="methodology-item">
-                              <strong>{f.title}</strong>
-                              <p>{f.description}</p>
+                              <strong>
+                                #{risks.length + experiences.length + idx + 1}{" "}
+                                {cleanFindingTitle(f.title)}
+                              </strong>
+                              <p>{cleanFindingDescription(f.description)}</p>
+                              <span className="finding-ref muted">{analysisReferenceLabel(f, uiLang)}</span>
                             </div>
                           ))}
                         </details>

@@ -213,16 +213,282 @@ def has_usable_text(text: str | None) -> bool:
         )
     ):
         return False
-    cleaned = re.sub(r"^\[OCR_APPLIED\][^\n]*\n?", "", stripped, flags=re.IGNORECASE)
+    cleaned = strip_extraction_chrome(stripped)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return len(cleaned) >= _MIN_NATIVE_TEXT_CHARS
+
+
+_PAGE_HEADER_RE = re.compile(
+    r"^---\s*page\s+\d+\s*\([^)]*\)\s*---(?:\s*\[[^\]]*\])?\s*",
+    re.IGNORECASE | re.MULTILINE,
+)
+_OCR_CHROME_RE = re.compile(
+    r"(?:^|\n)\s*---\s*(?:page|sheet|ocr|cad|ifc|gaeb)[^\n]*---\s*(?:\[[^\]]*\])?\s*",
+    re.IGNORECASE,
+)
+_PERSIAN_LETTER_RE = re.compile(r"[\u0600-\u06FF]")
+_KNOWN_REVERSED_FA = {
+    "نامتخاس": "ساختمان",
+    "هرادا": "اداره",
+    "دحاو": "واحد",
+    "تاملزلا": "الزامات",
+    "اراکنامپ": "پیمانکارا",
+    "ناراکنامپ": "پیمانکاران",
+    "یمنیا": "ایمنی",
+    "شراتش": "شرایط",
+}
+_COMMON_FA_TOKENS = {
+    "از",
+    "به",
+    "که",
+    "این",
+    "را",
+    "با",
+    "در",
+    "برای",
+    "و",
+    "یا",
+    "تا",
+    "هر",
+    "یک",
+    "می",
+    "نمی",
+    "است",
+    "هست",
+    "شود",
+    "کل",
+    "پیمانکار",
+    "پیمانکاران",
+    "پیمانکارا",
+    "ساختمان",
+    "اداره",
+    "واحد",
+    "ایمنی",
+    "کار",
+    "پروژه",
+    "قرارداد",
+    "الزامات",
+    "شرایط",
+    "محدوده",
+    "شرح",
+    "تاسیسات",
+    "وتاسیسات",
+    "دانش",
+    "فنی",
+    "نقشه",
+    "نقشهها",
+    "متره",
+    "مناقصه",
+    "امتیاز",
+    "پیمان",
+    "کارفرما",
+    "نظارت",
+    "مکانیک",
+    "ابنیه",
+}
+
+
+def strip_extraction_chrome(text: str) -> str:
+    """Remove OCR/page markers that must never appear in user-facing quotes."""
+    cleaned = text or ""
+    cleaned = re.sub(r"^\[OCR_APPLIED\][^\n]*\n?", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"^---\s*cad:[^\n]*\n?", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"^---\s*ifc:[^\n]*\n?", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"^---\s*gaeb:[^\n]*\n?", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"^\[(?:DWG|DXF|Revit|DXF-fallback) strings\]\s*", "", cleaned, flags=re.IGNORECASE)
+    cleaned = _PAGE_HEADER_RE.sub("", cleaned)
+    cleaned = _OCR_CHROME_RE.sub("\n", cleaned)
     cleaned = re.sub(r"---\s*(page|sheet|ocr)[^-\n]*---", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\[OCR_TRUNCATED\][^\n]*", "", cleaned, flags=re.IGNORECASE)
     cleaned = re.sub(r"\[NEEDS_MANUAL_REVIEW\]", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\[(?:STAMP|SIGNATURE|DRAWING)(?:,[^\]]*)?\]", "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip()
+
+
+def _fa_token_score(text: str) -> int:
+    toks = re.findall(r"[\u0600-\u06FF]{1,}", text or "")
+    score = 0
+    for t in toks:
+        if t in _COMMON_FA_TOKENS:
+            score += 3
+        elif t.endswith(("ها", "ان", "ات", "ین", "ون")) and len(t) >= 4:
+            score += 1
+        elif t.startswith(("می", "نمی", "بر", "در")) and len(t) >= 3:
+            score += 1
+    return score
+
+
+def _reverse_visual_rtl_runs(text: str) -> str:
+    """Convert visually-stored RTL PDF text to logical order.
+
+    Some native PDFs emit Persian glyphs already in visual order (each word
+    character-reversed, and often the token sequence flipped). Latin/digit runs
+    stay left-to-right.
+    """
+    if not text or not _PERSIAN_LETTER_RE.search(text):
+        return text
+
+    # Reverse whole string, then flip contiguous LTR (Latin/digit/punct) runs back.
+    flipped = text[::-1]
+
+    def _restore_ltr(m: re.Match[str]) -> str:
+        return m.group(0)[::-1]
+
+    return re.sub(r"[A-Za-z0-9][A-Za-z0-9._/%+\-]*", _restore_ltr, flipped)
+
+
+def _wordwise_unreverse_persian(text: str) -> str:
+    """Reverse only Arabic-script words (keeps Latin and punctuation in place)."""
+
+    def _fix_tok(m: re.Match[str]) -> str:
+        return m.group(0)[::-1]
+
+    return re.sub(r"[\u0600-\u06FF]+", _fix_tok, text)
+
+
+def _token_order_unreverse(text: str) -> str:
+    """Un-reverse each Arabic word, then reverse token order (visual RTL lines)."""
+    toks = (text or "").split()
+    fixed: list[str] = []
+    for tok in toks:
+        if re.fullmatch(r"[\u0600-\u06FF]+", tok):
+            fixed.append(_KNOWN_REVERSED_FA.get(tok, tok[::-1]))
+        else:
+            fixed.append(tok)
+    return " ".join(reversed(fixed))
+
+
+def _looks_visually_reversed(text: str) -> bool:
+    if not text:
+        return False
+    # Arabic presentation forms almost always mean visual PDF order
+    if re.search(r"[\uFB50-\uFDFF\uFE70-\uFEFF]", text):
+        return True
+    if any(k in text for k in _KNOWN_REVERSED_FA):
+        return True
+    reversed_hits = 0
+    for tok in re.findall(r"[\u0600-\u06FF]{4,}", text):
+        rev = tok[::-1]
+        # Palindromes (e.g. تاسیسات) must not count — they falsely flag good text.
+        if rev == tok:
+            continue
+        if rev in _COMMON_FA_TOKENS or rev in _KNOWN_REVERSED_FA:
+            reversed_hits += 1
+            if reversed_hits >= 2:
+                return True
+    return False
+
+
+def repair_reversed_persian(text: str) -> str:
+    """If Persian looks character-reversed (common in some PDFs), repair it.
+
+    Never rewrite already-readable Persian: only accept a candidate when its
+    token score is strictly better than the original.
+    """
+    raw = (text or "").strip()
+    if not raw or not _PERSIAN_LETTER_RE.search(raw):
+        return raw
+    base = _fa_token_score(raw)
+    candidates = [
+        raw,
+        _token_order_unreverse(raw),
+        _wordwise_unreverse_persian(raw),
+        _reverse_visual_rtl_runs(raw),
+        _wordwise_unreverse_persian(_reverse_visual_rtl_runs(raw)),
+    ]
+    best = raw
+    best_score = base
+    for c in candidates:
+        sc = _fa_token_score(c)
+        if sc > best_score:
+            best = c
+            best_score = sc
+    # Only rewrite when a candidate is clearly better (or known visual-RTL markers).
+    if best is not raw and best_score > base:
+        parts = [_KNOWN_REVERSED_FA.get(tok, tok) for tok in best.split()]
+        return " ".join(parts)
+    if _looks_visually_reversed(raw) and best_score >= base + 2:
+        parts = [_KNOWN_REVERSED_FA.get(tok, tok) for tok in best.split()]
+        return " ".join(parts)
+    return raw
+
+
+def clean_display_excerpt(text: str | None, *, max_len: int = 420) -> str | None:
+    """Prepare a user-facing document quote: strip OCR chrome + fix RTL garble.
+
+    Keeps the same sentence content from the file; only normalizes presentation
+    glyphs and repairs *actually* reversed Persian so the quote is readable.
+    """
+    if not text:
+        return None
+    cleaned = strip_extraction_chrome(text)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
-    return len(cleaned) >= _MIN_NATIVE_TEXT_CHARS
+    if not cleaned:
+        return None
+    # Presentation-form glyphs (common in Iranian PDFs) → standard Arabic letters
+    try:
+        import unicodedata
+
+        cleaned = unicodedata.normalize("NFKC", cleaned)
+    except Exception:  # noqa: BLE001
+        pass
+    cleaned = repair_reversed_persian(cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    # Drop leftover page markers inside the middle of a quote
+    cleaned = re.sub(r"---\s*page\s+\d+[^-\n]*---", "", cleaned, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if len(cleaned) < 8:
+        return None
+    if len(cleaned) > max_len:
+        cleaned = cleaned[: max_len - 1].rstrip() + "…"
+    return cleaned
+
+
+def verbatim_document_excerpt(text: str | None, *, max_len: int = 500) -> str | None:
+    """Return a readable document quote for «جمله ایراددار».
+
+    Strips extraction chrome and repairs only truly reversed/presentation-form
+    Persian — does not invent new wording or reverse already-correct text.
+    """
+    return clean_display_excerpt(text, max_len=max_len)
+
+
+def sentence_around_index(text: str, index: int, *, max_len: int = 500) -> str | None:
+    """Cut the nearest sentence/line around ``index`` from raw extracted text.
+
+    ``index`` must refer to the original ``text`` (not a chrome-stripped copy),
+    so the returned slice matches the document characters exactly.
+    """
+    if not text:
+        return None
+    raw = text
+    if not raw.strip():
+        return None
+    idx = max(0, min(int(index), len(raw) - 1))
+    # Prefer paragraph/line boundaries, then sentence punctuation.
+    start = 0
+    for sep in ("\n", "؟", "!", "?", ".", "。"):
+        pos = raw.rfind(sep, 0, idx)
+        if pos >= 0:
+            start = max(start, pos + 1)
+            break
+    else:
+        start = max(0, idx - 120)
+
+    end = len(raw)
+    for sep in ("\n", "؟", "!", "?", ".", "。"):
+        pos = raw.find(sep, idx)
+        if pos >= 0:
+            end = min(end, pos + (0 if sep == "\n" else 1))
+            break
+    else:
+        end = min(len(raw), idx + 280)
+
+    chunk = raw[start:end].strip()
+    if len(chunk) < 12:
+        # Fallback window around the hit
+        chunk = raw[max(0, idx - 80) : min(len(raw), idx + 220)].strip()
+    return clean_display_excerpt(chunk, max_len=max_len)
 
 
 # Same threshold used by STD-SEED-005 / standard_extraction_confidence.

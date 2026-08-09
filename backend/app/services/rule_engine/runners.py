@@ -88,6 +88,7 @@ def _finding(
             evidence=merged_evidence,
             finding_category="risk",
             source_excerpt=merged_evidence[:500],
+            source_document_name=_extract_doc_names_from_text(merged_evidence),
             cause_effect_chain=[
                 f"risk_id={risk_id or enriched.get('risk_id')}",
                 f"check={(rule.logic_config or {}).get('check')}",
@@ -102,6 +103,19 @@ def _finding(
         schedule_impact=enriched.get("schedule_impact") or rule.schedule_impact,
         lang=lang,
     )
+
+
+def _extract_doc_names_from_text(text: str | None) -> str | None:
+    if not text:
+        return None
+    found: list[str] = []
+    for m in re.finditer(r"([\w.\-]+\.(?:pdf|docx?|xlsx?|txt|dwg|dxf|ifc|x8\d|d8\d))", text, re.I):
+        name = m.group(1)
+        if name not in found:
+            found.append(name)
+        if len(found) >= 4:
+            break
+    return "، ".join(found) if found else None
 
 
 # ----- Schedule -----

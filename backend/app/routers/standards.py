@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import Principal, get_principal, require_admin
 from app.database import get_db
 from app.models import CatalogStandardAsset, Project, ProjectStandard
-from app.schemas import AuthMeOut, CatalogStandardOut
+from app.schemas import CatalogStandardOut
 from app.services.project_standards import ensure_project_standards
 from app.services.storage import StorageError, open_for_read, save_catalog_standard
 
@@ -25,15 +25,6 @@ def _normalize_code(raw: str) -> str:
     if not code:
         raise HTTPException(status_code=400, detail="standard_code is required")
     return code.upper()[:64]
-
-
-@router.get("/auth/me", response_model=AuthMeOut)
-async def auth_me(principal: Principal = Depends(get_principal)) -> AuthMeOut:
-    return AuthMeOut(
-        username=principal.username,
-        role=principal.role.value,  # type: ignore[arg-type]
-        is_admin=principal.is_admin,
-    )
 
 
 @router.post("/standards/catalog", response_model=CatalogStandardOut)
@@ -87,6 +78,8 @@ async def upload_catalog_standard(
     asset.content_type = content_type
     asset.size_bytes = len(data)
     asset.uploaded_by = principal.username
+    asset.extracted_text = None
+    asset.extraction_status = "pending"
 
     # Optionally surface on a project checklist immediately
     if project_id is not None:
@@ -130,6 +123,14 @@ async def upload_catalog_standard(
 
     await db.commit()
     await db.refresh(asset)
+    # Best-effort: extract catalog PDF text so the next analysis can use it immediately.
+    try:
+        from app.services.catalog_standard_text import ensure_catalog_standard_text
+
+        await ensure_catalog_standard_text(db, asset)
+        await db.refresh(asset)
+    except Exception:  # noqa: BLE001
+        pass
     return CatalogStandardOut(
         standard_code=asset.standard_code,
         title=asset.title,

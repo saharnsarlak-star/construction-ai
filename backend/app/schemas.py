@@ -83,10 +83,88 @@ class ProjectStandardOut(BaseModel):
     has_pdf: bool = False  # original file retained in catalog_standard_assets
 
 
+class DemoLimitsOut(BaseModel):
+    is_demo: bool = False
+    expires_at: datetime | None = None
+    expired: bool = False
+    days_left: int | None = None
+    max_documents: int = 0
+    documents_used: int = 0
+    documents_remaining: int = 0
+    max_analyses: int = 0
+    analyses_used: int = 0
+    analyses_remaining: int = 0
+    max_file_mb: int = 0
+    max_total_mb: int = 0
+    can_create_project: bool = True
+    can_upload: bool = True
+    can_analyze: bool = True
+    locks: list[str] = []
+
+
 class AuthMeOut(BaseModel):
     username: str
     role: Literal["admin", "user"]
     is_admin: bool
+    status: Literal["pending", "approved", "rejected"] = "approved"
+    demo_project_id: int | None = None
+    demo: DemoLimitsOut | None = None
+
+
+class LoginIn(BaseModel):
+    email: str
+    password: str
+
+
+class LoginOut(BaseModel):
+    api_token: str
+    username: str
+    role: Literal["admin", "user"]
+    is_admin: bool
+    status: Literal["pending", "approved", "rejected"] = "approved"
+    demo_project_id: int | None = None
+    demo: DemoLimitsOut | None = None
+
+
+class DemoRequestIn(BaseModel):
+    full_name: str = Field(min_length=2, max_length=255)
+    email: str = Field(min_length=5, max_length=255)
+    password: str = Field(min_length=8, max_length=128)
+    company: str | None = Field(default=None, max_length=255)
+    phone: str | None = Field(default=None, max_length=64)
+    message: str | None = Field(default=None, max_length=2000)
+
+
+class DemoRequestOut(BaseModel):
+    id: int
+    username: str
+    email: str | None
+    full_name: str | None
+    company: str | None
+    phone: str | None
+    message: str | None
+    status: Literal["pending", "approved", "rejected"]
+    demo_project_id: int | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class DemoRequestActionOut(BaseModel):
+    id: int
+    status: Literal["pending", "approved", "rejected"]
+    demo_project_id: int | None = None
+    detail: str | None = None
+
+
+class DemoRequestDeleteIn(BaseModel):
+    user_ids: list[int] = Field(min_length=1, max_length=500)
+
+
+class DemoRequestDeleteOut(BaseModel):
+    deleted_count: int = 0
+    deleted_ids: list[int] = []
+    detail: str | None = None
 
 
 class CatalogStandardOut(BaseModel):
@@ -119,6 +197,7 @@ class ProjectOut(BaseModel):
     ui_language: LanguageCode
     report_language: LanguageCode
     description: str | None
+    is_demo: bool = False
     created_at: datetime
     documents: list[DocumentOut] = []
 
@@ -144,6 +223,8 @@ class FindingOut(BaseModel):
     estimated_impact: str | None = None
     source_layer: str | None = None
     confidence_score: int | None = None
+    source_document_name: str | None = None
+    source_page: int | None = None
 
     model_config = {"from_attributes": True}
 

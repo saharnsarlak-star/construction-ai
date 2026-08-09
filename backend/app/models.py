@@ -77,6 +77,12 @@ class UserRole(str, enum.Enum):
     USER = "user"
 
 
+class AccountStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+
+
 class AppUser(Base):
     """Minimal end-user for Phase 0 standards access control (not full multi-tenant IAM)."""
 
@@ -84,11 +90,22 @@ class AppUser(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     role: Mapped[UserRole] = mapped_column(
         Enum(UserRole, values_callable=_enum_values, native_enum=False),
         nullable=False,
         default=UserRole.USER,
     )
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default=AccountStatus.APPROVED.value)
+    full_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    company: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    phone: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    demo_project_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_demo_user: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
+    demo_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    demo_analyses_used: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     api_token: Mapped[str] = mapped_column(String(128), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -111,6 +128,8 @@ class CatalogStandardAsset(Base):
     content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
     uploaded_by: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    extracted_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    extraction_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -139,6 +158,8 @@ class Project(Base):
         default=LanguageCode.FA,
     )
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True, index=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     documents: Mapped[list["Document"]] = relationship(back_populates="project", cascade="all, delete-orphan")
@@ -238,6 +259,8 @@ class Finding(Base):
     # Phase 3+: rule_based | llm_based | hybrid (additive; None = legacy keyword findings)
     source_layer: Mapped[str | None] = mapped_column(String(32), nullable=True)
     confidence_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    source_document_name: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     analysis: Mapped["Analysis"] = relationship(back_populates="findings")
 

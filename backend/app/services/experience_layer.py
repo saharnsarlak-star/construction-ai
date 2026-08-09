@@ -299,46 +299,30 @@ def experience_to_finding(
     eid = item.experience_id
     # Avoid EXP-EXP-… if experience_id already has EXP- prefix
     code = eid if eid.upper().startswith("EXP-") else f"EXP-{eid}"
-    prefix = {
-        LanguageCode.FA: "مبتنی بر تجربه (قاعده اجباری نیست).",
-        LanguageCode.EN: "EXPERIENCE-BASED (not a mandatory rule).",
-        LanguageCode.DE: "ERFAHRUNGSBASIERT (keine Pflichtregel).",
-        LanguageCode.FR: "BASÉ SUR L'EXPÉRIENCE (pas une règle obligatoire).",
-    }.get(lang, "EXPERIENCE-BASED (not a mandatory rule).")
     intro = {
         LanguageCode.FA: "این الگو در پروژه‌های قبلی مشکل ایجاد کرده است.",
         LanguageCode.EN: "This pattern has caused issues in previous projects.",
         LanguageCode.DE: "Dieses Muster hat in früheren Projekten Probleme verursacht.",
         LanguageCode.FR: "Ce schéma a déjà causé des problèmes sur des projets antérieurs.",
     }.get(lang, "This pattern has caused issues in previous projects.")
-    title_prefix = {
-        LanguageCode.FA: "[تجربه]",
-        LanguageCode.EN: "[Experience]",
-        LanguageCode.DE: "[Erfahrung]",
-        LanguageCode.FR: "[Expérience]",
-    }.get(lang, "[Experience]")
     caveat = {
         LanguageCode.FA: "فقط شاخص تجربه — جایگزین انطباق با استاندارد یا شواهد پروژه نیست.",
         LanguageCode.EN: "Experience indicator only — does not replace standards compliance or project evidence.",
         LanguageCode.DE: "Nur Erfahrungsindikator — ersetzt nicht Normkonformität oder Projekthinweise.",
         LanguageCode.FR: "Indicateur d'expérience uniquement — ne remplace pas la conformité normative.",
     }.get(lang, "Experience indicator only — does not replace standards compliance or project evidence.")
-    desc = (
-        f"{prefix} {intro} "
-        f"{item.description.strip()} "
-        f"[validation_status={item.validation_status}; origin_kind={item.origin_kind}; "
-        f"confidence={item.confidence_level}]"
-    )
+    # Clean user-facing description (no [Experience] title prefix; metadata stays in cause_effect)
+    desc = f"{intro} {item.description.strip()}"
     evidence = (
         f"experience_id={eid}; related_project_types={types}; "
         f"related_risk_id={item.related_risk_id or '—'}; "
         f"source={item.source or 'admin'}; author={item.author or '—'}"
     )
-    return RiskFinding(
+    finding = RiskFinding(
         code=code,
         category=item.category or "experience",
         severity=_severity_from_confidence(item.confidence_level),
-        title=f"{title_prefix} {item.title}",
+        title=(item.title or "").strip(),
         description=desc,
         recommendation=prevention,
         financial_impact=None,
@@ -346,7 +330,7 @@ def experience_to_finding(
         evidence=evidence[:2000],
         finding_category="experience",
         risk_score=conf,
-        source_excerpt=item.description[:800],
+        source_excerpt=None,
         cause_effect_chain=[
             f"experience_id={eid}",
             f"origin_kind={item.origin_kind}",
@@ -359,7 +343,9 @@ def experience_to_finding(
         source_layer="experience_based",
         confidence_score=conf,
         data_completeness_caveat=caveat,
+        estimated_impact=_severity_from_confidence(item.confidence_level).value,
     )
+    return finding
 
 
 async def list_active_experience_items(db: AsyncSession) -> list[ExperienceKnowledgeItem]:

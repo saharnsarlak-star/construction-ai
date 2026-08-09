@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import experience, projects, risks, standards
+from app.routers import auth, experience, projects, risks, standards
 from app.schemas import HealthOut
 from app.services.storage import storage_mode
 
@@ -26,6 +26,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(auth.router, prefix=settings.api_prefix)
 app.include_router(projects.router, prefix=settings.api_prefix)
 app.include_router(standards.router, prefix=settings.api_prefix)
 app.include_router(risks.router, prefix=settings.api_prefix)

@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     # Phase 0 minimal auth tokens (bootstrap; also seeded into app_users)
     admin_api_token: str = "dev-admin-token"
     user_api_token: str = "dev-user-token"
+    admin_email: str = "admin@tenderrisk.local"
+    admin_password: str = "Admin123!"
+    user_email: str = "user@tenderrisk.local"
+    user_password: str = "User123!"
 
     # Phase 1 — Canonical Document Model writer (default OFF = production-safe)
     cdm_enabled: bool = False
@@ -127,6 +131,13 @@ class Settings(BaseSettings):
                     pass
             return [part.strip() for part in raw.split(",") if part.strip()]
         return value
+
+    # Demo workspace limits (applied to approved demo accounts)
+    demo_days_valid: int = 7
+    demo_max_documents: int = 5
+    demo_max_analyses: int = 2
+    demo_max_file_mb: int = 20
+    demo_max_total_mb: int = 50
 
     @property
     def supabase_enabled(self) -> bool:

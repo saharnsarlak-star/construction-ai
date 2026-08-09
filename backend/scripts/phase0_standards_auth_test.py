@@ -49,20 +49,33 @@ async def main() -> int:
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         # 1) Auth roles
         anon = await client.get("/api/auth/me")
-        assert anon.status_code == 200, anon.text
-        assert anon.json()["role"] == "user", anon.json()
-        print("PASS anon -> user", anon.json())
+        assert anon.status_code == 401, anon.text
+        print("PASS anon -> 401")
 
-        admin_me = await client.get(
-            "/api/auth/me", headers={"X-API-Token": settings.admin_api_token}
+        admin_login = await client.post(
+            "/api/auth/login",
+            json={"email": settings.admin_email, "password": settings.admin_password},
         )
+        assert admin_login.status_code == 200, admin_login.text
+        admin_token = admin_login.json()["api_token"]
+        assert admin_login.json()["is_admin"] is True
+        print("PASS admin login", admin_login.json())
+
+        admin_me = await client.get("/api/auth/me", headers={"X-API-Token": admin_token})
         assert admin_me.status_code == 200
         assert admin_me.json()["is_admin"] is True
         print("PASS admin me", admin_me.json())
 
-        user_me = await client.get(
-            "/api/auth/me", headers={"X-API-Token": settings.user_api_token}
+        user_login = await client.post(
+            "/api/auth/login",
+            json={"email": settings.user_email, "password": settings.user_password},
         )
+        assert user_login.status_code == 200, user_login.text
+        user_token = user_login.json()["api_token"]
+        assert user_login.json()["is_admin"] is False
+        print("PASS user login", user_login.json())
+
+        user_me = await client.get("/api/auth/me", headers={"X-API-Token": user_token})
         assert user_me.status_code == 200
         assert user_me.json()["is_admin"] is False
         print("PASS user me", user_me.json())
@@ -85,7 +98,7 @@ async def main() -> int:
         # 3) User cannot upload catalog
         denied = await client.post(
             "/api/standards/catalog",
-            headers={"X-API-Token": settings.user_api_token},
+            headers={"X-API-Token": user_token},
             data={
                 "standard_code": "PHASE0_TEST_STD",
                 "title": "Phase0 Test Standard",
@@ -100,7 +113,7 @@ async def main() -> int:
         # 4) User cannot upload project category=standard
         denied_doc = await client.post(
             f"/api/projects/{project_id}/documents",
-            headers={"X-API-Token": settings.user_api_token},
+            headers={"X-API-Token": user_token},
             data={"category": "standard"},
             files={"files": ("phase0_test.pdf", MINI_PDF, "application/pdf")},
         )
@@ -110,7 +123,7 @@ async def main() -> int:
         # 5) Admin uploads catalog PDF
         up = await client.post(
             "/api/standards/catalog",
-            headers={"X-API-Token": settings.admin_api_token},
+            headers={"X-API-Token": admin_token},
             data={
                 "standard_code": "PHASE0_TEST_STD",
                 "title": "Phase0 Test Standard",
@@ -139,7 +152,7 @@ async def main() -> int:
         # 7) User downloads original PDF
         dl = await client.get(
             f"/api/projects/{project_id}/standards/PHASE0_TEST_STD/download",
-            headers={"X-API-Token": settings.user_api_token},
+            headers={"X-API-Token": user_token},
         )
         assert dl.status_code == 200, dl.text
         assert dl.content.startswith(b"%PDF"), dl.content[:20]
@@ -149,7 +162,7 @@ async def main() -> int:
         # 8) Download for code without PDF -> 404
         no_pdf = await client.get(
             f"/api/projects/{project_id}/standards/IR_NBR_01/download",
-            headers={"X-API-Token": settings.user_api_token},
+            headers={"X-API-Token": user_token},
         )
         # May be 403 if not on list, or 404 if on list without asset
         assert no_pdf.status_code in {403, 404}, no_pdf.text

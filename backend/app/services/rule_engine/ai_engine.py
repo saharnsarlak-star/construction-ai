@@ -430,7 +430,7 @@ def _finding_from_llm(
     )
     mapping_src = enriched.get("mapping_source") or (risk or {}).get("mapping_source") or (risk or {}).get("source") or "python_seed"
 
-    from app.services.analyzer import apply_composed_risk
+    from app.services.analyzer import apply_composed_risk, parse_source_page
 
     return apply_composed_risk(
         RiskFinding(
@@ -443,6 +443,8 @@ def _finding_from_llm(
             evidence=f"{doc_bit.strip()}{loc_bit}: {excerpt}"[:2000],
             finding_category="risk",
             source_excerpt=excerpt[:800],
+            source_document_name=doc_name or None,
+            source_page=parse_source_page(location),
             cause_effect_chain=[
                 f"risk_id={risk_id or enriched.get('risk_id')}",
                 f"check={(rule.logic_config or {}).get('check')}",

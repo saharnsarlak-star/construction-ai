@@ -1,9 +1,10 @@
 import json
+import re
 from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -39,7 +40,13 @@ from app.schemas import (
     UploadBatchOut,
     UploadErrorOut,
 )
-from app.services.analyzer import analyze_project_documents
+from app.services.analyzer import analyze_project_documents, enrich_findings_document_sources
+from app.services.demo_limits import (
+    assert_can_analyze,
+    assert_can_create_project,
+    assert_can_upload,
+    record_demo_analysis,
+)
 from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file, has_usable_text
 from app.services.extraction_jobs import process_document_extraction, queued_meta
 from app.services.rule_engine import run_python_seed_rules
@@ -119,17 +126,28 @@ def _project_out(project: Project) -> ProjectOut:
         ui_language=project.ui_language,
         report_language=project.report_language,
         description=project.description,
+        is_demo=bool(getattr(project, "is_demo", False)),
         created_at=project.created_at,
         documents=[_doc_out(d) for d in project.documents],
     )
 
 
 @router.get("", response_model=list[ProjectOut])
-async def list_projects(db: AsyncSession = Depends(get_db)) -> list[ProjectOut]:
+async def list_projects(
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_principal),
+) -> list[ProjectOut]:
     try:
-        result = await db.execute(
-            select(Project).options(selectinload(Project.documents)).order_by(Project.id.desc())
-        )
+        query = select(Project).options(selectinload(Project.documents)).order_by(Project.id.desc())
+        if not principal.is_admin and principal.id is not None:
+            # Seed "user" still sees legacy unowned projects; demo users only see their own.
+            if principal.username == "user":
+                query = query.where(
+                    or_(Project.owner_user_id == principal.id, Project.owner_user_id.is_(None))
+                )
+            else:
+                query = query.where(Project.owner_user_id == principal.id)
+        result = await db.execute(query)
         return [_project_out(p) for p in result.scalars().all()]
     except Exception as exc:  # noqa: BLE001
         # Surface DB/schema errors to the client so CORS+500 is diagnosable.
@@ -137,7 +155,17 @@ async def list_projects(db: AsyncSession = Depends(get_db)) -> list[ProjectOut]:
 
 
 @router.post("", response_model=ProjectOut)
-async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_db)) -> ProjectOut:
+async def create_project(
+    payload: ProjectCreate,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_principal),
+) -> ProjectOut:
+    owner = None
+    if principal.id is not None:
+        from app.models import AppUser
+
+        owner = await db.get(AppUser, principal.id)
+        await assert_can_create_project(db, owner)
     data = payload.model_dump()
     # One app language: keep UI and report language identical.
     lang = data.get("report_language") or data.get("ui_language") or LanguageCode.FA
@@ -148,6 +176,8 @@ async def create_project(payload: ProjectCreate, db: AsyncSession = Depends(get_
     # DB column is varchar
     if hasattr(data.get("project_type"), "value"):
         data["project_type"] = data["project_type"].value
+    if principal.id is not None:
+        data["owner_user_id"] = principal.id
     project = Project(**data)
     db.add(project)
     await db.commit()
@@ -335,8 +365,20 @@ async def upload_documents(
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
+    from app.models import AppUser
+    from app.services.demo_limits import is_demo_user
+
+    owner = await db.get(AppUser, principal.id) if principal.id is not None else None
+    if project.is_demo or is_demo_user(owner):
+        await assert_can_upload(db, owner, project, incoming_files=len(files), incoming_bytes=0)
+
     max_bytes = (
         None if settings.max_upload_mb <= 0 else settings.max_upload_mb * 1024 * 1024
+    )
+    demo_file_cap = (
+        settings.demo_max_file_mb * 1024 * 1024
+        if (project.is_demo or is_demo_user(owner))
+        else None
     )
     saved: list[Document] = []
     errors: list[UploadErrorOut] = []
@@ -360,8 +402,15 @@ async def upload_documents(
                 size += len(chunk)
                 if max_bytes is not None and size > max_bytes:
                     raise ValueError(f"File too large: {name}")
+                if demo_file_cap is not None and size > demo_file_cap:
+                    raise ValueError(
+                        f"Demo limit: each file must be ≤ {settings.demo_max_file_mb} MB"
+                    )
                 chunks.append(chunk)
             data = b"".join(chunks)
+
+            if project.is_demo or is_demo_user(owner):
+                await assert_can_upload(db, owner, project, incoming_files=1, incoming_bytes=size)
 
             stored_path, local_path = await file_storage.save_upload(
                 project_id=project.id,
@@ -567,15 +616,72 @@ async def reextract_document(
     return _doc_out(doc)
 
 
+_MAX_DOC_TEXT_FOR_ANALYSIS = 80_000
+_EXTRACTION_WAIT_S = 20.0
+
+
+def _slim_meta_for_analysis(meta_json: str | None) -> str | None:
+    """Keep extraction status for gating; drop bulky per-page OCR text blobs."""
+    if not meta_json:
+        return None
+    try:
+        meta = json.loads(meta_json)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(meta, dict):
+        return None
+    extraction = meta.get("extraction") if isinstance(meta.get("extraction"), dict) else {}
+    slim: dict = {
+        "extraction": {
+            k: extraction.get(k)
+            for k in (
+                "phase",
+                "progressPercent",
+                "message",
+                "done",
+                "total",
+                "pdfKind",
+                "pageCount",
+                "ocrPageCount",
+                "failedPages",
+                "needsManualReview",
+                "provider",
+                "error",
+            )
+            if extraction.get(k) is not None
+        }
+    }
+    pages = meta.get("pages") if isinstance(meta.get("pages"), list) else []
+    if pages:
+        slim["pages"] = [
+            {
+                "page": p.get("page"),
+                "confidence": p.get("confidence"),
+                "kind": p.get("kind"),
+                "error": p.get("error"),
+                "needsManualReview": p.get("needsManualReview"),
+                "containsDrawing": p.get("containsDrawing"),
+            }
+            for p in pages[:40]
+            if isinstance(p, dict)
+        ]
+    return json.dumps(slim, ensure_ascii=False)
+
+
 @router.post("/{project_id}/analyze", response_model=AnalysisOut)
 async def analyze_project(
     project_id: int,
     payload: AnalyzeRequest | None = None,
     db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_principal),
 ) -> AnalysisOut:
     import asyncio
 
+    from app.models import AppUser
+
     project = await _get_project(db, project_id)
+    owner = await db.get(AppUser, principal.id) if principal.id is not None else None
+    owner = await assert_can_analyze(db, owner, project)
     report_language = (payload.report_language if payload and payload.report_language else None) or project.report_language
     # Keep project languages in sync with the language used for this analysis.
     if project.ui_language != report_language or project.report_language != report_language:
@@ -608,8 +714,8 @@ async def analyze_project(
 
     for doc_id in pending_ids:
         try:
-            await process_document_extraction(doc_id)
-        except Exception:  # noqa: BLE001
+            await asyncio.wait_for(process_document_extraction(doc_id), timeout=_EXTRACTION_WAIT_S)
+        except Exception:  # noqa: BLE001 — timeout or extract failure
             # Fall back to synchronous light extract so analysis still sees something.
             try:
                 doc = next((d for d in project.documents if d.id == doc_id), None)
@@ -622,7 +728,7 @@ async def analyze_project(
                     )
                 else:
                     text = await asyncio.to_thread(
-                        extract_text_from_file, path, allow_ocr=True
+                        extract_text_from_file, path, allow_ocr=False
                     )
                 doc.extracted_text = text
                 await db.commit()
@@ -633,18 +739,22 @@ async def analyze_project(
         await db.commit()
         project = await _get_project(db, project_id)
 
-    docs_payload = [
-        {
-            "id": d.id,
-            "category": d.category.value if hasattr(d.category, "value") else d.category,
-            "original_name": d.original_name,
-            "stored_path": d.stored_path,
-            "extracted_text": d.extracted_text or "",
-            "content_type": d.content_type,
-            "meta_json": d.meta_json,
-        }
-        for d in project.documents
-    ]
+    docs_payload = []
+    for d in project.documents:
+        text = d.extracted_text or ""
+        if len(text) > _MAX_DOC_TEXT_FOR_ANALYSIS:
+            text = text[:_MAX_DOC_TEXT_FOR_ANALYSIS]
+        docs_payload.append(
+            {
+                "id": d.id,
+                "category": d.category.value if hasattr(d.category, "value") else d.category,
+                "original_name": d.original_name,
+                "stored_path": d.stored_path,
+                "extracted_text": text,
+                "content_type": d.content_type,
+                "meta_json": _slim_meta_for_analysis(d.meta_json),
+            }
+        )
     raw_type = getattr(project, "project_type", None)
     if isinstance(raw_type, ProjectType):
         ptype = raw_type
@@ -677,7 +787,49 @@ async def analyze_project(
             }
         )
 
-    result = analyze_project_documents(
+    # Pull text from admin catalog PDFs so analysis actually uses uploaded standards.
+    if selected_standards:
+        from app.services.catalog_standard_text import ensure_catalog_standard_text
+
+        codes = [s["code"] for s in selected_standards]
+        assets = (
+            await db.execute(
+                select(CatalogStandardAsset).where(CatalogStandardAsset.standard_code.in_(codes))
+            )
+        ).scalars().all()
+        by_code = {a.standard_code: a for a in assets}
+        for s in selected_standards:
+            asset = by_code.get(s["code"])
+            if asset is None:
+                continue
+            text = await ensure_catalog_standard_text(db, asset)
+            if not text.strip():
+                continue
+            if len(text) > _MAX_DOC_TEXT_FOR_ANALYSIS:
+                text = text[:_MAX_DOC_TEXT_FOR_ANALYSIS]
+            s["extracted_text"] = text
+            s["original_name"] = asset.original_name or s["title"]
+            docs_payload.append(
+                {
+                    "id": -int(asset.id or 0) - 1,
+                    "category": DocumentCategory.STANDARD.value,
+                    "original_name": asset.original_name or s["code"],
+                    "stored_path": asset.stored_path,
+                    "extracted_text": text,
+                    "content_type": asset.content_type,
+                    "meta_json": json.dumps(
+                        {
+                            "extraction": {"phase": "completed", "provider": "catalog"},
+                            "catalog_standard": True,
+                            "standard_code": s["code"],
+                        },
+                        ensure_ascii=False,
+                    ),
+                }
+            )
+
+    result = await asyncio.to_thread(
+        analyze_project_documents,
         country=project.country,
         report_language=report_language,
         documents=docs_payload,
@@ -759,6 +911,7 @@ async def analyze_project(
                 by_code[af.code] = af
 
         merged = list(by_code.values())
+        merged = enrich_findings_document_sources(merged, docs_payload, lang=report_language)
         result["findings"] = merged
         risks = [f for f in merged if getattr(f, "finding_category", "risk") == "risk"]
         result["counts_risk"] = {
@@ -797,6 +950,7 @@ async def analyze_project(
             for ef in exp_findings:
                 by_code_exp[ef.code] = ef
             merged_exp = list(by_code_exp.values())
+            merged_exp = enrich_findings_document_sources(merged_exp, docs_payload, lang=report_language)
             result["findings"] = merged_exp
             engines = [result.get("engine") or "keyword"]
             engines.append("experience_layer")
@@ -907,6 +1061,8 @@ async def analyze_project(
                 estimated_impact=getattr(item, "estimated_impact", None),
                 source_layer=getattr(item, "source_layer", None),
                 confidence_score=getattr(item, "confidence_score", None),
+                source_document_name=getattr(item, "source_document_name", None),
+                source_page=getattr(item, "source_page", None),
             )
         )
 
@@ -941,6 +1097,7 @@ async def analyze_project(
             logger.exception("Knowledge graph chain build failed for analysis %s", analysis.id)
 
     await db.commit()
+    await record_demo_analysis(db, owner)
     return await _analysis_out(db, analysis.id)
 
 
@@ -957,7 +1114,7 @@ async def latest_analysis(project_id: int, db: AsyncSession = Depends(get_db)) -
     analysis = result.scalar_one_or_none()
     if not analysis:
         raise HTTPException(status_code=404, detail="No analysis yet")
-    return _to_analysis_out(analysis)
+    return await _analysis_out(db, analysis.id)
 
 
 async def _get_project(db: AsyncSession, project_id: int) -> Project:
@@ -984,10 +1141,23 @@ async def _analysis_out(db: AsyncSession, analysis_id: int) -> AnalysisOut:
         select(Analysis).options(selectinload(Analysis.findings)).where(Analysis.id == analysis_id)
     )
     analysis = result.scalar_one()
-    return _to_analysis_out(analysis)
+    docs_payload: list[dict] = []
+    try:
+        proj = await _get_project(db, analysis.project_id)
+        docs_payload = [
+            {
+                "original_name": d.original_name,
+                "category": d.category.value if hasattr(d.category, "value") else str(d.category),
+                "extracted_text": d.extracted_text or "",
+            }
+            for d in (proj.documents or [])
+        ]
+    except Exception:  # noqa: BLE001
+        docs_payload = []
+    return _to_analysis_out(analysis, documents=docs_payload)
 
 
-def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
+def _to_analysis_out(analysis: Analysis, *, documents: list[dict] | None = None) -> AnalysisOut:
     payload = json.loads(analysis.result_json or "{}")
     findings_out: list[FindingOut] = []
     seen_ids: set[int] = set()
@@ -1004,6 +1174,87 @@ def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
                     chain = [str(x) for x in parsed]
             except json.JSONDecodeError:
                 chain = []
+        doc_name = getattr(f, "source_document_name", None)
+        page = getattr(f, "source_page", None)
+        excerpt = getattr(f, "source_excerpt", None)
+        if not doc_name or page is None:
+            for step in chain:
+                if not doc_name and step.startswith("document="):
+                    doc_name = step.split("=", 1)[1].strip() or None
+                if page is None and step.startswith("location="):
+                    from app.services.analyzer import parse_source_page
+
+                    page = parse_source_page(step.split("=", 1)[1])
+        if not doc_name and f.evidence:
+            m = re.search(r"^\s*\(([^)]+)\)|\b([^\s:]+\.(?:pdf|docx?|xlsx?|txt))\b", f.evidence, re.I)
+            if m:
+                doc_name = (m.group(1) or m.group(2) or "").strip() or None
+        if documents and (not doc_name or page is None or not excerpt):
+            from app.services.analyzer import find_page_for_quote, locate_document_excerpt
+
+            hints = re.findall(
+                r"[\w\u0600-\u06FFA-Za-z]{3,}",
+                f"{f.title or ''} {excerpt or ''} {f.description or ''}",
+            )[:16]
+            if not doc_name or not excerpt:
+                name, found_excerpt, found_page = locate_document_excerpt(
+                    documents,
+                    keywords=hints,
+                    prefer_categories=("tender",),
+                )
+                if not doc_name and name:
+                    doc_name = name
+                if not excerpt and found_excerpt:
+                    excerpt = found_excerpt
+                if page is None and found_page is not None:
+                    page = found_page
+            if page is None:
+                page = find_page_for_quote(
+                    documents,
+                    filename=doc_name,
+                    quote=excerpt,
+                    keywords=hints,
+                )
+        if excerpt:
+            # Make quotes readable: NFKC + repair only truly reversed Persian.
+            from app.services.extractor import clean_display_excerpt
+
+            excerpt = clean_display_excerpt(excerpt, max_len=800) or excerpt
+            # If stored quote is still unusable, re-cut a sentence from the source file.
+            from app.services.extractor import _fa_token_score, _looks_visually_reversed
+
+            if documents and (
+                _looks_visually_reversed(excerpt)
+                or (_fa_token_score(excerpt) < 2 and re.search(r"[\u0600-\u06FF]", excerpt or ""))
+            ):
+                from app.services.analyzer import locate_document_excerpt
+
+                hints = re.findall(
+                    r"[\w\u0600-\u06FFA-Za-z]{3,}",
+                    f"{f.title or ''} {f.description or ''}",
+                )[:12]
+                prefer = ("tender",)
+                name, found_excerpt, found_page = locate_document_excerpt(
+                    documents,
+                    keywords=hints,
+                    prefer_categories=prefer,
+                )
+                if found_excerpt:
+                    excerpt = clean_display_excerpt(found_excerpt, max_len=800) or found_excerpt
+                    if not doc_name and name:
+                        doc_name = name
+                    if page is None and found_page is not None:
+                        page = found_page
+        # Keep human-readable cause steps only (hide metadata dumps)
+        display_chain = [
+            s
+            for s in chain
+            if s.strip()
+            and not re.match(
+                r"^(risk_id|check|source_layer|rkb_source|confidence_score|document|location|score_model)=",
+                s.strip(),
+            )
+        ]
         findings_out.append(
             FindingOut(
                 id=f.id,
@@ -1018,12 +1269,14 @@ def _to_analysis_out(analysis: Analysis) -> AnalysisOut:
                 evidence=f.evidence,
                 finding_category=getattr(f, "finding_category", None) or "risk",
                 risk_score=getattr(f, "risk_score", None),
-                source_excerpt=getattr(f, "source_excerpt", None),
-                cause_effect_chain=chain,
+                source_excerpt=excerpt,
+                cause_effect_chain=display_chain,
                 data_completeness_caveat=getattr(f, "data_completeness_caveat", None),
                 estimated_impact=getattr(f, "estimated_impact", None),
                 source_layer=getattr(f, "source_layer", None),
                 confidence_score=getattr(f, "confidence_score", None),
+                source_document_name=doc_name,
+                source_page=page,
             )
         )
     counts = payload.get("counts_risk") or payload.get("counts") or {
