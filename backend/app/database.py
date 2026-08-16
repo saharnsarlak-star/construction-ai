@@ -1,34 +1,50 @@
 from collections.abc import AsyncGenerator
 from uuid import uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
 
 from app.config import settings
+
+try:
+    from app.dns_fallback import install_supabase_dns_fallback
+
+    install_supabase_dns_fallback()
+except Exception:  # noqa: BLE001 — optional DNS patch
+    pass
 
 
 class Base(DeclarativeBase):
     pass
 
 
-def _build_engine():
+def _postgres_url() -> str:
     url = settings.database_url
+    if "postgresql" not in url:
+        return url
+    join = "&" if "?" in url else "?"
+    if "prepared_statement_cache_size=" not in url:
+        url = f"{url}{join}prepared_statement_cache_size=0"
+    return url
+
+
+def _base_asyncpg_connect_args() -> dict:
+    return {
+        "statement_cache_size": 0,
+        "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4().hex}__",
+    }
+
+
+def _build_engine(*, connect_args: dict | None = None) -> AsyncEngine:
+    url = _postgres_url()
     is_postgres = "postgresql" in url
     if is_postgres:
-        # Disable SQLAlchemy asyncpg dialect prepared-statement cache (PgBouncer-safe).
-        join = "&" if "?" in url else "?"
-        if "prepared_statement_cache_size=" not in url:
-            url = f"{url}{join}prepared_statement_cache_size=0"
         return create_async_engine(
             url,
             echo=False,
             poolclass=NullPool,
-            connect_args={
-                # Disable asyncpg's own statement cache for transaction-mode PgBouncer.
-                "statement_cache_size": 0,
-                "prepared_statement_name_func": lambda: f"__asyncpg_{uuid4().hex}__",
-            },
+            connect_args=connect_args or _base_asyncpg_connect_args(),
         )
     return create_async_engine(url, echo=False)
 
@@ -43,7 +59,13 @@ async def init_db() -> None:
     from sqlalchemy import select, text
 
     from app.config import settings
+    from app.db_connect import ensure_db_reachable
     from app.models import AppUser, UserRole
+
+    try:
+        await ensure_db_reachable(dns_attempts=12, connect_attempts=5)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[init_db] db warmup warning: {exc}")
 
     try:
         async with engine.begin() as conn:
@@ -136,9 +158,174 @@ async def init_db() -> None:
                     """
                 )
             )
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS registry_categories (
+                      id bigserial primary key,
+                      code varchar(64) not null unique,
+                      title_fa varchar(255) not null,
+                      title_en varchar(255),
+                      description_fa text,
+                      sort_order integer not null default 0,
+                      color_index integer not null default 0,
+                      created_at timestamptz not null default now(),
+                      updated_at timestamptz not null default now()
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_registry_categories_sort "
+                    "ON registry_categories (sort_order)"
+                )
+            )
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS implementation_steps (
+                      id bigserial primary key,
+                      step_code varchar(64) not null unique,
+                      phase varchar(32) not null,
+                      sort_order integer not null default 0,
+                      title_fa varchar(512) not null,
+                      title_en varchar(512),
+                      description_fa text,
+                      description_en text,
+                      status varchar(32) not null default 'pending',
+                      category varchar(64) not null default 'general',
+                      notes text,
+                      metadata_json text,
+                      created_at timestamptz not null default now(),
+                      updated_at timestamptz not null default now()
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS idx_implementation_steps_sort "
+                    "ON implementation_steps (sort_order)"
+                )
+            )
     except Exception as exc:  # noqa: BLE001
         # SQLite uses different DDL; create_all above already covers local DBs.
         print(f"[init_db] standards tables ensure warning: {exc}")
+
+    # Phase B — ontology / knowledge graph tables (additive).
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS parties (
+                      id bigserial primary key,
+                      project_id bigint not null references projects(id) on delete cascade,
+                      legal_name varchar(512) not null,
+                      party_role varchar(64) not null default 'unknown',
+                      contact_ref varchar(512),
+                      meta_json text,
+                      created_at timestamptz not null default now(),
+                      unique (project_id, legal_name, party_role)
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS project_elements (
+                      id bigserial primary key,
+                      project_id bigint not null references projects(id) on delete cascade,
+                      element_type varchar(128) not null default 'element',
+                      name_label varchar(512),
+                      type_mark varchar(128),
+                      ifc_global_id varchar(64),
+                      match_key varchar(255) not null,
+                      fire_rating varchar(64),
+                      host_level varchar(128),
+                      material_ref varchar(255),
+                      drawing_ref varchar(128),
+                      confidence integer,
+                      meta_json text,
+                      created_at timestamptz not null default now(),
+                      updated_at timestamptz not null default now(),
+                      unique (project_id, match_key)
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS element_document_refs (
+                      id bigserial primary key,
+                      project_id bigint not null references projects(id) on delete cascade,
+                      element_id bigint not null references project_elements(id) on delete cascade,
+                      document_id bigint not null references documents(id) on delete cascade,
+                      source_kind varchar(64) not null,
+                      source_local_id varchar(128) not null default '',
+                      excerpt text,
+                      confidence integer,
+                      created_at timestamptz not null default now(),
+                      unique (element_id, document_id, source_kind, source_local_id)
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS ontology_edges (
+                      id bigserial primary key,
+                      project_id bigint not null references projects(id) on delete cascade,
+                      from_type varchar(64) not null,
+                      from_id varchar(128) not null,
+                      to_type varchar(64) not null,
+                      to_id varchar(128) not null,
+                      predicate varchar(64) not null,
+                      confidence integer,
+                      origin_kind varchar(32) not null default 'python',
+                      document_id bigint references documents(id) on delete set null,
+                      evidence_json text,
+                      created_at timestamptz not null default now()
+                    )
+                    """
+                )
+            )
+            try:
+                await conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_standard_clauses_standard_clause "
+                        "ON standard_clauses (standard_id, clause_number)"
+                    )
+                )
+            except Exception:
+                pass
+            await conn.execute(
+                text(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS uq_ontology_edge_tuple "
+                    "ON ontology_edges (project_id, from_type, from_id, to_type, to_id, predicate)"
+                )
+            )
+            for idx_sql in (
+                "CREATE INDEX IF NOT EXISTS idx_parties_project ON parties (project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_elements_project ON project_elements (project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_project_elements_ifc ON project_elements (ifc_global_id)",
+                "CREATE INDEX IF NOT EXISTS idx_element_doc_refs_project ON element_document_refs (project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_element_doc_refs_element ON element_document_refs (element_id)",
+                "CREATE INDEX IF NOT EXISTS idx_ontology_edges_project ON ontology_edges (project_id)",
+                "CREATE INDEX IF NOT EXISTS idx_ontology_edges_predicate ON ontology_edges (predicate)",
+                "CREATE INDEX IF NOT EXISTS idx_ontology_edges_from ON ontology_edges (from_type, from_id)",
+                "CREATE INDEX IF NOT EXISTS idx_ontology_edges_to ON ontology_edges (to_type, to_id)",
+            ):
+                try:
+                    await conn.execute(text(idx_sql))
+                except Exception:
+                    pass
+    except Exception as exc:  # noqa: BLE001
+        print(f"[init_db] ontology tables ensure warning: {exc}")
 
     # Additive columns for existing MVP Postgres databases (must not block boot).
     try:
@@ -188,6 +375,15 @@ async def init_db() -> None:
                 "ALTER TABLE experience_knowledge_items ADD COLUMN IF NOT EXISTS match_keywords_json TEXT",
                 "ALTER TABLE catalog_standard_assets ADD COLUMN IF NOT EXISTS extracted_text TEXT",
                 "ALTER TABLE catalog_standard_assets ADD COLUMN IF NOT EXISTS extraction_status VARCHAR(32)",
+                "ALTER TABLE documents ADD COLUMN IF NOT EXISTS taxonomy_code VARCHAR(32)",
+                "ALTER TABLE catalog_standard_assets ADD COLUMN IF NOT EXISTS family_code VARCHAR(32)",
+                "ALTER TABLE standard_clauses ADD COLUMN IF NOT EXISTS section_title VARCHAR(512)",
+                "ALTER TABLE standard_clauses ADD COLUMN IF NOT EXISTS slot_code VARCHAR(160)",
+                "ALTER TABLE standard_clauses ADD COLUMN IF NOT EXISTS taxonomy_code VARCHAR(32)",
+                "ALTER TABLE standard_clauses ADD COLUMN IF NOT EXISTS taxonomy_confidence DOUBLE PRECISION",
+                "ALTER TABLE implementation_steps ADD COLUMN IF NOT EXISTS deliverables_fa TEXT",
+                "ALTER TABLE implementation_steps ADD COLUMN IF NOT EXISTS related_paths TEXT",
+                "ALTER TABLE implementation_steps ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT FALSE",
             ):
                 try:
                     await conn.execute(text(stmt))
@@ -223,6 +419,12 @@ async def init_db() -> None:
                 "ALTER TABLE findings ADD COLUMN source_page INTEGER",
                 "ALTER TABLE catalog_standard_assets ADD COLUMN extracted_text TEXT",
                 "ALTER TABLE catalog_standard_assets ADD COLUMN extraction_status VARCHAR(32)",
+                "ALTER TABLE documents ADD COLUMN taxonomy_code VARCHAR(32)",
+                "ALTER TABLE catalog_standard_assets ADD COLUMN family_code VARCHAR(32)",
+                "ALTER TABLE standard_clauses ADD COLUMN section_title VARCHAR(512)",
+                "ALTER TABLE standard_clauses ADD COLUMN slot_code VARCHAR(160)",
+                "ALTER TABLE standard_clauses ADD COLUMN taxonomy_code VARCHAR(32)",
+                "ALTER TABLE standard_clauses ADD COLUMN taxonomy_confidence FLOAT",
             ):
                 try:
                     await conn.execute(text(stmt))
@@ -279,6 +481,21 @@ async def init_db() -> None:
             )
     except Exception as exc:  # noqa: BLE001
         print(f"[init_db] risks seed warning: {exc}")
+
+    try:
+        from app.services.project_registry import seed_project_registry
+
+        async with SessionLocal() as session:
+            stats = await seed_project_registry(session)
+            cats = stats["categories"]
+            items = stats["items"]
+            print(
+                f"[init_db] project_registry seed: categories_inserted={cats['inserted']} "
+                f"categories_updated={cats['updated']} items_inserted={items['inserted']} "
+                f"items_backfilled={items['backfilled']} total_items={items['table_count']}"
+            )
+    except Exception as exc:  # noqa: BLE001
+        print(f"[init_db] project_registry seed warning: {exc}")
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

@@ -1,0 +1,37 @@
+{
+  "step": 1,
+  "phase": "A",
+  "generated_at": "2026-08-14T09:05:00+00:00",
+  "verdict": "ACCEPTED",
+  "verdict_fa": "تأیید — Step 1 بدون ایراد اجرا شد",
+  "summary_fa": "58 بند واقعی از ضابطه 55 (بخش 2-2) با 90 requirement معنایی LLM در DB ذخیره شد. متن کامل 390542 کاراکتر، source_page 100%.",
+  "database": {
+    "standard_code": "CODE55-VOL1-IR",
+    "clauses": 58,
+    "requirements": 90,
+    "source_page_pct": 100.0,
+    "extracted_text_len": 390542,
+    "country_code": "IR",
+    "ingest_command": "pipeline --save-catalog CODE55-VOL1-IR --section 2-2 --text step1_real_doc/*.docx --force"
+  },
+  "acceptance_criteria": {
+    "min_20_clauses_in_db": { "required": 20, "actual": 58, "pass": true },
+    "requirements_via_llm_in_db": { "required": "semantic LLM", "actual": 90, "pass": true },
+    "full_text_not_truncated": { "required": 300000, "actual": 390542, "pass": true },
+    "source_page_90pct": { "required": 90, "actual": 100.0, "pass": true },
+    "metadata": { "country": "IR", "pass": true },
+    "unit_tests": { "actual": "10/10", "pass": true }
+  },
+  "fixes_applied_this_session": [
+    "DNS fallback via Google DNS + known Supabase pooler IPs (Tailscale fix)",
+    "UTF-8 stdout for Windows Persian output",
+    "DB session per clause (no timeout during LLM)",
+    "Full Word text cached in DB (500k cap)"
+  ],
+  "reports": {
+    "parse_layer": "step1_post_fix_report.json",
+    "llm_sample": "step1_llm_real_clause.json",
+    "real_data": "step1_real_data_report.json",
+    "qa": "standards_qa_report.json"
+  }
+}

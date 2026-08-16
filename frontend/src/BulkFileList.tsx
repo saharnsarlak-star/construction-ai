@@ -239,6 +239,13 @@ export function BulkFileList({
                 />
                 <div className="file-meta">
                   <span title={d.original_name}>{d.original_name}</span>
+                  {d.taxonomy_code || d.taxonomy_title_fa ? (
+                    <small className="tag taxonomy-tag">
+                      {t(uiLang, "docTaxonomyLabel")}
+                      {d.taxonomy_code ? ` ${d.taxonomy_code}` : ""}
+                      {d.taxonomy_title_fa ? ` · ${d.taxonomy_title_fa}` : ""}
+                    </small>
+                  ) : null}
                   <small className={textOk ? "tag ok" : "tag warn"}>
                     {d.extraction_phase &&
                     d.extraction_phase !== "completed" &&

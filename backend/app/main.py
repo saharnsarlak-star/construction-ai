@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import init_db
-from app.routers import auth, experience, projects, risks, standards
+from app.startup_checks import run_startup_checks
+from app.routers import auth, experience, implementation_steps, project_registry, projects, risks, standards, taxonomy
 from app.schemas import HealthOut
 from app.services.storage import storage_mode
 
@@ -13,7 +14,11 @@ from app.services.storage import storage_mode
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings.storage_dir.mkdir(parents=True, exist_ok=True)
+    run_startup_checks()
     await init_db()
+    from app.tender_taxonomy import warm_taxonomy_cache
+
+    warm_taxonomy_cache()
     yield
 
 
@@ -31,6 +36,9 @@ app.include_router(projects.router, prefix=settings.api_prefix)
 app.include_router(standards.router, prefix=settings.api_prefix)
 app.include_router(risks.router, prefix=settings.api_prefix)
 app.include_router(experience.router, prefix=settings.api_prefix)
+app.include_router(implementation_steps.router, prefix=settings.api_prefix)
+app.include_router(project_registry.router, prefix=settings.api_prefix)
+app.include_router(taxonomy.router, prefix=settings.api_prefix)
 
 
 @app.get("/api/health", response_model=HealthOut)

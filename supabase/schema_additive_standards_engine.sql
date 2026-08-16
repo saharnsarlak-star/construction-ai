@@ -1,24 +1,13 @@
--- Additive migration: Standards Engine (standards, standard_clauses, requirements).
+-- Additive migration: Standards Engine (standard_clauses, requirements).
+-- Uses existing catalog_standard_assets as the standards catalog (no new standards table).
 -- Safe to re-run on existing Supabase MVP projects (IF NOT EXISTS).
 --
--- NOTE: If schema_ctkm.sql was already applied, a different ``standards`` table
--- (UUID-based) may exist — do not run this migration on that database without
--- reconciling table names first.
-
-create table if not exists standards (
-  id bigserial primary key,
-  country_code varchar(8) not null,
-  standard_code varchar(64) not null,
-  title_fa varchar(512) not null,
-  title_en varchar(512),
-  version varchar(64),
-  effective_date date,
-  created_at timestamptz not null default now()
-);
+-- Prerequisite: run schema_additive_standards_engine_catalog_columns.sql first if
+-- catalog_standard_assets needs country_code / standard_version / effective_date.
 
 create table if not exists standard_clauses (
   id bigserial primary key,
-  standard_id bigint not null references standards(id) on delete cascade,
+  standard_id bigint not null references catalog_standard_assets(id) on delete cascade,
   clause_number varchar(64) not null,
   chapter varchar(128),
   section varchar(128),

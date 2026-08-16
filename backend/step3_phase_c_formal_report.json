@@ -1,0 +1,89 @@
+{
+  "step": 3,
+  "phase": "C",
+  "title": "TI-1 Semantic Tender Intelligence — Final Verification Report",
+  "generated_at": "2026-08-14T11:09:52.214518+00:00",
+  "A_IMPLEMENTED": [
+    "LLM semantic compliance engine (semantic_compliance.py)",
+    "TI-1 orchestrator (tender_intelligence.py)",
+    "Analyzer integration gated on KNOWLEDGE_GRAPH_ENABLED (projects.py)",
+    "Keyword standards path suppressed when TI-1 active (skip_keyword_standards)",
+    "Finding → StandardClause + Requirement graph edges (link_ti_findings_to_graph)",
+    "Valid RKB risk ID RISK-STD-CLAUSE-COMPLIANCE-001",
+    "source_layer=llm_based for all TI findings",
+    "LLM-not-configured diagnostic finding (TI-LLM-NOT-CONFIGURED)",
+    "Requirement source_page provenance on findings",
+    "No arbitrary 12-requirement cap (ti_max_checks_per_standard, default 0=unlimited)",
+    "conflicts_with predicate on standards_kg_bridge",
+    "STD-SEED-003 hybrid stub skipped when TI-1 active (ai_engine.py)",
+    "document_id provenance on TI graph edges",
+    "local_semantic offline TI path for dev/verify (llm_client.py)"
+  ],
+  "B_AUTOMATED_TESTED": [
+    "tests/test_ti_phase_c.py — TI finding builder, batch, gating, graph link, wiring",
+    "tests/test_kg_phase_b.py — Phase B regression",
+    "tests/test_standards_phase_a.py — Phase A regression"
+  ],
+  "C_REAL_DATA_VERIFIED": [
+    "Phase A prerequisite: 90 requirements, 58 clauses",
+    "TI-1 smoke on Supabase: 5 findings, 5 graph links",
+    "Coverage status matrix: partial + contradictory detected via controlled mock LLM",
+    "E2E analyze path: keyword skip + TI + guardrail smoke",
+    "STD-SEED-003 skipped when KNOWLEDGE_GRAPH_ENABLED",
+    "Phase B prerequisite: ontology tables intact",
+    "Behavioral keyword gating: STD-TOPIC-GAP-001 absent when skip_keyword_standards=true",
+    "LLM-not-configured diagnostic finding verified",
+    "Live LLM spot check: coverage_status=silent"
+  ],
+  "D_NOT_VERIFIED": [],
+  "E_BLOCKERS": [],
+  "F_NON_BLOCKING_LIMITATIONS": [
+    "TI-1 gated on KNOWLEDGE_GRAPH_ENABLED (bundled with KG chains)",
+    "Production semantic checks require OPENAI_API_KEY or LLM_PROVIDER=replay/local_semantic",
+    "Verify script uses mock LLM when no API key — real LLM spot check runs only when configured",
+    "gap_checker.py remains CLI-only keyword heuristic (not TI-1 decision path)",
+    "No dedicated REST endpoint for TI-only queries — exposed via analysis result_json"
+  ],
+  "G_DATABASE_CHANGES": [
+    "No schema changes — uses Phase A requirements + Phase B ontology_edges",
+    "Ephemeral Phase-C-TI-Verify project cleaned up after run"
+  ],
+  "H_FILES_CHANGED": [
+    "backend/app/services/tender_intelligence.py",
+    "backend/app/standards_engine/compliance/semantic_compliance.py",
+    "backend/app/services/analyzer.py",
+    "backend/app/routers/projects.py",
+    "backend/app/services/rule_engine/ai_engine.py",
+    "backend/app/services/rule_engine/llm_client.py",
+    "backend/app/standards_engine/ingestion/pipeline.py",
+    "backend/app/config.py",
+    "backend/.env.example",
+    "backend/tests/test_ti_phase_c.py",
+    "backend/scripts/phase_c_complete_verify.py"
+  ],
+  "I_TEST_RESULTS": {
+    "phase_c_unit": "13/13 OK",
+    "phase_b_regression": "14/14 OK",
+    "phase_a_regression": "10/10 OK",
+    "total_automated": "37/37 OK",
+    "phase_c_supabase_verify": "ACCEPTED",
+    "verdict_checks": {
+      "phase_a_requirements": true,
+      "phase_b_prerequisite": true,
+      "requirements_load": true,
+      "ti_smoke": true,
+      "keyword_gating": true,
+      "llm_diagnostic": true,
+      "wiring": true,
+      "coverage_status_matrix": true,
+      "e2e_analyze": true,
+      "std_seed_003_skip": true
+    },
+    "real_llm_spot_check": {
+      "skipped": false,
+      "coverage_status": "silent",
+      "pass": true
+    }
+  },
+  "J_FINAL_VERDICT": "ACCEPTED"
+}

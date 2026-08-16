@@ -46,6 +46,7 @@ class Discipline(str, enum.Enum):
     MEP = "mep"
     HSE = "hse"
     ARCHITECTURAL = "architectural"
+    ADMINISTRATIVE = "administrative"
 
 
 class Topic(str, enum.Enum):
@@ -57,6 +58,14 @@ class Topic(str, enum.Enum):
     EARTHWORK = "earthwork"
     DRAINAGE = "drainage"
     GEOTECHNICAL = "geotechnical"
+    SITE_SAFETY = "site_safety"
+    TEMPORARY_WORKS = "temporary_works"
+    FALL_PROTECTION = "fall_protection"
+    PPE = "ppe"
+    EMERGENCY_PREPAREDNESS = "emergency_preparedness"
+    MATERIAL_STORAGE_HANDLING = "material_storage_handling"
+    SITE_LIGHTING = "site_lighting"
+    ACCESS_EGRESS = "access_egress"
 
 
 class Element(str, enum.Enum):
@@ -87,6 +96,7 @@ LABELS_FA: Final[dict[TaxonomyAxis, dict[str, str]]] = {
         Discipline.MEP.value: "تأسیسات مکانیک و برق",
         Discipline.HSE.value: "ایمنی، بهداشت و محیط‌زیست",
         Discipline.ARCHITECTURAL.value: "معماری",
+        Discipline.ADMINISTRATIVE.value: "مقررات عمومی و مستندسازی",
     },
     TaxonomyAxis.TOPIC: {
         Topic.CONCRETE.value: "بتن",
@@ -97,6 +107,14 @@ LABELS_FA: Final[dict[TaxonomyAxis, dict[str, str]]] = {
         Topic.EARTHWORK.value: "خاک‌برداری و خاک‌ریزی",
         Topic.DRAINAGE.value: "زهکشی",
         Topic.GEOTECHNICAL.value: "ژئوتکنیک",
+        Topic.SITE_SAFETY.value: "ایمنی عمومی کارگاه",
+        Topic.TEMPORARY_WORKS.value: "سازه‌ها و تأسیسات موقت کارگاهی",
+        Topic.FALL_PROTECTION.value: "حفاظت در برابر سقوط",
+        Topic.PPE.value: "تجهیزات حفاظت فردی",
+        Topic.EMERGENCY_PREPAREDNESS.value: "آمادگی و شرایط اضطراری",
+        Topic.MATERIAL_STORAGE_HANDLING.value: "انبارداری و جابجایی مصالح",
+        Topic.SITE_LIGHTING.value: "روشنایی کارگاه",
+        Topic.ACCESS_EGRESS.value: "دسترسی و تخلیه ایمن",
     },
     TaxonomyAxis.ELEMENT: {
         Element.COLUMN.value: "ستون",
@@ -124,9 +142,20 @@ AXIS_ENUM: Final[dict[TaxonomyAxis, type[enum.Enum]]] = {
 }
 
 
+# Finer-grained codes under each topic (free-form strings — not a fixed Enum).
+# Key = topic code, value = list of subtopic codes. Populate as new volumes are ingested
+# (e.g. concrete → mix_design, curing, formwork, …).
+subtopics: Final[dict[str, list[str]]] = {}
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def subtopics_for_topic(topic_code: str) -> list[str]:
+    """Return registered subtopic codes for ``topic_code`` (may be empty)."""
+    return list(subtopics.get(topic_code, []))
 
 
 def codes_for_axis(axis: TaxonomyAxis) -> list[str]:
@@ -190,5 +219,7 @@ __all__ = [
     "label_fa_for",
     "list_axis",
     "resolve_member",
+    "subtopics",
+    "subtopics_for_topic",
     "taxonomy_entry",
 ]

@@ -1,0 +1,7 @@
+{
+  "generated_at": "2026-08-13T18:48:16.655582+00:00",
+  "errors": [
+    "db ping: [Errno 11001] getaddrinfo failed"
+  ],
+  "db_connected": false
+}

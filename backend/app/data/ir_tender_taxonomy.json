@@ -1,0 +1,4414 @@
+{
+  "schema_version": 1,
+  "taxonomy_id": "IR_TENDER_V1",
+  "taxonomy_name": "فهرست جامع دسته‌بندی اسناد و موضوعات مناقصه در ایران",
+  "language": "fa/en",
+  "code_format": "root=NN | sub=NN.N | topic=NN.N.NN (extend by appending .NN or new roots)",
+  "categories": [
+    {
+      "code": "1",
+      "title_fa": "اسناد عمومی و فرآیند مناقصه",
+      "title_en": "Tender Documents & Procurement Process",
+      "subcategories": [
+        {
+          "code": "1.1",
+          "title_fa": "اسناد دعوت به مناقصه",
+          "title_en": "Invitation to Tender",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "1.1.01",
+              "title_fa": "آگهی مناقصه",
+              "title_en": "Tender Notice"
+            },
+            {
+              "code": "1.1.02",
+              "title_fa": "دعوتنامه شرکت در مناقصه",
+              "title_en": "Invitation to Tender"
+            },
+            {
+              "code": "1.1.03",
+              "title_fa": "شرح کلی پروژه",
+              "title_en": "Project Overview"
+            },
+            {
+              "code": "1.1.04",
+              "title_fa": "مشخصات کارفرما",
+              "title_en": "Employer Information"
+            },
+            {
+              "code": "1.1.05",
+              "title_fa": "مشخصات مشاور/دستگاه نظارت",
+              "title_en": "Consultant / Engineer Information"
+            },
+            {
+              "code": "1.1.06",
+              "title_fa": "اطلاعات تماس و مکاتبات مناقصه",
+              "title_en": "Tender Communication Information"
+            },
+            {
+              "code": "1.1.07",
+              "title_fa": "شرایط و الزامات شرکت در مناقصه",
+              "title_en": "Tender Participation Requirements"
+            },
+            {
+              "code": "1.1.08",
+              "title_fa": "مهلت دریافت اسناد",
+              "title_en": "Tender Document Issue Deadline"
+            },
+            {
+              "code": "1.1.09",
+              "title_fa": "مهلت ارسال پیشنهاد",
+              "title_en": "Tender Submission Deadline"
+            },
+            {
+              "code": "1.1.10",
+              "title_fa": "محل و نحوه تحویل پیشنهاد",
+              "title_en": "Tender Submission Procedure"
+            },
+            {
+              "code": "1.1.11",
+              "title_fa": "مدت اعتبار پیشنهاد",
+              "title_en": "Bid Validity Period"
+            },
+            {
+              "code": "1.1.12",
+              "title_fa": "برنامه زمانی فرآیند مناقصه",
+              "title_en": "Tender Schedule"
+            }
+          ]
+        },
+        {
+          "code": "1.2",
+          "title_fa": "دستورالعمل مناقصه‌گران",
+          "title_en": "Instructions to Bidders",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "1.2.01",
+              "title_fa": "دستورالعمل تهیه پیشنهاد",
+              "title_en": "Instructions for Preparing the Bid"
+            },
+            {
+              "code": "1.2.02",
+              "title_fa": "نحوه تکمیل فرم‌های مناقصه",
+              "title_en": "Bid Form Instructions"
+            },
+            {
+              "code": "1.2.03",
+              "title_fa": "نحوه ارائه پیشنهاد فنی",
+              "title_en": "Technical Proposal Requirements"
+            },
+            {
+              "code": "1.2.04",
+              "title_fa": "نحوه ارائه پیشنهاد مالی",
+              "title_en": "Financial Proposal Requirements"
+            },
+            {
+              "code": "1.2.05",
+              "title_fa": "نحوه بسته‌بندی و تسلیم پیشنهاد",
+              "title_en": "Bid Submission Requirements"
+            },
+            {
+              "code": "1.2.06",
+              "title_fa": "شرایط رد یا پذیرش پیشنهاد",
+              "title_en": "Bid Rejection / Acceptance Conditions"
+            },
+            {
+              "code": "1.2.07",
+              "title_fa": "شرایط شرکت مشترک",
+              "title_en": "Joint Venture / Consortium Requirements"
+            },
+            {
+              "code": "1.2.08",
+              "title_fa": "شرایط استفاده از پیمانکار جزء",
+              "title_en": "Subcontractor Requirements"
+            }
+          ]
+        },
+        {
+          "code": "1.3",
+          "title_fa": "جلسات و پرسش‌های مناقصه",
+          "title_en": "Pre-Bid Meetings & Clarifications",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "1.3.01",
+              "title_fa": "جلسه پیش‌مناقصه",
+              "title_en": "Pre-Bid Meeting"
+            },
+            {
+              "code": "1.3.02",
+              "title_fa": "صورتجلسه پیش‌مناقصه",
+              "title_en": "Pre-Bid Meeting Minutes"
+            },
+            {
+              "code": "1.3.03",
+              "title_fa": "پرسش‌های مناقصه‌گران",
+              "title_en": "Bidder Questions"
+            },
+            {
+              "code": "1.3.04",
+              "title_fa": "پاسخ‌های کارفرما",
+              "title_en": "Employer Responses"
+            },
+            {
+              "code": "1.3.05",
+              "title_fa": "درخواست شفاف‌سازی",
+              "title_en": "Request for Information (RFI)"
+            },
+            {
+              "code": "1.3.06",
+              "title_fa": "ابهامات اسناد",
+              "title_en": "Tender Document Clarifications"
+            },
+            {
+              "code": "1.3.07",
+              "title_fa": "بخشنامه‌های توضیحی",
+              "title_en": "Clarification Circulars"
+            }
+          ]
+        },
+        {
+          "code": "1.4",
+          "title_fa": "الحاقیه‌ها و اصلاحات",
+          "title_en": "Addenda & Amendments",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "1.4.01",
+              "title_fa": "الحاقیه اسناد مناقصه",
+              "title_en": "Tender Addendum"
+            },
+            {
+              "code": "1.4.02",
+              "title_fa": "اصلاحیه",
+              "title_en": "Amendment"
+            },
+            {
+              "code": "1.4.03",
+              "title_fa": "تغییر مقادیر",
+              "title_en": "Quantity Amendment"
+            },
+            {
+              "code": "1.4.04",
+              "title_fa": "اصلاح نقشه",
+              "title_en": "Drawing Revision"
+            },
+            {
+              "code": "1.4.05",
+              "title_fa": "اصلاح مشخصات فنی",
+              "title_en": "Specification Revision"
+            },
+            {
+              "code": "1.4.06",
+              "title_fa": "تمدید مهلت مناقصه",
+              "title_en": "Tender Deadline Extension"
+            },
+            {
+              "code": "1.4.07",
+              "title_fa": "جایگزینی اسناد",
+              "title_en": "Document Replacement"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "2",
+      "title_fa": "اسناد قراردادی و حقوقی",
+      "title_en": "Contractual & Legal Documents",
+      "subcategories": [
+        {
+          "code": "2.1",
+          "title_fa": "اسناد اصلی قرارداد",
+          "title_en": "Contract Documents",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "2.1.01",
+              "title_fa": "موافقتنامه",
+              "title_en": "Agreement"
+            },
+            {
+              "code": "2.1.02",
+              "title_fa": "پیمان",
+              "title_en": "Contract"
+            },
+            {
+              "code": "2.1.03",
+              "title_fa": "شرایط عمومی پیمان",
+              "title_en": "General Conditions of Contract"
+            },
+            {
+              "code": "2.1.04",
+              "title_fa": "شرایط خصوصی پیمان",
+              "title_en": "Particular Conditions of Contract"
+            },
+            {
+              "code": "2.1.05",
+              "title_fa": "پیوست‌های قرارداد",
+              "title_en": "Contract Appendices"
+            },
+            {
+              "code": "2.1.06",
+              "title_fa": "شرح خدمات و شرح کار",
+              "title_en": "Scope of Work"
+            },
+            {
+              "code": "2.1.07",
+              "title_fa": "محدوده تعهدات پیمانکار",
+              "title_en": "Contractor's Scope of Responsibility"
+            },
+            {
+              "code": "2.1.08",
+              "title_fa": "محدوده تعهدات کارفرما",
+              "title_en": "Employer's Responsibilities"
+            },
+            {
+              "code": "2.1.09",
+              "title_fa": "تعهدات مشاور/مهندس",
+              "title_en": "Consultant / Engineer Responsibilities"
+            },
+            {
+              "code": "2.1.10",
+              "title_fa": "ترتیب اولویت اسناد",
+              "title_en": "Order of Precedence"
+            }
+          ]
+        },
+        {
+          "code": "2.2",
+          "title_fa": "مدت، مبلغ و پرداخت",
+          "title_en": "Contract Time, Price & Payment",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "2.2.01",
+              "title_fa": "مبلغ پیمان",
+              "title_en": "Contract Price"
+            },
+            {
+              "code": "2.2.02",
+              "title_fa": "مدت پیمان",
+              "title_en": "Contract Duration"
+            },
+            {
+              "code": "2.2.03",
+              "title_fa": "تاریخ شروع",
+              "title_en": "Commencement Date"
+            },
+            {
+              "code": "2.2.04",
+              "title_fa": "تاریخ تکمیل",
+              "title_en": "Completion Date"
+            },
+            {
+              "code": "2.2.05",
+              "title_fa": "برنامه پرداخت",
+              "title_en": "Payment Schedule"
+            },
+            {
+              "code": "2.2.06",
+              "title_fa": "شرایط پرداخت",
+              "title_en": "Payment Terms"
+            },
+            {
+              "code": "2.2.07",
+              "title_fa": "پیش‌پرداخت",
+              "title_en": "Advance Payment"
+            },
+            {
+              "code": "2.2.08",
+              "title_fa": "صورت‌وضعیت",
+              "title_en": "Interim Payment Certificate"
+            },
+            {
+              "code": "2.2.09",
+              "title_fa": "پرداخت نهایی",
+              "title_en": "Final Payment"
+            },
+            {
+              "code": "2.2.10",
+              "title_fa": "کسورات",
+              "title_en": "Deductions"
+            },
+            {
+              "code": "2.2.11",
+              "title_fa": "سپرده حسن انجام کار",
+              "title_en": "Retention"
+            }
+          ]
+        },
+        {
+          "code": "2.3",
+          "title_fa": "تضمین‌ها و ضمانت‌نامه‌ها",
+          "title_en": "Bonds & Guarantees",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "2.3.01",
+              "title_fa": "ضمانت‌نامه شرکت در مناقصه",
+              "title_en": "Bid Bond"
+            },
+            {
+              "code": "2.3.02",
+              "title_fa": "ضمانت‌نامه حسن انجام تعهدات",
+              "title_en": "Performance Bond"
+            },
+            {
+              "code": "2.3.03",
+              "title_fa": "ضمانت‌نامه پیش‌پرداخت",
+              "title_en": "Advance Payment Guarantee"
+            },
+            {
+              "code": "2.3.04",
+              "title_fa": "ضمانت‌نامه حسن انجام کار",
+              "title_en": "Performance Guarantee"
+            },
+            {
+              "code": "2.3.05",
+              "title_fa": "ضمانت‌نامه دوره تضمین",
+              "title_en": "Warranty Guarantee"
+            },
+            {
+              "code": "2.3.06",
+              "title_fa": "ضمانت‌نامه استرداد کسور",
+              "title_en": "Retention Money Guarantee"
+            }
+          ]
+        },
+        {
+          "code": "2.4",
+          "title_fa": "تغییرات و ادعاها",
+          "title_en": "Variations & Claims",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "2.4.01",
+              "title_fa": "دستور تغییر",
+              "title_en": "Variation Order"
+            },
+            {
+              "code": "2.4.02",
+              "title_fa": "تغییر مقادیر",
+              "title_en": "Variation in Quantities"
+            },
+            {
+              "code": "2.4.03",
+              "title_fa": "کار جدید",
+              "title_en": "New Work"
+            },
+            {
+              "code": "2.4.04",
+              "title_fa": "قیمت جدید",
+              "title_en": "New Unit Rate"
+            },
+            {
+              "code": "2.4.05",
+              "title_fa": "کار اضافی",
+              "title_en": "Additional Work"
+            },
+            {
+              "code": "2.4.06",
+              "title_fa": "حذف کار",
+              "title_en": "Omission"
+            },
+            {
+              "code": "2.4.07",
+              "title_fa": "ادعا",
+              "title_en": "Claim"
+            },
+            {
+              "code": "2.4.08",
+              "title_fa": "ادعای مالی",
+              "title_en": "Cost Claim"
+            },
+            {
+              "code": "2.4.09",
+              "title_fa": "ادعای زمانی",
+              "title_en": "Time Claim"
+            },
+            {
+              "code": "2.4.10",
+              "title_fa": "تمدید مدت",
+              "title_en": "Extension of Time (EOT)"
+            },
+            {
+              "code": "2.4.11",
+              "title_fa": "تأخیر",
+              "title_en": "Delay"
+            },
+            {
+              "code": "2.4.12",
+              "title_fa": "خسارت تأخیر",
+              "title_en": "Delay Damages / Liquidated Damages"
+            }
+          ]
+        },
+        {
+          "code": "2.5",
+          "title_fa": "اختلافات و خاتمه قرارداد",
+          "title_en": "Disputes & Termination",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "2.5.01",
+              "title_fa": "حل اختلاف",
+              "title_en": "Dispute Resolution"
+            },
+            {
+              "code": "2.5.02",
+              "title_fa": "مذاکره",
+              "title_en": "Negotiation"
+            },
+            {
+              "code": "2.5.03",
+              "title_fa": "سازش",
+              "title_en": "Settlement"
+            },
+            {
+              "code": "2.5.04",
+              "title_fa": "داوری",
+              "title_en": "Arbitration"
+            },
+            {
+              "code": "2.5.05",
+              "title_fa": "مراجع قضایی",
+              "title_en": "Judicial Proceedings"
+            },
+            {
+              "code": "2.5.06",
+              "title_fa": "تعلیق قرارداد",
+              "title_en": "Suspension"
+            },
+            {
+              "code": "2.5.07",
+              "title_fa": "فسخ قرارداد",
+              "title_en": "Termination"
+            },
+            {
+              "code": "2.5.08",
+              "title_fa": "خاتمه قرارداد",
+              "title_en": "Contract Termination"
+            },
+            {
+              "code": "2.5.09",
+              "title_fa": "فورس ماژور",
+              "title_en": "Force Majeure"
+            }
+          ]
+        },
+        {
+          "code": "2.6",
+          "title_fa": "بیمه و مسئولیت",
+          "title_en": "Insurance & Liability",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "2.6.01",
+              "title_fa": "بیمه مسئولیت مدنی",
+              "title_en": "Liability Insurance"
+            },
+            {
+              "code": "2.6.02",
+              "title_fa": "بیمه کارگاه",
+              "title_en": "Construction All Risks (CAR)"
+            },
+            {
+              "code": "2.6.03",
+              "title_fa": "بیمه تجهیزات",
+              "title_en": "Equipment Insurance"
+            },
+            {
+              "code": "2.6.04",
+              "title_fa": "بیمه کارکنان",
+              "title_en": "Workers' Insurance"
+            },
+            {
+              "code": "2.6.05",
+              "title_fa": "مسئولیت در قبال اشخاص ثالث",
+              "title_en": "Third-Party Liability"
+            },
+            {
+              "code": "2.6.06",
+              "title_fa": "مسئولیت پیمانکار",
+              "title_en": "Contractor Liability"
+            },
+            {
+              "code": "2.6.07",
+              "title_fa": "مالیات و عوارض",
+              "title_en": "Taxes & Duties"
+            },
+            {
+              "code": "2.6.08",
+              "title_fa": "بیمه تأمین اجتماعی",
+              "title_en": "Social Security Insurance"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "3",
+      "title_fa": "مشخصات فنی",
+      "title_en": "Technical Specifications",
+      "subcategories": [
+        {
+          "code": "3.1",
+          "title_fa": "مشخصات فنی عمومی",
+          "title_en": "General Technical Specifications",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "3.1.01",
+              "title_fa": "مشخصات فنی عمومی",
+              "title_en": "General Technical Specifications"
+            },
+            {
+              "code": "3.1.02",
+              "title_fa": "الزامات فنی پروژه",
+              "title_en": "Project Technical Requirements"
+            },
+            {
+              "code": "3.1.03",
+              "title_fa": "الزامات مصالح",
+              "title_en": "Material Requirements"
+            },
+            {
+              "code": "3.1.04",
+              "title_fa": "الزامات اجرا",
+              "title_en": "Construction Requirements"
+            },
+            {
+              "code": "3.1.05",
+              "title_fa": "الزامات نصب",
+              "title_en": "Installation Requirements"
+            },
+            {
+              "code": "3.1.06",
+              "title_fa": "الزامات تست",
+              "title_en": "Testing Requirements"
+            },
+            {
+              "code": "3.1.07",
+              "title_fa": "الزامات بازرسی",
+              "title_en": "Inspection Requirements"
+            },
+            {
+              "code": "3.1.08",
+              "title_fa": "الزامات تحویل",
+              "title_en": "Handover Requirements"
+            }
+          ]
+        },
+        {
+          "code": "3.2",
+          "title_fa": "مشخصات فنی خصوصی",
+          "title_en": "Particular Technical Specifications",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "3.2.01",
+              "title_fa": "مشخصات فنی خصوصی پروژه",
+              "title_en": "Particular Technical Specifications"
+            },
+            {
+              "code": "3.2.02",
+              "title_fa": "مشخصات مصالح خاص",
+              "title_en": "Special Material Specifications"
+            },
+            {
+              "code": "3.2.03",
+              "title_fa": "تجهیزات خاص",
+              "title_en": "Special Equipment Requirements"
+            },
+            {
+              "code": "3.2.04",
+              "title_fa": "روش‌های خاص اجرا",
+              "title_en": "Special Construction Requirements"
+            }
+          ]
+        },
+        {
+          "code": "3.3",
+          "title_fa": "روش‌های اجرایی",
+          "title_en": "Method Statements",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "3.3.01",
+              "title_fa": "روش اجرای کار",
+              "title_en": "Method Statement"
+            },
+            {
+              "code": "3.3.02",
+              "title_fa": "روش بتن‌ریزی",
+              "title_en": "Concrete Pouring Method"
+            },
+            {
+              "code": "3.3.03",
+              "title_fa": "روش خاکبرداری",
+              "title_en": "Excavation Method"
+            },
+            {
+              "code": "3.3.04",
+              "title_fa": "روش نصب",
+              "title_en": "Installation Method"
+            },
+            {
+              "code": "3.3.05",
+              "title_fa": "روش جوشکاری",
+              "title_en": "Welding Procedure"
+            },
+            {
+              "code": "3.3.06",
+              "title_fa": "روش تست",
+              "title_en": "Testing Procedure"
+            },
+            {
+              "code": "3.3.07",
+              "title_fa": "روش راه‌اندازی",
+              "title_en": "Commissioning Procedure"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "4",
+      "title_fa": "نقشه‌ها و مدارک طراحی",
+      "title_en": "Drawings & Design Documents",
+      "subcategories": [
+        {
+          "code": "4.1",
+          "title_fa": "نقشه‌های معماری",
+          "title_en": "Architectural Drawings",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "4.1.01",
+              "title_fa": "پلان‌ها",
+              "title_en": "Plans"
+            },
+            {
+              "code": "4.1.02",
+              "title_fa": "نماها",
+              "title_en": "Elevations"
+            },
+            {
+              "code": "4.1.03",
+              "title_fa": "مقاطع",
+              "title_en": "Sections"
+            },
+            {
+              "code": "4.1.04",
+              "title_fa": "دیتیل‌های معماری",
+              "title_en": "Architectural Details"
+            },
+            {
+              "code": "4.1.05",
+              "title_fa": "جدول نازک‌کاری",
+              "title_en": "Finish Schedule"
+            },
+            {
+              "code": "4.1.06",
+              "title_fa": "جدول در و پنجره",
+              "title_en": "Door & Window Schedule"
+            }
+          ]
+        },
+        {
+          "code": "4.2",
+          "title_fa": "نقشه‌های سازه",
+          "title_en": "Structural Drawings",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "4.2.01",
+              "title_fa": "نقشه فونداسیون",
+              "title_en": "Foundation Drawings"
+            },
+            {
+              "code": "4.2.02",
+              "title_fa": "نقشه ستون‌ها",
+              "title_en": "Column Drawings"
+            },
+            {
+              "code": "4.2.03",
+              "title_fa": "نقشه تیرها",
+              "title_en": "Beam Drawings"
+            },
+            {
+              "code": "4.2.04",
+              "title_fa": "نقشه سقف‌ها",
+              "title_en": "Slab Drawings"
+            },
+            {
+              "code": "4.2.05",
+              "title_fa": "نقشه دیوارهای برشی",
+              "title_en": "Shear Wall Drawings"
+            },
+            {
+              "code": "4.2.06",
+              "title_fa": "نقشه آرماتوربندی",
+              "title_en": "Reinforcement Drawings"
+            },
+            {
+              "code": "4.2.07",
+              "title_fa": "نقشه سازه فولادی",
+              "title_en": "Steel Structure Drawings"
+            },
+            {
+              "code": "4.2.08",
+              "title_fa": "نقشه اتصالات",
+              "title_en": "Connection Drawings"
+            }
+          ]
+        },
+        {
+          "code": "4.3",
+          "title_fa": "نقشه‌های مکانیکی",
+          "title_en": "Mechanical Drawings",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "4.3.01",
+              "title_fa": "تهویه مطبوع",
+              "title_en": "HVAC Drawings"
+            },
+            {
+              "code": "4.3.02",
+              "title_fa": "لوله‌کشی",
+              "title_en": "Plumbing Drawings"
+            },
+            {
+              "code": "4.3.03",
+              "title_fa": "آب و فاضلاب",
+              "title_en": "Water & Drainage Drawings"
+            },
+            {
+              "code": "4.3.04",
+              "title_fa": "آتش‌نشانی",
+              "title_en": "Fire Fighting Drawings"
+            },
+            {
+              "code": "4.3.05",
+              "title_fa": "تجهیزات مکانیکی",
+              "title_en": "Mechanical Equipment Drawings"
+            },
+            {
+              "code": "4.3.06",
+              "title_fa": "آسانسور",
+              "title_en": "Elevator Drawings"
+            }
+          ]
+        },
+        {
+          "code": "4.4",
+          "title_fa": "نقشه‌های الکتریکی",
+          "title_en": "Electrical Drawings",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "4.4.01",
+              "title_fa": "برق قدرت",
+              "title_en": "Power Drawings"
+            },
+            {
+              "code": "4.4.02",
+              "title_fa": "روشنایی",
+              "title_en": "Lighting Drawings"
+            },
+            {
+              "code": "4.4.03",
+              "title_fa": "تابلوهای برق",
+              "title_en": "Electrical Panel Drawings"
+            },
+            {
+              "code": "4.4.04",
+              "title_fa": "کابل‌کشی",
+              "title_en": "Cable Layouts"
+            },
+            {
+              "code": "4.4.05",
+              "title_fa": "ارتینگ",
+              "title_en": "Earthing Drawings"
+            },
+            {
+              "code": "4.4.06",
+              "title_fa": "صاعقه‌گیر",
+              "title_en": "Lightning Protection Drawings"
+            },
+            {
+              "code": "4.4.07",
+              "title_fa": "اعلام حریق",
+              "title_en": "Fire Alarm Drawings"
+            },
+            {
+              "code": "4.4.08",
+              "title_fa": "دوربین مداربسته",
+              "title_en": "CCTV Drawings"
+            },
+            {
+              "code": "4.4.09",
+              "title_fa": "شبکه و مخابرات",
+              "title_en": "Data & Telecommunication Drawings"
+            }
+          ]
+        },
+        {
+          "code": "4.5",
+          "title_fa": "نقشه‌های سایت و محوطه",
+          "title_en": "Site & External Works Drawings",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "4.5.01",
+              "title_fa": "پلان سایت",
+              "title_en": "Site Plan"
+            },
+            {
+              "code": "4.5.02",
+              "title_fa": "نقشه توپوگرافی",
+              "title_en": "Topographic Plan"
+            },
+            {
+              "code": "4.5.03",
+              "title_fa": "نقشه محوطه",
+              "title_en": "External Works Plan"
+            },
+            {
+              "code": "4.5.04",
+              "title_fa": "نقشه راه و دسترسی",
+              "title_en": "Road & Access Plan"
+            },
+            {
+              "code": "4.5.05",
+              "title_fa": "نقشه زهکشی",
+              "title_en": "Drainage Plan"
+            },
+            {
+              "code": "4.5.06",
+              "title_fa": "نقشه فضای سبز",
+              "title_en": "Landscape Plan"
+            },
+            {
+              "code": "4.5.07",
+              "title_fa": "نقشه تأسیسات زیرزمینی",
+              "title_en": "Underground Utilities Plan"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "5",
+      "title_fa": "متره، برآورد و قیمت‌گذاری",
+      "title_en": "Quantity Surveying, BOQ & Cost",
+      "subcategories": [
+        {
+          "code": "5.1",
+          "title_fa": "مقادیر و متره",
+          "title_en": "Quantities & Measurement",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "5.1.01",
+              "title_fa": "فهرست مقادیر",
+              "title_en": "Bill of Quantities (BOQ)"
+            },
+            {
+              "code": "5.1.02",
+              "title_fa": "متره",
+              "title_en": "Quantity Take-Off"
+            },
+            {
+              "code": "5.1.03",
+              "title_fa": "جدول مقادیر",
+              "title_en": "Quantity Schedule"
+            },
+            {
+              "code": "5.1.04",
+              "title_fa": "ریزمتره",
+              "title_en": "Detailed Quantity Take-Off"
+            },
+            {
+              "code": "5.1.05",
+              "title_fa": "مقادیر اولیه",
+              "title_en": "Tender Quantities"
+            },
+            {
+              "code": "5.1.06",
+              "title_fa": "مقادیر واقعی",
+              "title_en": "Actual Quantities"
+            }
+          ]
+        },
+        {
+          "code": "5.2",
+          "title_fa": "قیمت‌گذاری",
+          "title_en": "Pricing",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "5.2.01",
+              "title_fa": "فهرست‌بها",
+              "title_en": "Price List / Schedule of Rates"
+            },
+            {
+              "code": "5.2.02",
+              "title_fa": "قیمت پایه",
+              "title_en": "Base Price"
+            },
+            {
+              "code": "5.2.03",
+              "title_fa": "قیمت واحد",
+              "title_en": "Unit Rate"
+            },
+            {
+              "code": "5.2.04",
+              "title_fa": "تجزیه‌بهای واحد",
+              "title_en": "Unit Rate Analysis"
+            },
+            {
+              "code": "5.2.05",
+              "title_fa": "قیمت پیشنهادی",
+              "title_en": "Bid Price"
+            },
+            {
+              "code": "5.2.06",
+              "title_fa": "قیمت کل",
+              "title_en": "Total Bid Price"
+            },
+            {
+              "code": "5.2.07",
+              "title_fa": "اقلام ستاره‌دار",
+              "title_en": "Starred Items"
+            },
+            {
+              "code": "5.2.08",
+              "title_fa": "اقلام جدید",
+              "title_en": "New Items"
+            },
+            {
+              "code": "5.2.09",
+              "title_fa": "قیمت‌های جدید",
+              "title_en": "New Rates"
+            }
+          ]
+        },
+        {
+          "code": "5.3",
+          "title_fa": "هزینه‌های پروژه",
+          "title_en": "Project Costs",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "5.3.01",
+              "title_fa": "هزینه مصالح",
+              "title_en": "Material Cost"
+            },
+            {
+              "code": "5.3.02",
+              "title_fa": "هزینه نیروی انسانی",
+              "title_en": "Labor Cost"
+            },
+            {
+              "code": "5.3.03",
+              "title_fa": "هزینه ماشین‌آلات",
+              "title_en": "Equipment Cost"
+            },
+            {
+              "code": "5.3.04",
+              "title_fa": "هزینه حمل",
+              "title_en": "Transportation Cost"
+            },
+            {
+              "code": "5.3.05",
+              "title_fa": "هزینه تجهیز کارگاه",
+              "title_en": "Mobilization Cost"
+            },
+            {
+              "code": "5.3.06",
+              "title_fa": "هزینه برچیدن کارگاه",
+              "title_en": "Demobilization Cost"
+            },
+            {
+              "code": "5.3.07",
+              "title_fa": "هزینه‌های بالاسری",
+              "title_en": "Overhead Costs"
+            },
+            {
+              "code": "5.3.08",
+              "title_fa": "هزینه‌های موقت",
+              "title_en": "Temporary Works Costs"
+            },
+            {
+              "code": "5.3.09",
+              "title_fa": "هزینه آزمایش‌ها",
+              "title_en": "Testing Costs"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "6",
+      "title_fa": "مطالعات سایت، ژئوتکنیک و نقشه‌برداری",
+      "title_en": "Site Investigation, Geotechnical & Survey",
+      "subcategories": [
+        {
+          "code": "6.1",
+          "title_fa": "مطالعات ژئوتکنیک",
+          "title_en": "Geotechnical Investigation",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "6.1.01",
+              "title_fa": "گزارش ژئوتکنیک",
+              "title_en": "Geotechnical Report"
+            },
+            {
+              "code": "6.1.02",
+              "title_fa": "مکانیک خاک",
+              "title_en": "Soil Mechanics"
+            },
+            {
+              "code": "6.1.03",
+              "title_fa": "حفاری گمانه",
+              "title_en": "Borehole Investigation"
+            },
+            {
+              "code": "6.1.04",
+              "title_fa": "لاگ گمانه",
+              "title_en": "Borehole Log"
+            },
+            {
+              "code": "6.1.05",
+              "title_fa": "آزمایش نفوذ استاندارد",
+              "title_en": "Standard Penetration Test (SPT)"
+            },
+            {
+              "code": "6.1.06",
+              "title_fa": "آزمایش‌های آزمایشگاهی خاک",
+              "title_en": "Soil Laboratory Tests"
+            },
+            {
+              "code": "6.1.07",
+              "title_fa": "ظرفیت باربری",
+              "title_en": "Bearing Capacity"
+            },
+            {
+              "code": "6.1.08",
+              "title_fa": "نشست",
+              "title_en": "Settlement"
+            },
+            {
+              "code": "6.1.09",
+              "title_fa": "سطح آب زیرزمینی",
+              "title_en": "Groundwater Level"
+            },
+            {
+              "code": "6.1.10",
+              "title_fa": "فشار آب زیرزمینی",
+              "title_en": "Groundwater Pressure"
+            }
+          ]
+        },
+        {
+          "code": "6.2",
+          "title_fa": "مطالعات زمین و محیط",
+          "title_en": "Geological & Environmental Investigation",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "6.2.01",
+              "title_fa": "گزارش زمین‌شناسی",
+              "title_en": "Geological Report"
+            },
+            {
+              "code": "6.2.02",
+              "title_fa": "مطالعات هیدرولوژی",
+              "title_en": "Hydrological Study"
+            },
+            {
+              "code": "6.2.03",
+              "title_fa": "مطالعات هیدروژئولوژی",
+              "title_en": "Hydrogeological Study"
+            },
+            {
+              "code": "6.2.04",
+              "title_fa": "مطالعات آب‌های سطحی",
+              "title_en": "Surface Water Study"
+            },
+            {
+              "code": "6.2.05",
+              "title_fa": "مطالعات آلودگی خاک",
+              "title_en": "Soil Contamination Study"
+            }
+          ]
+        },
+        {
+          "code": "6.3",
+          "title_fa": "نقشه‌برداری",
+          "title_en": "Survey",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "6.3.01",
+              "title_fa": "نقشه‌برداری اولیه",
+              "title_en": "Initial Survey"
+            },
+            {
+              "code": "6.3.02",
+              "title_fa": "نقشه توپوگرافی",
+              "title_en": "Topographic Survey"
+            },
+            {
+              "code": "6.3.03",
+              "title_fa": "پیاده‌سازی محورها",
+              "title_en": "Setting Out"
+            },
+            {
+              "code": "6.3.04",
+              "title_fa": "کنترل تراز",
+              "title_en": "Level Control"
+            },
+            {
+              "code": "6.3.05",
+              "title_fa": "نقاط مبنا",
+              "title_en": "Benchmarks"
+            },
+            {
+              "code": "6.3.06",
+              "title_fa": "مختصات پروژه",
+              "title_en": "Project Coordinates"
+            },
+            {
+              "code": "6.3.07",
+              "title_fa": "برداشت وضع موجود",
+              "title_en": "Existing Condition Survey"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "7",
+      "title_fa": "اطلاعات و شرایط موجود سایت",
+      "title_en": "Existing Site Conditions",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "7.01",
+          "title_fa": "گزارش بازدید سایت",
+          "title_en": "Site Visit Report"
+        },
+        {
+          "code": "7.02",
+          "title_fa": "وضعیت موجود زمین",
+          "title_en": "Existing Site Conditions"
+        },
+        {
+          "code": "7.03",
+          "title_fa": "عکس‌های سایت",
+          "title_en": "Site Photographs"
+        },
+        {
+          "code": "7.04",
+          "title_fa": "فیلم بازدید",
+          "title_en": "Site Visit Video"
+        },
+        {
+          "code": "7.05",
+          "title_fa": "ساختمان‌های موجود",
+          "title_en": "Existing Structures"
+        },
+        {
+          "code": "7.06",
+          "title_fa": "ساختمان‌های مجاور",
+          "title_en": "Adjacent Buildings"
+        },
+        {
+          "code": "7.07",
+          "title_fa": "تأسیسات موجود",
+          "title_en": "Existing Utilities"
+        },
+        {
+          "code": "7.08",
+          "title_fa": "خطوط برق موجود",
+          "title_en": "Existing Electrical Lines"
+        },
+        {
+          "code": "7.09",
+          "title_fa": "خطوط آب موجود",
+          "title_en": "Existing Water Lines"
+        },
+        {
+          "code": "7.10",
+          "title_fa": "خطوط فاضلاب موجود",
+          "title_en": "Existing Sewer Lines"
+        },
+        {
+          "code": "7.11",
+          "title_fa": "خطوط گاز موجود",
+          "title_en": "Existing Gas Lines"
+        },
+        {
+          "code": "7.12",
+          "title_fa": "خطوط مخابرات",
+          "title_en": "Existing Telecommunication Lines"
+        },
+        {
+          "code": "7.13",
+          "title_fa": "مسیرهای دسترسی",
+          "title_en": "Access Routes"
+        },
+        {
+          "code": "7.14",
+          "title_fa": "محدودیت‌های دسترسی",
+          "title_en": "Access Constraints"
+        },
+        {
+          "code": "7.15",
+          "title_fa": "محدودیت‌های سایت",
+          "title_en": "Site Constraints"
+        },
+        {
+          "code": "7.16",
+          "title_fa": "شرایط اقلیمی",
+          "title_en": "Climatic Conditions"
+        }
+      ]
+    },
+    {
+      "code": "8",
+      "title_fa": "کارهای خاکی و زیرسازی",
+      "title_en": "Earthworks & Site Preparation",
+      "subcategories": [
+        {
+          "code": "8.1",
+          "title_fa": "پایدارسازی گود و سازه نگهبان",
+          "title_en": "Excavation Support & Retaining Systems",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "8.1.01",
+              "title_fa": "سازه نگهبان",
+              "title_en": "Retaining Structure"
+            },
+            {
+              "code": "8.1.02",
+              "title_fa": "شمع نگهبان",
+              "title_en": "Soldier Piles"
+            },
+            {
+              "code": "8.1.03",
+              "title_fa": "نیلینگ",
+              "title_en": "Soil Nailing"
+            },
+            {
+              "code": "8.1.04",
+              "title_fa": "انکراژ",
+              "title_en": "Ground Anchoring"
+            },
+            {
+              "code": "8.1.05",
+              "title_fa": "دیوار دیافراگمی",
+              "title_en": "Diaphragm Wall"
+            },
+            {
+              "code": "8.1.06",
+              "title_fa": "شمع‌های سکانتی",
+              "title_en": "Secant Piles"
+            },
+            {
+              "code": "8.1.07",
+              "title_fa": "مهاربندی",
+              "title_en": "Bracing"
+            },
+            {
+              "code": "8.1.08",
+              "title_fa": "پایدارسازی شیب",
+              "title_en": "Slope Stabilization"
+            }
+          ]
+        },
+        {
+          "code": "8.2",
+          "title_fa": "آب و زهکشی",
+          "title_en": "Dewatering & Drainage",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "8.2.01",
+              "title_fa": "آبکشی",
+              "title_en": "Dewatering"
+            },
+            {
+              "code": "8.2.02",
+              "title_fa": "پمپاژ آب زیرزمینی",
+              "title_en": "Groundwater Pumping"
+            },
+            {
+              "code": "8.2.03",
+              "title_fa": "زهکشی",
+              "title_en": "Drainage"
+            },
+            {
+              "code": "8.2.04",
+              "title_fa": "کانال زهکشی",
+              "title_en": "Drainage Channel"
+            },
+            {
+              "code": "8.2.05",
+              "title_fa": "کنترل آب سطحی",
+              "title_en": "Surface Water Control"
+            }
+          ]
+        }
+      ],
+      "topics": [
+        {
+          "code": "8.01",
+          "title_fa": "خاکبرداری",
+          "title_en": "Excavation"
+        },
+        {
+          "code": "8.02",
+          "title_fa": "گودبرداری",
+          "title_en": "Bulk Excavation"
+        },
+        {
+          "code": "8.03",
+          "title_fa": "خاکریزی",
+          "title_en": "Embankment / Filling"
+        },
+        {
+          "code": "8.04",
+          "title_fa": "تسطیح",
+          "title_en": "Grading"
+        },
+        {
+          "code": "8.05",
+          "title_fa": "شیب‌بندی",
+          "title_en": "Slope Grading"
+        },
+        {
+          "code": "8.06",
+          "title_fa": "تراکم خاک",
+          "title_en": "Soil Compaction"
+        },
+        {
+          "code": "8.07",
+          "title_fa": "لایه‌گذاری",
+          "title_en": "Layering"
+        },
+        {
+          "code": "8.08",
+          "title_fa": "حمل خاک",
+          "title_en": "Soil Hauling"
+        },
+        {
+          "code": "8.09",
+          "title_fa": "دفع خاک",
+          "title_en": "Spoil Disposal"
+        },
+        {
+          "code": "8.10",
+          "title_fa": "خاک مناسب و نامناسب",
+          "title_en": "Suitable / Unsuitable Soil"
+        },
+        {
+          "code": "8.11",
+          "title_fa": "آماده‌سازی بستر",
+          "title_en": "Subgrade Preparation"
+        },
+        {
+          "code": "8.12",
+          "title_fa": "تثبیت خاک",
+          "title_en": "Soil Stabilization"
+        }
+      ]
+    },
+    {
+      "code": "9",
+      "title_fa": "فونداسیون، سازه و بتن",
+      "title_en": "Foundations, Structures & Concrete",
+      "subcategories": [
+        {
+          "code": "9.1",
+          "title_fa": "فونداسیون",
+          "title_en": "Foundations",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "9.1.01",
+              "title_fa": "بتن مگر",
+              "title_en": "Lean Concrete"
+            },
+            {
+              "code": "9.1.02",
+              "title_fa": "فونداسیون منفرد",
+              "title_en": "Isolated Foundation"
+            },
+            {
+              "code": "9.1.03",
+              "title_fa": "فونداسیون نواری",
+              "title_en": "Strip Foundation"
+            },
+            {
+              "code": "9.1.04",
+              "title_fa": "فونداسیون گسترده",
+              "title_en": "Raft Foundation"
+            },
+            {
+              "code": "9.1.05",
+              "title_fa": "شمع",
+              "title_en": "Pile Foundation"
+            },
+            {
+              "code": "9.1.06",
+              "title_fa": "کلاف و شناژ",
+              "title_en": "Foundation Tie Beam"
+            }
+          ]
+        },
+        {
+          "code": "9.2",
+          "title_fa": "آرماتور و فولاد",
+          "title_en": "Reinforcement",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "9.2.01",
+              "title_fa": "آرماتوربندی",
+              "title_en": "Reinforcement"
+            },
+            {
+              "code": "9.2.02",
+              "title_fa": "برش میلگرد",
+              "title_en": "Rebar Cutting"
+            },
+            {
+              "code": "9.2.03",
+              "title_fa": "خم‌کاری میلگرد",
+              "title_en": "Rebar Bending"
+            },
+            {
+              "code": "9.2.04",
+              "title_fa": "نصب میلگرد",
+              "title_en": "Rebar Installation"
+            },
+            {
+              "code": "9.2.05",
+              "title_fa": "وصله میلگرد",
+              "title_en": "Rebar Splicing"
+            },
+            {
+              "code": "9.2.06",
+              "title_fa": "کاور بتن",
+              "title_en": "Concrete Cover"
+            }
+          ]
+        },
+        {
+          "code": "9.3",
+          "title_fa": "قالب‌بندی",
+          "title_en": "Formwork",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "9.3.01",
+              "title_fa": "قالب چوبی",
+              "title_en": "Timber Formwork"
+            },
+            {
+              "code": "9.3.02",
+              "title_fa": "قالب فلزی",
+              "title_en": "Steel Formwork"
+            },
+            {
+              "code": "9.3.03",
+              "title_fa": "قالب مدولار",
+              "title_en": "Modular Formwork"
+            },
+            {
+              "code": "9.3.04",
+              "title_fa": "قالب لغزنده",
+              "title_en": "Slip Formwork"
+            },
+            {
+              "code": "9.3.05",
+              "title_fa": "داربست",
+              "title_en": "Scaffolding"
+            }
+          ]
+        },
+        {
+          "code": "9.4",
+          "title_fa": "بتن",
+          "title_en": "Concrete",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "9.4.01",
+              "title_fa": "بتن‌ریزی",
+              "title_en": "Concrete Pouring"
+            },
+            {
+              "code": "9.4.02",
+              "title_fa": "بتن آماده",
+              "title_en": "Ready-Mix Concrete"
+            },
+            {
+              "code": "9.4.03",
+              "title_fa": "پمپاژ بتن",
+              "title_en": "Concrete Pumping"
+            },
+            {
+              "code": "9.4.04",
+              "title_fa": "ویبره بتن",
+              "title_en": "Concrete Vibration"
+            },
+            {
+              "code": "9.4.05",
+              "title_fa": "عمل‌آوری بتن",
+              "title_en": "Concrete Curing"
+            },
+            {
+              "code": "9.4.06",
+              "title_fa": "درزهای بتن",
+              "title_en": "Concrete Joints"
+            },
+            {
+              "code": "9.4.07",
+              "title_fa": "بتن‌ریزی در هوای گرم",
+              "title_en": "Hot Weather Concreting"
+            },
+            {
+              "code": "9.4.08",
+              "title_fa": "بتن‌ریزی در هوای سرد",
+              "title_en": "Cold Weather Concreting"
+            }
+          ]
+        },
+        {
+          "code": "9.5",
+          "title_fa": "آزمایش بتن",
+          "title_en": "Concrete Testing",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "9.5.01",
+              "title_fa": "آزمایش اسلامپ",
+              "title_en": "Slump Test"
+            },
+            {
+              "code": "9.5.02",
+              "title_fa": "نمونه‌گیری بتن",
+              "title_en": "Concrete Sampling"
+            },
+            {
+              "code": "9.5.03",
+              "title_fa": "مقاومت فشاری",
+              "title_en": "Compressive Strength"
+            },
+            {
+              "code": "9.5.04",
+              "title_fa": "مغزه‌گیری",
+              "title_en": "Core Testing"
+            },
+            {
+              "code": "9.5.05",
+              "title_fa": "آزمایش بتن تازه",
+              "title_en": "Fresh Concrete Testing"
+            }
+          ]
+        },
+        {
+          "code": "9.6",
+          "title_fa": "سازه فولادی",
+          "title_en": "Steel Structures",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "9.6.01",
+              "title_fa": "تیر و ستون فولادی",
+              "title_en": "Steel Beams & Columns"
+            },
+            {
+              "code": "9.6.02",
+              "title_fa": "اتصالات پیچی",
+              "title_en": "Bolted Connections"
+            },
+            {
+              "code": "9.6.03",
+              "title_fa": "اتصالات جوشی",
+              "title_en": "Welded Connections"
+            },
+            {
+              "code": "9.6.04",
+              "title_fa": "ساخت سازه فولادی",
+              "title_en": "Steel Fabrication"
+            },
+            {
+              "code": "9.6.05",
+              "title_fa": "نصب سازه فولادی",
+              "title_en": "Steel Erection"
+            },
+            {
+              "code": "9.6.06",
+              "title_fa": "تست جوش",
+              "title_en": "Welding Inspection"
+            },
+            {
+              "code": "9.6.07",
+              "title_fa": "تست غیرمخرب",
+              "title_en": "Non-Destructive Testing (NDT)"
+            },
+            {
+              "code": "9.6.08",
+              "title_fa": "پوشش ضدخوردگی",
+              "title_en": "Corrosion Protection"
+            },
+            {
+              "code": "9.6.09",
+              "title_fa": "پوشش ضدحریق",
+              "title_en": "Fire Protection Coating"
+            }
+          ]
+        },
+        {
+          "code": "9.7",
+          "title_fa": "سازه‌های خاص",
+          "title_en": "Special Structures",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "9.7.01",
+              "title_fa": "سازه پیش‌ساخته",
+              "title_en": "Precast Structure"
+            },
+            {
+              "code": "9.7.02",
+              "title_fa": "سازه پیش‌تنیده",
+              "title_en": "Prestressed Structure"
+            },
+            {
+              "code": "9.7.03",
+              "title_fa": "سازه پس‌تنیده",
+              "title_en": "Post-Tensioned Structure"
+            },
+            {
+              "code": "9.7.04",
+              "title_fa": "سازه‌های فضاکار",
+              "title_en": "Space Frame"
+            },
+            {
+              "code": "9.7.05",
+              "title_fa": "سازه‌های کابلی",
+              "title_en": "Cable Structures"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "10",
+      "title_fa": "معماری و نازک‌کاری",
+      "title_en": "Architecture & Finishing Works",
+      "subcategories": [
+        {
+          "code": "10.1",
+          "title_fa": "دیوار و مصالح بنایی",
+          "title_en": "Walls & Masonry",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "10.1.01",
+              "title_fa": "دیوارچینی",
+              "title_en": "Masonry"
+            },
+            {
+              "code": "10.1.02",
+              "title_fa": "آجرچینی",
+              "title_en": "Brickwork"
+            },
+            {
+              "code": "10.1.03",
+              "title_fa": "بلوک‌چینی",
+              "title_en": "Blockwork"
+            },
+            {
+              "code": "10.1.04",
+              "title_fa": "دیوار خشک",
+              "title_en": "Drywall"
+            },
+            {
+              "code": "10.1.05",
+              "title_fa": "پارتیشن",
+              "title_en": "Partitions"
+            },
+            {
+              "code": "10.1.06",
+              "title_fa": "اندود",
+              "title_en": "Plastering"
+            },
+            {
+              "code": "10.1.07",
+              "title_fa": "گچ‌کاری",
+              "title_en": "Gypsum Plastering"
+            }
+          ]
+        },
+        {
+          "code": "10.2",
+          "title_fa": "کف",
+          "title_en": "Flooring",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "10.2.01",
+              "title_fa": "سرامیک",
+              "title_en": "Ceramic Tile"
+            },
+            {
+              "code": "10.2.02",
+              "title_fa": "سنگ",
+              "title_en": "Stone Flooring"
+            },
+            {
+              "code": "10.2.03",
+              "title_fa": "پارکت",
+              "title_en": "Parquet"
+            },
+            {
+              "code": "10.2.04",
+              "title_fa": "کف‌پوش",
+              "title_en": "Floor Covering"
+            },
+            {
+              "code": "10.2.05",
+              "title_fa": "کف صنعتی",
+              "title_en": "Industrial Flooring"
+            },
+            {
+              "code": "10.2.06",
+              "title_fa": "کف اپوکسی",
+              "title_en": "Epoxy Flooring"
+            }
+          ]
+        },
+        {
+          "code": "10.3",
+          "title_fa": "سقف و دیوار",
+          "title_en": "Ceilings & Walls",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "10.3.01",
+              "title_fa": "سقف کاذب",
+              "title_en": "False Ceiling"
+            },
+            {
+              "code": "10.3.02",
+              "title_fa": "پانل سقفی",
+              "title_en": "Ceiling Panels"
+            },
+            {
+              "code": "10.3.03",
+              "title_fa": "دیوارپوش",
+              "title_en": "Wall Cladding"
+            },
+            {
+              "code": "10.3.04",
+              "title_fa": "رنگ‌آمیزی",
+              "title_en": "Painting"
+            },
+            {
+              "code": "10.3.05",
+              "title_fa": "پوشش دکوراتیو",
+              "title_en": "Decorative Finishes"
+            }
+          ]
+        },
+        {
+          "code": "10.4",
+          "title_fa": "نما و بازشوها",
+          "title_en": "Facade, Doors & Windows",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "10.4.01",
+              "title_fa": "نمای ساختمان",
+              "title_en": "Building Facade"
+            },
+            {
+              "code": "10.4.02",
+              "title_fa": "سنگ نما",
+              "title_en": "Stone Facade"
+            },
+            {
+              "code": "10.4.03",
+              "title_fa": "نمای شیشه‌ای",
+              "title_en": "Glass Facade"
+            },
+            {
+              "code": "10.4.04",
+              "title_fa": "درب",
+              "title_en": "Doors"
+            },
+            {
+              "code": "10.4.05",
+              "title_fa": "پنجره",
+              "title_en": "Windows"
+            },
+            {
+              "code": "10.4.06",
+              "title_fa": "شیشه",
+              "title_en": "Glazing"
+            },
+            {
+              "code": "10.4.07",
+              "title_fa": "کرتین‌وال",
+              "title_en": "Curtain Wall"
+            }
+          ]
+        },
+        {
+          "code": "10.5",
+          "title_fa": "عایق‌کاری",
+          "title_en": "Insulation & Waterproofing",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "10.5.01",
+              "title_fa": "عایق رطوبتی",
+              "title_en": "Waterproofing"
+            },
+            {
+              "code": "10.5.02",
+              "title_fa": "عایق حرارتی",
+              "title_en": "Thermal Insulation"
+            },
+            {
+              "code": "10.5.03",
+              "title_fa": "عایق صوتی",
+              "title_en": "Acoustic Insulation"
+            },
+            {
+              "code": "10.5.04",
+              "title_fa": "آب‌بندی",
+              "title_en": "Sealing"
+            },
+            {
+              "code": "10.5.05",
+              "title_fa": "درزگیر",
+              "title_en": "Sealant"
+            },
+            {
+              "code": "10.5.06",
+              "title_fa": "درز انبساط",
+              "title_en": "Expansion Joint"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "11",
+      "title_fa": "تأسیسات مکانیکی",
+      "title_en": "Mechanical Services",
+      "subcategories": [
+        {
+          "code": "11.1",
+          "title_fa": "تهویه مطبوع",
+          "title_en": "HVAC",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "11.1.01",
+              "title_fa": "چیلر",
+              "title_en": "Chiller"
+            },
+            {
+              "code": "11.1.02",
+              "title_fa": "بویلر",
+              "title_en": "Boiler"
+            },
+            {
+              "code": "11.1.03",
+              "title_fa": "هواساز",
+              "title_en": "Air Handling Unit (AHU)"
+            },
+            {
+              "code": "11.1.04",
+              "title_fa": "فن‌کویل",
+              "title_en": "Fan Coil Unit (FCU)"
+            },
+            {
+              "code": "11.1.05",
+              "title_fa": "برج خنک‌کن",
+              "title_en": "Cooling Tower"
+            },
+            {
+              "code": "11.1.06",
+              "title_fa": "کانال‌کشی",
+              "title_en": "Ductwork"
+            },
+            {
+              "code": "11.1.07",
+              "title_fa": "تهویه",
+              "title_en": "Ventilation"
+            }
+          ]
+        },
+        {
+          "code": "11.2",
+          "title_fa": "لوله‌کشی",
+          "title_en": "Plumbing & Piping",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "11.2.01",
+              "title_fa": "آب سرد و گرم",
+              "title_en": "Cold & Hot Water"
+            },
+            {
+              "code": "11.2.02",
+              "title_fa": "فاضلاب",
+              "title_en": "Sewer / Drainage"
+            },
+            {
+              "code": "11.2.03",
+              "title_fa": "لوله‌کشی",
+              "title_en": "Piping"
+            },
+            {
+              "code": "11.2.04",
+              "title_fa": "شیرآلات",
+              "title_en": "Valves"
+            },
+            {
+              "code": "11.2.05",
+              "title_fa": "مخازن",
+              "title_en": "Water Tanks"
+            },
+            {
+              "code": "11.2.06",
+              "title_fa": "پمپ‌ها",
+              "title_en": "Pumps"
+            }
+          ]
+        },
+        {
+          "code": "11.3",
+          "title_fa": "آتش‌نشانی",
+          "title_en": "Fire Protection",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "11.3.01",
+              "title_fa": "اسپرینکلر",
+              "title_en": "Sprinkler System"
+            },
+            {
+              "code": "11.3.02",
+              "title_fa": "هیدرانت",
+              "title_en": "Hydrant System"
+            },
+            {
+              "code": "11.3.03",
+              "title_fa": "پمپ آتش‌نشانی",
+              "title_en": "Fire Pump"
+            },
+            {
+              "code": "11.3.04",
+              "title_fa": "مخزن آتش‌نشانی",
+              "title_en": "Fire Water Tank"
+            },
+            {
+              "code": "11.3.05",
+              "title_fa": "سیستم اطفای حریق",
+              "title_en": "Fire Suppression"
+            }
+          ]
+        },
+        {
+          "code": "11.4",
+          "title_fa": "تجهیزات مکانیکی",
+          "title_en": "Mechanical Equipment",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "11.4.01",
+              "title_fa": "کمپرسور",
+              "title_en": "Compressor"
+            },
+            {
+              "code": "11.4.02",
+              "title_fa": "پمپ صنعتی",
+              "title_en": "Industrial Pump"
+            },
+            {
+              "code": "11.4.03",
+              "title_fa": "تجهیزات دوار",
+              "title_en": "Rotating Equipment"
+            },
+            {
+              "code": "11.4.04",
+              "title_fa": "آسانسور",
+              "title_en": "Elevator"
+            },
+            {
+              "code": "11.4.05",
+              "title_fa": "پله برقی",
+              "title_en": "Escalator"
+            }
+          ]
+        },
+        {
+          "code": "11.5",
+          "title_fa": "سیستم‌های خاص",
+          "title_en": "Special Mechanical Systems",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "11.5.01",
+              "title_fa": "گاز",
+              "title_en": "Gas System"
+            },
+            {
+              "code": "11.5.02",
+              "title_fa": "گاز طبی",
+              "title_en": "Medical Gas"
+            },
+            {
+              "code": "11.5.03",
+              "title_fa": "هوای فشرده",
+              "title_en": "Compressed Air"
+            },
+            {
+              "code": "11.5.04",
+              "title_fa": "تجهیزات آشپزخانه صنعتی",
+              "title_en": "Commercial Kitchen Equipment"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "12",
+      "title_fa": "تأسیسات الکتریکی و جریان ضعیف",
+      "title_en": "Electrical & Low Voltage Systems",
+      "subcategories": [
+        {
+          "code": "12.1",
+          "title_fa": "برق قدرت",
+          "title_en": "Electrical Power",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "12.1.01",
+              "title_fa": "برق فشار متوسط",
+              "title_en": "Medium Voltage (MV)"
+            },
+            {
+              "code": "12.1.02",
+              "title_fa": "برق فشار ضعیف",
+              "title_en": "Low Voltage (LV)"
+            },
+            {
+              "code": "12.1.03",
+              "title_fa": "ترانسفورماتور",
+              "title_en": "Transformer"
+            },
+            {
+              "code": "12.1.04",
+              "title_fa": "تابلو برق",
+              "title_en": "Electrical Panel"
+            },
+            {
+              "code": "12.1.05",
+              "title_fa": "کابل‌کشی",
+              "title_en": "Cable Installation"
+            },
+            {
+              "code": "12.1.06",
+              "title_fa": "سینی کابل",
+              "title_en": "Cable Tray"
+            },
+            {
+              "code": "12.1.07",
+              "title_fa": "باسداکت",
+              "title_en": "Busduct"
+            },
+            {
+              "code": "12.1.08",
+              "title_fa": "دیزل ژنراتور",
+              "title_en": "Generator"
+            },
+            {
+              "code": "12.1.09",
+              "title_fa": "UPS",
+              "title_en": "Uninterruptible Power Supply"
+            }
+          ]
+        },
+        {
+          "code": "12.2",
+          "title_fa": "روشنایی",
+          "title_en": "Lighting",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "12.2.01",
+              "title_fa": "روشنایی داخلی",
+              "title_en": "Internal Lighting"
+            },
+            {
+              "code": "12.2.02",
+              "title_fa": "روشنایی خارجی",
+              "title_en": "External Lighting"
+            },
+            {
+              "code": "12.2.03",
+              "title_fa": "روشنایی اضطراری",
+              "title_en": "Emergency Lighting"
+            }
+          ]
+        },
+        {
+          "code": "12.3",
+          "title_fa": "حفاظت الکتریکی",
+          "title_en": "Electrical Protection",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "12.3.01",
+              "title_fa": "سیستم ارت",
+              "title_en": "Earthing / Grounding"
+            },
+            {
+              "code": "12.3.02",
+              "title_fa": "صاعقه‌گیر",
+              "title_en": "Lightning Protection"
+            },
+            {
+              "code": "12.3.03",
+              "title_fa": "حفاظت اضافه‌جریان",
+              "title_en": "Overcurrent Protection"
+            }
+          ]
+        },
+        {
+          "code": "12.4",
+          "title_fa": "جریان ضعیف",
+          "title_en": "ELV / Low Voltage Systems",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "12.4.01",
+              "title_fa": "اعلام حریق",
+              "title_en": "Fire Alarm"
+            },
+            {
+              "code": "12.4.02",
+              "title_fa": "دوربین مداربسته",
+              "title_en": "CCTV"
+            },
+            {
+              "code": "12.4.03",
+              "title_fa": "کنترل تردد",
+              "title_en": "Access Control"
+            },
+            {
+              "code": "12.4.04",
+              "title_fa": "شبکه",
+              "title_en": "Data Network"
+            },
+            {
+              "code": "12.4.05",
+              "title_fa": "مخابرات",
+              "title_en": "Telecommunication"
+            },
+            {
+              "code": "12.4.06",
+              "title_fa": "سیستم صوتی",
+              "title_en": "Public Address"
+            },
+            {
+              "code": "12.4.07",
+              "title_fa": "آنتن مرکزی",
+              "title_en": "MATV"
+            },
+            {
+              "code": "12.4.08",
+              "title_fa": "سیستم مدیریت ساختمان",
+              "title_en": "Building Management System (BMS)"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "13",
+      "title_fa": "راه، محوطه و روسازی",
+      "title_en": "Roads, External Works & Landscaping",
+      "subcategories": [
+        {
+          "code": "13.1",
+          "title_fa": "راهسازی",
+          "title_en": "Road Works",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "13.1.01",
+              "title_fa": "زیرسازی راه",
+              "title_en": "Road Subgrade"
+            },
+            {
+              "code": "13.1.02",
+              "title_fa": "اساس",
+              "title_en": "Base Course"
+            },
+            {
+              "code": "13.1.03",
+              "title_fa": "زیراساس",
+              "title_en": "Subbase"
+            },
+            {
+              "code": "13.1.04",
+              "title_fa": "روسازی",
+              "title_en": "Pavement"
+            },
+            {
+              "code": "13.1.05",
+              "title_fa": "آسفالت",
+              "title_en": "Asphalt"
+            },
+            {
+              "code": "13.1.06",
+              "title_fa": "بتن روسازی",
+              "title_en": "Concrete Pavement"
+            }
+          ]
+        },
+        {
+          "code": "13.2",
+          "title_fa": "محوطه",
+          "title_en": "External Works",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "13.2.01",
+              "title_fa": "جدول‌گذاری",
+              "title_en": "Kerb Works"
+            },
+            {
+              "code": "13.2.02",
+              "title_fa": "پیاده‌رو",
+              "title_en": "Sidewalk"
+            },
+            {
+              "code": "13.2.03",
+              "title_fa": "پارکینگ",
+              "title_en": "Parking Area"
+            },
+            {
+              "code": "13.2.04",
+              "title_fa": "مسیر دسترسی",
+              "title_en": "Access Road"
+            },
+            {
+              "code": "13.2.05",
+              "title_fa": "محوطه‌سازی",
+              "title_en": "Site Development"
+            }
+          ]
+        },
+        {
+          "code": "13.3",
+          "title_fa": "فضای سبز",
+          "title_en": "Landscaping",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "13.3.01",
+              "title_fa": "فضای سبز",
+              "title_en": "Landscaping"
+            },
+            {
+              "code": "13.3.02",
+              "title_fa": "کاشت گیاه",
+              "title_en": "Planting"
+            },
+            {
+              "code": "13.3.03",
+              "title_fa": "آبیاری",
+              "title_en": "Irrigation"
+            },
+            {
+              "code": "13.3.04",
+              "title_fa": "درختکاری",
+              "title_en": "Tree Planting"
+            },
+            {
+              "code": "13.3.05",
+              "title_fa": "مبلمان شهری",
+              "title_en": "Site Furniture"
+            }
+          ]
+        },
+        {
+          "code": "13.4",
+          "title_fa": "علائم و تجهیزات راه",
+          "title_en": "Road Furniture",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "13.4.01",
+              "title_fa": "علائم ترافیکی",
+              "title_en": "Traffic Signs"
+            },
+            {
+              "code": "13.4.02",
+              "title_fa": "خط‌کشی",
+              "title_en": "Road Markings"
+            },
+            {
+              "code": "13.4.03",
+              "title_fa": "گاردریل",
+              "title_en": "Guardrail"
+            },
+            {
+              "code": "13.4.04",
+              "title_fa": "روشنایی محوطه",
+              "title_en": "External Lighting"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "14",
+      "title_fa": "تخریب، پاکسازی و جابجایی تأسیسات",
+      "title_en": "Demolition, Clearance & Utility Relocation",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "14.01",
+          "title_fa": "تخریب سازه",
+          "title_en": "Structural Demolition"
+        },
+        {
+          "code": "14.02",
+          "title_fa": "تخریب جزئی",
+          "title_en": "Partial Demolition"
+        },
+        {
+          "code": "14.03",
+          "title_fa": "تخریب کامل",
+          "title_en": "Full Demolition"
+        },
+        {
+          "code": "14.04",
+          "title_fa": "جمع‌آوری نخاله",
+          "title_en": "Debris Removal"
+        },
+        {
+          "code": "14.05",
+          "title_fa": "پاکسازی سایت",
+          "title_en": "Site Clearance"
+        },
+        {
+          "code": "14.06",
+          "title_fa": "برچیدن تأسیسات موجود",
+          "title_en": "Existing Utility Removal"
+        },
+        {
+          "code": "14.07",
+          "title_fa": "جابجایی تأسیسات",
+          "title_en": "Utility Relocation"
+        },
+        {
+          "code": "14.08",
+          "title_fa": "جابجایی خطوط برق",
+          "title_en": "Electrical Utility Relocation"
+        },
+        {
+          "code": "14.09",
+          "title_fa": "جابجایی خطوط آب",
+          "title_en": "Water Utility Relocation"
+        },
+        {
+          "code": "14.10",
+          "title_fa": "جابجایی گاز",
+          "title_en": "Gas Utility Relocation"
+        },
+        {
+          "code": "14.11",
+          "title_fa": "جابجایی مخابرات",
+          "title_en": "Telecommunication Relocation"
+        },
+        {
+          "code": "14.12",
+          "title_fa": "مدیریت مواد خطرناک",
+          "title_en": "Hazardous Material Removal"
+        }
+      ]
+    },
+    {
+      "code": "15",
+      "title_fa": "تجهیز کارگاه و عملیات موقت",
+      "title_en": "Mobilization & Temporary Works",
+      "subcategories": [
+        {
+          "code": "15.1",
+          "title_fa": "تجهیز کارگاه",
+          "title_en": "Mobilization",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "15.1.01",
+              "title_fa": "طرح تجهیز کارگاه",
+              "title_en": "Mobilization Plan"
+            },
+            {
+              "code": "15.1.02",
+              "title_fa": "دفتر کارگاه",
+              "title_en": "Site Office"
+            },
+            {
+              "code": "15.1.03",
+              "title_fa": "انبار",
+              "title_en": "Storage Facilities"
+            },
+            {
+              "code": "15.1.04",
+              "title_fa": "محل استقرار کارکنان",
+              "title_en": "Worker Facilities"
+            },
+            {
+              "code": "15.1.05",
+              "title_fa": "حصارکشی",
+              "title_en": "Site Fencing"
+            },
+            {
+              "code": "15.1.06",
+              "title_fa": "نگهبانی",
+              "title_en": "Site Security"
+            },
+            {
+              "code": "15.1.07",
+              "title_fa": "تأسیسات موقت",
+              "title_en": "Temporary Utilities"
+            }
+          ]
+        },
+        {
+          "code": "15.2",
+          "title_fa": "عملیات موقت",
+          "title_en": "Temporary Works",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "15.2.01",
+              "title_fa": "برق موقت",
+              "title_en": "Temporary Electricity"
+            },
+            {
+              "code": "15.2.02",
+              "title_fa": "آب موقت",
+              "title_en": "Temporary Water"
+            },
+            {
+              "code": "15.2.03",
+              "title_fa": "فاضلاب موقت",
+              "title_en": "Temporary Drainage"
+            },
+            {
+              "code": "15.2.04",
+              "title_fa": "راه موقت",
+              "title_en": "Temporary Roads"
+            },
+            {
+              "code": "15.2.05",
+              "title_fa": "سازه موقت",
+              "title_en": "Temporary Structures"
+            },
+            {
+              "code": "15.2.06",
+              "title_fa": "داربست",
+              "title_en": "Scaffolding"
+            },
+            {
+              "code": "15.2.07",
+              "title_fa": "مسیر دسترسی موقت",
+              "title_en": "Temporary Access"
+            },
+            {
+              "code": "15.2.08",
+              "title_fa": "حفاظت موقت",
+              "title_en": "Temporary Protection"
+            }
+          ]
+        },
+        {
+          "code": "15.3",
+          "title_fa": "برچیدن کارگاه",
+          "title_en": "Demobilization",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "15.3.01",
+              "title_fa": "جمع‌آوری کارگاه",
+              "title_en": "Site Demobilization"
+            },
+            {
+              "code": "15.3.02",
+              "title_fa": "خروج تجهیزات",
+              "title_en": "Equipment Removal"
+            },
+            {
+              "code": "15.3.03",
+              "title_fa": "پاکسازی نهایی سایت",
+              "title_en": "Final Site Clearance"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "16",
+      "title_fa": "نقشه‌برداری، کنترل هندسی و کنترل ابعادی",
+      "title_en": "Survey & Dimensional Control",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "16.01",
+          "title_fa": "پیاده‌سازی",
+          "title_en": "Setting Out"
+        },
+        {
+          "code": "16.02",
+          "title_fa": "کنترل محور",
+          "title_en": "Gridline Control"
+        },
+        {
+          "code": "16.03",
+          "title_fa": "کنترل تراز",
+          "title_en": "Level Control"
+        },
+        {
+          "code": "16.04",
+          "title_fa": "کنترل شاقولی",
+          "title_en": "Verticality Control"
+        },
+        {
+          "code": "16.05",
+          "title_fa": "کنترل ابعاد",
+          "title_en": "Dimensional Control"
+        },
+        {
+          "code": "16.06",
+          "title_fa": "برداشت As-Built",
+          "title_en": "As-Built Survey"
+        },
+        {
+          "code": "16.07",
+          "title_fa": "نقشه‌برداری اجرایی",
+          "title_en": "Construction Survey"
+        }
+      ]
+    },
+    {
+      "code": "17",
+      "title_fa": "کنترل کیفیت و آزمایش‌ها",
+      "title_en": "Quality Assurance & Quality Control (QA/QC)",
+      "subcategories": [
+        {
+          "code": "17.1",
+          "title_fa": "سیستم کیفیت",
+          "title_en": "Quality Management",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "17.1.01",
+              "title_fa": "برنامه کیفیت",
+              "title_en": "Quality Plan"
+            },
+            {
+              "code": "17.1.02",
+              "title_fa": "طرح بازرسی و آزمون",
+              "title_en": "Inspection & Test Plan (ITP)"
+            },
+            {
+              "code": "17.1.03",
+              "title_fa": "روش بازرسی",
+              "title_en": "Inspection Procedure"
+            },
+            {
+              "code": "17.1.04",
+              "title_fa": "درخواست بازرسی",
+              "title_en": "Inspection Request (IR)"
+            },
+            {
+              "code": "17.1.05",
+              "title_fa": "تأیید مصالح",
+              "title_en": "Material Approval"
+            },
+            {
+              "code": "17.1.06",
+              "title_fa": "تأیید نمونه",
+              "title_en": "Sample Approval"
+            },
+            {
+              "code": "17.1.07",
+              "title_fa": "تأیید فروشنده",
+              "title_en": "Vendor Approval"
+            }
+          ]
+        },
+        {
+          "code": "17.2",
+          "title_fa": "عدم انطباق",
+          "title_en": "Non-Conformance",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "17.2.01",
+              "title_fa": "گزارش عدم انطباق",
+              "title_en": "Non-Conformance Report (NCR)"
+            },
+            {
+              "code": "17.2.02",
+              "title_fa": "اقدام اصلاحی",
+              "title_en": "Corrective Action"
+            },
+            {
+              "code": "17.2.03",
+              "title_fa": "اقدام پیشگیرانه",
+              "title_en": "Preventive Action"
+            },
+            {
+              "code": "17.2.04",
+              "title_fa": "رفع نقص",
+              "title_en": "Defect Rectification"
+            }
+          ]
+        },
+        {
+          "code": "17.3",
+          "title_fa": "آزمایش‌ها",
+          "title_en": "Testing",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "17.3.01",
+              "title_fa": "آزمایش خاک",
+              "title_en": "Soil Testing"
+            },
+            {
+              "code": "17.3.02",
+              "title_fa": "آزمایش بتن",
+              "title_en": "Concrete Testing"
+            },
+            {
+              "code": "17.3.03",
+              "title_fa": "آزمایش آسفالت",
+              "title_en": "Asphalt Testing"
+            },
+            {
+              "code": "17.3.04",
+              "title_fa": "آزمایش جوش",
+              "title_en": "Welding Testing"
+            },
+            {
+              "code": "17.3.05",
+              "title_fa": "تست غیرمخرب",
+              "title_en": "Non-Destructive Testing (NDT)"
+            },
+            {
+              "code": "17.3.06",
+              "title_fa": "تست مصالح",
+              "title_en": "Material Testing"
+            },
+            {
+              "code": "17.3.07",
+              "title_fa": "کالیبراسیون",
+              "title_en": "Calibration"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "18",
+      "title_fa": "تدارکات، خرید و زنجیره تأمین",
+      "title_en": "Procurement & Supply Chain",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "18.01",
+          "title_fa": "برنامه تأمین",
+          "title_en": "Procurement Plan"
+        },
+        {
+          "code": "18.02",
+          "title_fa": "خرید مصالح",
+          "title_en": "Material Procurement"
+        },
+        {
+          "code": "18.03",
+          "title_fa": "خرید تجهیزات",
+          "title_en": "Equipment Procurement"
+        },
+        {
+          "code": "18.04",
+          "title_fa": "تأمین‌کننده",
+          "title_en": "Supplier"
+        },
+        {
+          "code": "18.05",
+          "title_fa": "سازنده",
+          "title_en": "Manufacturer"
+        },
+        {
+          "code": "18.06",
+          "title_fa": "پیمانکار جزء",
+          "title_en": "Subcontractor"
+        },
+        {
+          "code": "18.07",
+          "title_fa": "ارزیابی تأمین‌کننده",
+          "title_en": "Supplier Evaluation"
+        },
+        {
+          "code": "18.08",
+          "title_fa": "ارزیابی پیمانکار جزء",
+          "title_en": "Subcontractor Evaluation"
+        },
+        {
+          "code": "18.09",
+          "title_fa": "سفارش خرید",
+          "title_en": "Purchase Order"
+        },
+        {
+          "code": "18.10",
+          "title_fa": "اقلام با زمان تأمین طولانی",
+          "title_en": "Long Lead Items"
+        },
+        {
+          "code": "18.11",
+          "title_fa": "حمل و نقل",
+          "title_en": "Transportation"
+        },
+        {
+          "code": "18.12",
+          "title_fa": "لجستیک",
+          "title_en": "Logistics"
+        },
+        {
+          "code": "18.13",
+          "title_fa": "ترخیص کالا",
+          "title_en": "Customs Clearance"
+        },
+        {
+          "code": "18.14",
+          "title_fa": "تحویل مصالح",
+          "title_en": "Material Delivery"
+        },
+        {
+          "code": "18.15",
+          "title_fa": "انبارداری",
+          "title_en": "Warehousing"
+        },
+        {
+          "code": "18.16",
+          "title_fa": "کنترل موجودی",
+          "title_en": "Inventory Control"
+        }
+      ]
+    },
+    {
+      "code": "19",
+      "title_fa": "مدیریت مصالح و تجهیزات",
+      "title_en": "Materials & Equipment Management",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "19.01",
+          "title_fa": "فهرست مصالح",
+          "title_en": "Material List"
+        },
+        {
+          "code": "19.02",
+          "title_fa": "فهرست تجهیزات",
+          "title_en": "Equipment List"
+        },
+        {
+          "code": "19.03",
+          "title_fa": "مشخصات فنی مصالح",
+          "title_en": "Material Data Sheets"
+        },
+        {
+          "code": "19.04",
+          "title_fa": "مشخصات فنی تجهیزات",
+          "title_en": "Equipment Data Sheets"
+        },
+        {
+          "code": "19.05",
+          "title_fa": "گواهی سازنده",
+          "title_en": "Manufacturer Certificate"
+        },
+        {
+          "code": "19.06",
+          "title_fa": "گواهی کیفیت",
+          "title_en": "Certificate of Quality"
+        },
+        {
+          "code": "19.07",
+          "title_fa": "گواهی انطباق",
+          "title_en": "Certificate of Conformity"
+        },
+        {
+          "code": "19.08",
+          "title_fa": "گزارش تست کارخانه",
+          "title_en": "Factory Test Report"
+        },
+        {
+          "code": "19.09",
+          "title_fa": "حمل تجهیزات",
+          "title_en": "Equipment Transportation"
+        },
+        {
+          "code": "19.10",
+          "title_fa": "نگهداری تجهیزات",
+          "title_en": "Equipment Storage"
+        },
+        {
+          "code": "19.11",
+          "title_fa": "حفاظت مصالح",
+          "title_en": "Material Protection"
+        }
+      ]
+    },
+    {
+      "code": "20",
+      "title_fa": "ایمنی، بهداشت و محیط کار",
+      "title_en": "Health, Safety & Environment (HSE)",
+      "subcategories": [
+        {
+          "code": "20.1",
+          "title_fa": "مدیریت ایمنی",
+          "title_en": "Safety Management",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "20.1.01",
+              "title_fa": "برنامه HSE",
+              "title_en": "HSE Plan"
+            },
+            {
+              "code": "20.1.02",
+              "title_fa": "ارزیابی ریسک",
+              "title_en": "Risk Assessment"
+            },
+            {
+              "code": "20.1.03",
+              "title_fa": "تجزیه و تحلیل ایمنی کار",
+              "title_en": "Job Safety Analysis (JSA)"
+            },
+            {
+              "code": "20.1.04",
+              "title_fa": "آموزش ایمنی",
+              "title_en": "Safety Training"
+            },
+            {
+              "code": "20.1.05",
+              "title_fa": "بازرسی ایمنی",
+              "title_en": "Safety Inspection"
+            },
+            {
+              "code": "20.1.06",
+              "title_fa": "ممیزی ایمنی",
+              "title_en": "Safety Audit"
+            }
+          ]
+        },
+        {
+          "code": "20.2",
+          "title_fa": "تجهیزات حفاظت فردی",
+          "title_en": "Personal Protective Equipment (PPE)",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "20.2.01",
+              "title_fa": "کلاه ایمنی",
+              "title_en": "Safety Helmet"
+            },
+            {
+              "code": "20.2.02",
+              "title_fa": "عینک ایمنی",
+              "title_en": "Safety Glasses"
+            },
+            {
+              "code": "20.2.03",
+              "title_fa": "دستکش",
+              "title_en": "Safety Gloves"
+            },
+            {
+              "code": "20.2.04",
+              "title_fa": "کفش ایمنی",
+              "title_en": "Safety Footwear"
+            },
+            {
+              "code": "20.2.05",
+              "title_fa": "محافظ شنوایی",
+              "title_en": "Hearing Protection"
+            },
+            {
+              "code": "20.2.06",
+              "title_fa": "هارنس",
+              "title_en": "Safety Harness"
+            },
+            {
+              "code": "20.2.07",
+              "title_fa": "لایف‌لاین",
+              "title_en": "Lifeline"
+            }
+          ]
+        },
+        {
+          "code": "20.3",
+          "title_fa": "ایمنی عملیات",
+          "title_en": "Construction Safety",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "20.3.01",
+              "title_fa": "کار در ارتفاع",
+              "title_en": "Working at Height"
+            },
+            {
+              "code": "20.3.02",
+              "title_fa": "گودبرداری",
+              "title_en": "Excavation Safety"
+            },
+            {
+              "code": "20.3.03",
+              "title_fa": "فضای بسته",
+              "title_en": "Confined Space"
+            },
+            {
+              "code": "20.3.04",
+              "title_fa": "عملیات لیفتینگ",
+              "title_en": "Lifting Operations"
+            },
+            {
+              "code": "20.3.05",
+              "title_fa": "ایمنی جرثقیل",
+              "title_en": "Crane Safety"
+            },
+            {
+              "code": "20.3.06",
+              "title_fa": "ایمنی ماشین‌آلات",
+              "title_en": "Equipment Safety"
+            },
+            {
+              "code": "20.3.07",
+              "title_fa": "ایمنی برق",
+              "title_en": "Electrical Safety"
+            },
+            {
+              "code": "20.3.08",
+              "title_fa": "داربست",
+              "title_en": "Scaffolding Safety"
+            },
+            {
+              "code": "20.3.09",
+              "title_fa": "کار گرم",
+              "title_en": "Hot Work"
+            }
+          ]
+        },
+        {
+          "code": "20.4",
+          "title_fa": "شرایط اضطراری",
+          "title_en": "Emergency Management",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "20.4.01",
+              "title_fa": "طرح واکنش اضطراری",
+              "title_en": "Emergency Response Plan"
+            },
+            {
+              "code": "20.4.02",
+              "title_fa": "اطفای حریق",
+              "title_en": "Fire Response"
+            },
+            {
+              "code": "20.4.03",
+              "title_fa": "کمک‌های اولیه",
+              "title_en": "First Aid"
+            },
+            {
+              "code": "20.4.04",
+              "title_fa": "تخلیه اضطراری",
+              "title_en": "Emergency Evacuation"
+            },
+            {
+              "code": "20.4.05",
+              "title_fa": "نقاط تجمع",
+              "title_en": "Assembly Points"
+            }
+          ]
+        },
+        {
+          "code": "20.5",
+          "title_fa": "محیط زیست",
+          "title_en": "Environmental Management",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "20.5.01",
+              "title_fa": "مدیریت پسماند",
+              "title_en": "Waste Management"
+            },
+            {
+              "code": "20.5.02",
+              "title_fa": "کنترل گرد و غبار",
+              "title_en": "Dust Control"
+            },
+            {
+              "code": "20.5.03",
+              "title_fa": "کنترل صدا",
+              "title_en": "Noise Control"
+            },
+            {
+              "code": "20.5.04",
+              "title_fa": "کنترل آلودگی آب",
+              "title_en": "Water Pollution Control"
+            },
+            {
+              "code": "20.5.05",
+              "title_fa": "مواد خطرناک",
+              "title_en": "Hazardous Materials"
+            },
+            {
+              "code": "20.5.06",
+              "title_fa": "پسماند خطرناک",
+              "title_en": "Hazardous Waste"
+            },
+            {
+              "code": "20.5.07",
+              "title_fa": "مدیریت زیست‌محیطی",
+              "title_en": "Environmental Management"
+            }
+          ]
+        },
+        {
+          "code": "20.6",
+          "title_fa": "ترافیک کارگاه",
+          "title_en": "Traffic Management",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "20.6.01",
+              "title_fa": "طرح ترافیک کارگاه",
+              "title_en": "Construction Traffic Management Plan"
+            },
+            {
+              "code": "20.6.02",
+              "title_fa": "مسیر ماشین‌آلات",
+              "title_en": "Equipment Routes"
+            },
+            {
+              "code": "20.6.03",
+              "title_fa": "علائم ایمنی",
+              "title_en": "Safety Signage"
+            },
+            {
+              "code": "20.6.04",
+              "title_fa": "کنترل ورود و خروج",
+              "title_en": "Site Access Control"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "21",
+      "title_fa": "برنامه‌ریزی و کنترل پروژه",
+      "title_en": "Planning & Project Controls",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "21.01",
+          "title_fa": "برنامه زمان‌بندی",
+          "title_en": "Project Schedule"
+        },
+        {
+          "code": "21.02",
+          "title_fa": "برنامه مبنا",
+          "title_en": "Baseline Schedule"
+        },
+        {
+          "code": "21.03",
+          "title_fa": "روش مسیر بحرانی",
+          "title_en": "Critical Path Method (CPM)"
+        },
+        {
+          "code": "21.04",
+          "title_fa": "فعالیت‌های بحرانی",
+          "title_en": "Critical Activities"
+        },
+        {
+          "code": "21.05",
+          "title_fa": "نقاط عطف",
+          "title_en": "Milestones"
+        },
+        {
+          "code": "21.06",
+          "title_fa": "برنامه پیشرفت",
+          "title_en": "Progress Schedule"
+        },
+        {
+          "code": "21.07",
+          "title_fa": "گزارش پیشرفت",
+          "title_en": "Progress Report"
+        },
+        {
+          "code": "21.08",
+          "title_fa": "منحنی S",
+          "title_en": "S-Curve"
+        },
+        {
+          "code": "21.09",
+          "title_fa": "برنامه منابع",
+          "title_en": "Resource Schedule"
+        },
+        {
+          "code": "21.10",
+          "title_fa": "برنامه نیروی انسانی",
+          "title_en": "Manpower Schedule"
+        },
+        {
+          "code": "21.11",
+          "title_fa": "برنامه ماشین‌آلات",
+          "title_en": "Equipment Schedule"
+        },
+        {
+          "code": "21.12",
+          "title_fa": "برنامه خرید",
+          "title_en": "Procurement Schedule"
+        },
+        {
+          "code": "21.13",
+          "title_fa": "برنامه تأمین مصالح",
+          "title_en": "Material Procurement Schedule"
+        },
+        {
+          "code": "21.14",
+          "title_fa": "برنامه ساخت",
+          "title_en": "Construction Schedule"
+        },
+        {
+          "code": "21.15",
+          "title_fa": "برنامه تست",
+          "title_en": "Testing Schedule"
+        },
+        {
+          "code": "21.16",
+          "title_fa": "برنامه راه‌اندازی",
+          "title_en": "Commissioning Schedule"
+        },
+        {
+          "code": "21.17",
+          "title_fa": "برنامه تحویل",
+          "title_en": "Handover Schedule"
+        },
+        {
+          "code": "21.18",
+          "title_fa": "برنامه کوتاه‌مدت",
+          "title_en": "Look-Ahead Schedule"
+        },
+        {
+          "code": "21.19",
+          "title_fa": "برنامه جریان نقدینگی",
+          "title_en": "Cash Flow"
+        },
+        {
+          "code": "21.20",
+          "title_fa": "ساختار شکست کار",
+          "title_en": "Work Breakdown Structure (WBS)"
+        },
+        {
+          "code": "21.21",
+          "title_fa": "ساختار شکست هزینه",
+          "title_en": "Cost Breakdown Structure (CBS)"
+        }
+      ]
+    },
+    {
+      "code": "22",
+      "title_fa": "مدیریت ریسک و مدیریت تغییر",
+      "title_en": "Risk & Change Management",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "22.01",
+          "title_fa": "مدیریت ریسک",
+          "title_en": "Risk Management"
+        },
+        {
+          "code": "22.02",
+          "title_fa": "ثبت ریسک",
+          "title_en": "Risk Register"
+        },
+        {
+          "code": "22.03",
+          "title_fa": "شناسایی ریسک",
+          "title_en": "Risk Identification"
+        },
+        {
+          "code": "22.04",
+          "title_fa": "ارزیابی ریسک",
+          "title_en": "Risk Assessment"
+        },
+        {
+          "code": "22.05",
+          "title_fa": "تحلیل احتمال و اثر",
+          "title_en": "Probability & Impact Analysis"
+        },
+        {
+          "code": "22.06",
+          "title_fa": "برنامه پاسخ به ریسک",
+          "title_en": "Risk Response Plan"
+        },
+        {
+          "code": "22.07",
+          "title_fa": "مدیریت تغییر",
+          "title_en": "Change Management"
+        },
+        {
+          "code": "22.08",
+          "title_fa": "درخواست تغییر",
+          "title_en": "Change Request"
+        },
+        {
+          "code": "22.09",
+          "title_fa": "ارزیابی اثر تغییر",
+          "title_en": "Change Impact Assessment"
+        },
+        {
+          "code": "22.10",
+          "title_fa": "کنترل تغییرات",
+          "title_en": "Change Control"
+        },
+        {
+          "code": "22.11",
+          "title_fa": "ثبت تصمیمات",
+          "title_en": "Decision Log"
+        },
+        {
+          "code": "22.12",
+          "title_fa": "ثبت مسائل",
+          "title_en": "Issue Log"
+        }
+      ]
+    },
+    {
+      "code": "23",
+      "title_fa": "مدیریت پروژه و مدیریت ساخت",
+      "title_en": "Project & Construction Management",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "23.01",
+          "title_fa": "برنامه مدیریت پروژه",
+          "title_en": "Project Management Plan"
+        },
+        {
+          "code": "23.02",
+          "title_fa": "برنامه مدیریت ساخت",
+          "title_en": "Construction Management Plan"
+        },
+        {
+          "code": "23.03",
+          "title_fa": "ساختار سازمانی",
+          "title_en": "Organization Chart"
+        },
+        {
+          "code": "23.04",
+          "title_fa": "شرح وظایف",
+          "title_en": "Roles & Responsibilities"
+        },
+        {
+          "code": "23.05",
+          "title_fa": "ماتریس مسئولیت",
+          "title_en": "Responsibility Matrix / RACI"
+        },
+        {
+          "code": "23.06",
+          "title_fa": "برنامه ارتباطات",
+          "title_en": "Communication Plan"
+        },
+        {
+          "code": "23.07",
+          "title_fa": "مدیریت جلسات",
+          "title_en": "Meeting Management"
+        },
+        {
+          "code": "23.08",
+          "title_fa": "صورتجلسات",
+          "title_en": "Meeting Minutes"
+        },
+        {
+          "code": "23.09",
+          "title_fa": "مدیریت مکاتبات",
+          "title_en": "Correspondence Management"
+        },
+        {
+          "code": "23.10",
+          "title_fa": "مدیریت اسناد",
+          "title_en": "Document Control"
+        },
+        {
+          "code": "23.11",
+          "title_fa": "کنترل نسخه اسناد",
+          "title_en": "Document Revision Control"
+        },
+        {
+          "code": "23.12",
+          "title_fa": "مدیریت ارسال مدارک",
+          "title_en": "Submittal Management"
+        },
+        {
+          "code": "23.13",
+          "title_fa": "مدیریت رابط‌ها",
+          "title_en": "Interface Management"
+        },
+        {
+          "code": "23.14",
+          "title_fa": "هماهنگی بین رشته‌ها",
+          "title_en": "Interdisciplinary Coordination"
+        }
+      ]
+    },
+    {
+      "code": "24",
+      "title_fa": "صلاحیت پیمانکار و اسناد شرکت",
+      "title_en": "Contractor Qualification & Company Documents",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "24.01",
+          "title_fa": "اساسنامه شرکت",
+          "title_en": "Company Articles of Association"
+        },
+        {
+          "code": "24.02",
+          "title_fa": "روزنامه رسمی",
+          "title_en": "Official Gazette / Company Registration Documents"
+        },
+        {
+          "code": "24.03",
+          "title_fa": "گواهی ثبت شرکت",
+          "title_en": "Company Registration Certificate"
+        },
+        {
+          "code": "24.04",
+          "title_fa": "وکالتنامه",
+          "title_en": "Power of Attorney"
+        },
+        {
+          "code": "24.05",
+          "title_fa": "گواهی صلاحیت پیمانکار",
+          "title_en": "Contractor Qualification Certificate"
+        },
+        {
+          "code": "24.06",
+          "title_fa": "رتبه پیمانکار",
+          "title_en": "Contractor Grade / Classification"
+        },
+        {
+          "code": "24.07",
+          "title_fa": "سوابق اجرایی",
+          "title_en": "Past Experience"
+        },
+        {
+          "code": "24.08",
+          "title_fa": "پروژه‌های مشابه",
+          "title_en": "Similar Project Experience"
+        },
+        {
+          "code": "24.09",
+          "title_fa": "توان فنی",
+          "title_en": "Technical Capability"
+        },
+        {
+          "code": "24.10",
+          "title_fa": "توان مالی",
+          "title_en": "Financial Capability"
+        },
+        {
+          "code": "24.11",
+          "title_fa": "توان مدیریتی",
+          "title_en": "Management Capability"
+        },
+        {
+          "code": "24.12",
+          "title_fa": "فهرست کارکنان کلیدی",
+          "title_en": "Key Personnel List"
+        },
+        {
+          "code": "24.13",
+          "title_fa": "رزومه کارکنان",
+          "title_en": "Personnel CVs"
+        },
+        {
+          "code": "24.14",
+          "title_fa": "فهرست تجهیزات",
+          "title_en": "Equipment List"
+        },
+        {
+          "code": "24.15",
+          "title_fa": "ماشین‌آلات",
+          "title_en": "Construction Equipment"
+        },
+        {
+          "code": "24.16",
+          "title_fa": "فهرست پیمانکاران جزء",
+          "title_en": "Subcontractor List"
+        },
+        {
+          "code": "24.17",
+          "title_fa": "گواهی‌های تخصصی",
+          "title_en": "Professional Certifications"
+        }
+      ]
+    },
+    {
+      "code": "25",
+      "title_fa": "منابع انسانی و نیروی کار",
+      "title_en": "Human Resources & Manpower",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "25.01",
+          "title_fa": "برنامه نیروی انسانی",
+          "title_en": "Manpower Plan"
+        },
+        {
+          "code": "25.02",
+          "title_fa": "سرپرست کارگاه",
+          "title_en": "Site Manager"
+        },
+        {
+          "code": "25.03",
+          "title_fa": "مدیر پروژه",
+          "title_en": "Project Manager"
+        },
+        {
+          "code": "25.04",
+          "title_fa": "مسئول دفتر فنی",
+          "title_en": "Technical Office Manager"
+        },
+        {
+          "code": "25.05",
+          "title_fa": "مدیر کنترل پروژه",
+          "title_en": "Project Controls Manager"
+        },
+        {
+          "code": "25.06",
+          "title_fa": "مسئول QA/QC",
+          "title_en": "QA/QC Manager"
+        },
+        {
+          "code": "25.07",
+          "title_fa": "مسئول HSE",
+          "title_en": "HSE Manager"
+        },
+        {
+          "code": "25.08",
+          "title_fa": "سرپرست مکانیک",
+          "title_en": "Mechanical Supervisor"
+        },
+        {
+          "code": "25.09",
+          "title_fa": "سرپرست برق",
+          "title_en": "Electrical Supervisor"
+        },
+        {
+          "code": "25.10",
+          "title_fa": "نیروهای اجرایی",
+          "title_en": "Construction Workforce"
+        },
+        {
+          "code": "25.11",
+          "title_fa": "نیروی متخصص",
+          "title_en": "Skilled Workforce"
+        },
+        {
+          "code": "25.12",
+          "title_fa": "آموزش کارکنان",
+          "title_en": "Personnel Training"
+        },
+        {
+          "code": "25.13",
+          "title_fa": "صلاحیت کارکنان",
+          "title_en": "Personnel Competency"
+        },
+        {
+          "code": "25.14",
+          "title_fa": "برنامه شیفت کاری",
+          "title_en": "Shift Schedule"
+        }
+      ]
+    },
+    {
+      "code": "26",
+      "title_fa": "امور مالی، مالیاتی و پرداخت‌ها",
+      "title_en": "Financial, Tax & Payment Administration",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "26.01",
+          "title_fa": "صورت‌وضعیت",
+          "title_en": "Payment Statement"
+        },
+        {
+          "code": "26.02",
+          "title_fa": "صورت‌وضعیت موقت",
+          "title_en": "Interim Payment"
+        },
+        {
+          "code": "26.03",
+          "title_fa": "صورت‌وضعیت قطعی",
+          "title_en": "Final Account"
+        },
+        {
+          "code": "26.04",
+          "title_fa": "تعدیل",
+          "title_en": "Price Adjustment / Escalation"
+        },
+        {
+          "code": "26.05",
+          "title_fa": "مالیات",
+          "title_en": "Tax"
+        },
+        {
+          "code": "26.06",
+          "title_fa": "مالیات بر ارزش افزوده",
+          "title_en": "VAT"
+        },
+        {
+          "code": "26.07",
+          "title_fa": "عوارض",
+          "title_en": "Duties / Levies"
+        },
+        {
+          "code": "26.08",
+          "title_fa": "کسورات",
+          "title_en": "Deductions"
+        },
+        {
+          "code": "26.09",
+          "title_fa": "سپرده",
+          "title_en": "Retention"
+        },
+        {
+          "code": "26.10",
+          "title_fa": "پیش‌پرداخت",
+          "title_en": "Advance Payment"
+        },
+        {
+          "code": "26.11",
+          "title_fa": "جریان نقدینگی",
+          "title_en": "Cash Flow"
+        },
+        {
+          "code": "26.12",
+          "title_fa": "برنامه مالی",
+          "title_en": "Financial Plan"
+        },
+        {
+          "code": "26.13",
+          "title_fa": "هزینه‌های پروژه",
+          "title_en": "Project Costs"
+        },
+        {
+          "code": "26.14",
+          "title_fa": "بودجه پروژه",
+          "title_en": "Project Budget"
+        }
+      ]
+    },
+    {
+      "code": "27",
+      "title_fa": "استانداردها، مقررات و الزامات قانونی",
+      "title_en": "Standards, Codes & Regulations",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "27.01",
+          "title_fa": "مقررات ملی ساختمان",
+          "title_en": "Iranian National Building Codes"
+        },
+        {
+          "code": "27.02",
+          "title_fa": "نشریات سازمان برنامه و بودجه",
+          "title_en": "MPO Publications"
+        },
+        {
+          "code": "27.03",
+          "title_fa": "فهرست‌بهای سازمان برنامه و بودجه",
+          "title_en": "MPO Price Lists"
+        },
+        {
+          "code": "27.04",
+          "title_fa": "استانداردهای ملی ایران",
+          "title_en": "Iranian National Standards (ISIRI)"
+        },
+        {
+          "code": "27.05",
+          "title_fa": "آیین‌نامه‌های فنی",
+          "title_en": "Technical Codes"
+        },
+        {
+          "code": "27.06",
+          "title_fa": "ضوابط شهرداری",
+          "title_en": "Municipality Regulations"
+        },
+        {
+          "code": "27.07",
+          "title_fa": "ضوابط آتش‌نشانی",
+          "title_en": "Fire Department Regulations"
+        },
+        {
+          "code": "27.08",
+          "title_fa": "ضوابط نظام مهندسی",
+          "title_en": "Engineering Organization Regulations"
+        },
+        {
+          "code": "27.09",
+          "title_fa": "استانداردهای ASTM",
+          "title_en": "ASTM Standards"
+        },
+        {
+          "code": "27.10",
+          "title_fa": "استانداردهای ISO",
+          "title_en": "ISO Standards"
+        },
+        {
+          "code": "27.11",
+          "title_fa": "استانداردهای IEC",
+          "title_en": "IEC Standards"
+        },
+        {
+          "code": "27.12",
+          "title_fa": "استانداردهای EN",
+          "title_en": "EN Standards"
+        },
+        {
+          "code": "27.13",
+          "title_fa": "استانداردهای BS",
+          "title_en": "BS Standards"
+        },
+        {
+          "code": "27.14",
+          "title_fa": "استانداردهای ACI",
+          "title_en": "ACI Standards"
+        },
+        {
+          "code": "27.15",
+          "title_fa": "استانداردهای AWS",
+          "title_en": "AWS Standards"
+        },
+        {
+          "code": "27.16",
+          "title_fa": "استانداردهای ASME",
+          "title_en": "ASME Standards"
+        },
+        {
+          "code": "27.17",
+          "title_fa": "استانداردهای API",
+          "title_en": "API Standards"
+        },
+        {
+          "code": "27.18",
+          "title_fa": "استانداردهای NFPA",
+          "title_en": "NFPA Standards"
+        },
+        {
+          "code": "27.19",
+          "title_fa": "سایر استانداردهای قراردادی",
+          "title_en": "Project-Specific Standards"
+        }
+      ]
+    },
+    {
+      "code": "28",
+      "title_fa": "راه‌اندازی، تست و تحویل",
+      "title_en": "Testing, Commissioning & Handover",
+      "subcategories": [
+        {
+          "code": "28.1",
+          "title_fa": "تست و راه‌اندازی",
+          "title_en": "Testing & Commissioning",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "28.1.01",
+              "title_fa": "پیش‌راه‌اندازی",
+              "title_en": "Pre-Commissioning"
+            },
+            {
+              "code": "28.1.02",
+              "title_fa": "راه‌اندازی",
+              "title_en": "Commissioning"
+            },
+            {
+              "code": "28.1.03",
+              "title_fa": "تست عملکرد",
+              "title_en": "Functional Testing"
+            },
+            {
+              "code": "28.1.04",
+              "title_fa": "تست عملکرد نهایی",
+              "title_en": "Performance Testing"
+            },
+            {
+              "code": "28.1.05",
+              "title_fa": "تست کارخانه",
+              "title_en": "Factory Acceptance Test (FAT)"
+            },
+            {
+              "code": "28.1.06",
+              "title_fa": "تست سایت",
+              "title_en": "Site Acceptance Test (SAT)"
+            },
+            {
+              "code": "28.1.07",
+              "title_fa": "تست یکپارچه",
+              "title_en": "Integrated System Testing"
+            }
+          ]
+        },
+        {
+          "code": "28.2",
+          "title_fa": "رفع نواقص",
+          "title_en": "Punch List & Defects",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "28.2.01",
+              "title_fa": "لیست نواقص",
+              "title_en": "Punch List"
+            },
+            {
+              "code": "28.2.02",
+              "title_fa": "فهرست نواقص",
+              "title_en": "Snag List"
+            },
+            {
+              "code": "28.2.03",
+              "title_fa": "رفع نقص",
+              "title_en": "Defect Rectification"
+            },
+            {
+              "code": "28.2.04",
+              "title_fa": "بازرسی نهایی",
+              "title_en": "Final Inspection"
+            }
+          ]
+        },
+        {
+          "code": "28.3",
+          "title_fa": "تحویل",
+          "title_en": "Handover",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "28.3.01",
+              "title_fa": "تحویل موقت",
+              "title_en": "Provisional Acceptance"
+            },
+            {
+              "code": "28.3.02",
+              "title_fa": "تحویل اولیه",
+              "title_en": "Substantial Completion"
+            },
+            {
+              "code": "28.3.03",
+              "title_fa": "تحویل قطعی",
+              "title_en": "Final Acceptance"
+            },
+            {
+              "code": "28.3.04",
+              "title_fa": "دوره تضمین",
+              "title_en": "Defects Liability Period (DLP)"
+            },
+            {
+              "code": "28.3.05",
+              "title_fa": "گارانتی",
+              "title_en": "Warranty"
+            },
+            {
+              "code": "28.3.06",
+              "title_fa": "خدمات پس از تحویل",
+              "title_en": "After-Sales Service"
+            }
+          ]
+        },
+        {
+          "code": "28.4",
+          "title_fa": "مدارک نهایی",
+          "title_en": "Final Documentation",
+          "subcategories": [],
+          "topics": [
+            {
+              "code": "28.4.01",
+              "title_fa": "نقشه‌های چون‌ساخت",
+              "title_en": "As-Built Drawings"
+            },
+            {
+              "code": "28.4.02",
+              "title_fa": "دفترچه بهره‌برداری و نگهداری",
+              "title_en": "Operation & Maintenance Manuals (O&M)"
+            },
+            {
+              "code": "28.4.03",
+              "title_fa": "دستورالعمل بهره‌برداری",
+              "title_en": "Operating Instructions"
+            },
+            {
+              "code": "28.4.04",
+              "title_fa": "دستورالعمل نگهداری",
+              "title_en": "Maintenance Instructions"
+            },
+            {
+              "code": "28.4.05",
+              "title_fa": "فهرست قطعات یدکی",
+              "title_en": "Spare Parts List"
+            },
+            {
+              "code": "28.4.06",
+              "title_fa": "آموزش بهره‌بردار",
+              "title_en": "Operator Training"
+            }
+          ]
+        }
+      ],
+      "topics": []
+    },
+    {
+      "code": "29",
+      "title_fa": "محیط زیست و پایداری",
+      "title_en": "Environment & Sustainability",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "29.01",
+          "title_fa": "ارزیابی اثرات زیست‌محیطی",
+          "title_en": "Environmental Impact Assessment (EIA)"
+        },
+        {
+          "code": "29.02",
+          "title_fa": "برنامه مدیریت محیط زیست",
+          "title_en": "Environmental Management Plan (EMP)"
+        },
+        {
+          "code": "29.03",
+          "title_fa": "مدیریت پسماند",
+          "title_en": "Waste Management"
+        },
+        {
+          "code": "29.04",
+          "title_fa": "مدیریت آب",
+          "title_en": "Water Management"
+        },
+        {
+          "code": "29.05",
+          "title_fa": "کنترل آلودگی هوا",
+          "title_en": "Air Pollution Control"
+        },
+        {
+          "code": "29.06",
+          "title_fa": "کنترل گردوغبار",
+          "title_en": "Dust Control"
+        },
+        {
+          "code": "29.07",
+          "title_fa": "کنترل صدا و ارتعاش",
+          "title_en": "Noise & Vibration Control"
+        },
+        {
+          "code": "29.08",
+          "title_fa": "مدیریت خاک آلوده",
+          "title_en": "Contaminated Soil Management"
+        },
+        {
+          "code": "29.09",
+          "title_fa": "مواد خطرناک",
+          "title_en": "Hazardous Materials"
+        },
+        {
+          "code": "29.10",
+          "title_fa": "مصرف انرژی",
+          "title_en": "Energy Consumption"
+        },
+        {
+          "code": "29.11",
+          "title_fa": "بهره‌وری انرژی",
+          "title_en": "Energy Efficiency"
+        },
+        {
+          "code": "29.12",
+          "title_fa": "پایداری پروژه",
+          "title_en": "Project Sustainability"
+        }
+      ]
+    },
+    {
+      "code": "30",
+      "title_fa": "اسناد تصویری و اطلاعات تکمیلی سایت",
+      "title_en": "Visual & Supporting Site Information",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "30.01",
+          "title_fa": "تصاویر سایت",
+          "title_en": "Site Images"
+        },
+        {
+          "code": "30.02",
+          "title_fa": "تصاویر ماهواره‌ای",
+          "title_en": "Satellite Images"
+        },
+        {
+          "code": "30.03",
+          "title_fa": "تصاویر هوایی",
+          "title_en": "Aerial Images"
+        },
+        {
+          "code": "30.04",
+          "title_fa": "عکس‌های وضع موجود",
+          "title_en": "Existing Condition Photos"
+        },
+        {
+          "code": "30.05",
+          "title_fa": "فیلم سایت",
+          "title_en": "Site Videos"
+        },
+        {
+          "code": "30.06",
+          "title_fa": "تصاویر نقشه",
+          "title_en": "Drawing Images"
+        },
+        {
+          "code": "30.07",
+          "title_fa": "اسکن مدارک",
+          "title_en": "Scanned Documents"
+        },
+        {
+          "code": "30.08",
+          "title_fa": "کروکی‌ها",
+          "title_en": "Sketches"
+        },
+        {
+          "code": "30.09",
+          "title_fa": "گزارش تصویری",
+          "title_en": "Visual Reports"
+        }
+      ]
+    },
+    {
+      "code": "31",
+      "title_fa": "فایل‌های نقشه‌کشی، مدل و داده‌های فنی",
+      "title_en": "CAD, BIM & Digital Engineering Files",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "31.01",
+          "title_fa": "فایل اتوکد",
+          "title_en": "AutoCAD / DWG"
+        },
+        {
+          "code": "31.02",
+          "title_fa": "فایل DXF",
+          "title_en": "DXF"
+        },
+        {
+          "code": "31.03",
+          "title_fa": "فایل Revit",
+          "title_en": "RVT"
+        },
+        {
+          "code": "31.04",
+          "title_fa": "فایل IFC",
+          "title_en": "IFC"
+        },
+        {
+          "code": "31.05",
+          "title_fa": "فایل BIM",
+          "title_en": "BIM Model"
+        },
+        {
+          "code": "31.06",
+          "title_fa": "فایل DGN",
+          "title_en": "DGN"
+        },
+        {
+          "code": "31.07",
+          "title_fa": "فایل‌های مدل سه‌بعدی",
+          "title_en": "3D Models"
+        },
+        {
+          "code": "31.08",
+          "title_fa": "مدل سازه",
+          "title_en": "Structural Model"
+        },
+        {
+          "code": "31.09",
+          "title_fa": "مدل معماری",
+          "title_en": "Architectural Model"
+        },
+        {
+          "code": "31.10",
+          "title_fa": "مدل مکانیکی",
+          "title_en": "Mechanical Model"
+        },
+        {
+          "code": "31.11",
+          "title_fa": "مدل الکتریکی",
+          "title_en": "Electrical Model"
+        },
+        {
+          "code": "31.12",
+          "title_fa": "مدل هماهنگ",
+          "title_en": "Federated / Coordinated Model"
+        }
+      ]
+    },
+    {
+      "code": "32",
+      "title_fa": "اسناد اکسل، محاسبات و داده‌های عددی",
+      "title_en": "Spreadsheets, Calculations & Numerical Data",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "32.01",
+          "title_fa": "فایل Excel",
+          "title_en": "Excel / XLS / XLSX"
+        },
+        {
+          "code": "32.02",
+          "title_fa": "جداول محاسبات",
+          "title_en": "Calculation Sheets"
+        },
+        {
+          "code": "32.03",
+          "title_fa": "محاسبات سازه",
+          "title_en": "Structural Calculations"
+        },
+        {
+          "code": "32.04",
+          "title_fa": "محاسبات مکانیکی",
+          "title_en": "Mechanical Calculations"
+        },
+        {
+          "code": "32.05",
+          "title_fa": "محاسبات الکتریکی",
+          "title_en": "Electrical Calculations"
+        },
+        {
+          "code": "32.06",
+          "title_fa": "محاسبات بار",
+          "title_en": "Load Calculations"
+        },
+        {
+          "code": "32.07",
+          "title_fa": "محاسبات هیدرولیکی",
+          "title_en": "Hydraulic Calculations"
+        },
+        {
+          "code": "32.08",
+          "title_fa": "محاسبات مقادیر",
+          "title_en": "Quantity Calculations"
+        },
+        {
+          "code": "32.09",
+          "title_fa": "محاسبات قیمت",
+          "title_en": "Cost Calculations"
+        },
+        {
+          "code": "32.10",
+          "title_fa": "آنالیز قیمت",
+          "title_en": "Price Analysis"
+        }
+      ]
+    },
+    {
+      "code": "33",
+      "title_fa": "اسناد مکاتبات و سوابق تصمیمات",
+      "title_en": "Correspondence & Project Records",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "33.01",
+          "title_fa": "نامه‌های رسمی",
+          "title_en": "Official Correspondence"
+        },
+        {
+          "code": "33.02",
+          "title_fa": "نامه‌های کارفرما",
+          "title_en": "Employer Correspondence"
+        },
+        {
+          "code": "33.03",
+          "title_fa": "نامه‌های پیمانکار",
+          "title_en": "Contractor Correspondence"
+        },
+        {
+          "code": "33.04",
+          "title_fa": "نامه‌های مشاور",
+          "title_en": "Consultant Correspondence"
+        },
+        {
+          "code": "33.05",
+          "title_fa": "صورتجلسات",
+          "title_en": "Meeting Minutes"
+        },
+        {
+          "code": "33.06",
+          "title_fa": "دستورکارها",
+          "title_en": "Site Instructions"
+        },
+        {
+          "code": "33.07",
+          "title_fa": "دستورهای کار",
+          "title_en": "Work Orders"
+        },
+        {
+          "code": "33.08",
+          "title_fa": "پاسخ به مکاتبات",
+          "title_en": "Correspondence Responses"
+        },
+        {
+          "code": "33.09",
+          "title_fa": "درخواست اطلاعات",
+          "title_en": "RFI"
+        },
+        {
+          "code": "33.10",
+          "title_fa": "پاسخ RFI",
+          "title_en": "RFI Response"
+        },
+        {
+          "code": "33.11",
+          "title_fa": "سوابق تصمیمات",
+          "title_en": "Decision Records"
+        },
+        {
+          "code": "33.12",
+          "title_fa": "سوابق تغییرات",
+          "title_en": "Change Records"
+        },
+        {
+          "code": "33.13",
+          "title_fa": "سوابق تأییدیه‌ها",
+          "title_en": "Approval Records"
+        }
+      ]
+    },
+    {
+      "code": "34",
+      "title_fa": "الزامات خاص پروژه و صنایع تخصصی",
+      "title_en": "Project-Specific & Specialized Requirements",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "34.01",
+          "title_fa": "الزامات نفت و گاز",
+          "title_en": "Oil & Gas Requirements"
+        },
+        {
+          "code": "34.02",
+          "title_fa": "الزامات پتروشیمی",
+          "title_en": "Petrochemical Requirements"
+        },
+        {
+          "code": "34.03",
+          "title_fa": "الزامات نیروگاهی",
+          "title_en": "Power Plant Requirements"
+        },
+        {
+          "code": "34.04",
+          "title_fa": "الزامات صنعتی",
+          "title_en": "Industrial Project Requirements"
+        },
+        {
+          "code": "34.05",
+          "title_fa": "الزامات معدنی",
+          "title_en": "Mining Requirements"
+        },
+        {
+          "code": "34.06",
+          "title_fa": "الزامات راه و حمل‌ونقل",
+          "title_en": "Transportation Infrastructure Requirements"
+        },
+        {
+          "code": "34.07",
+          "title_fa": "الزامات آب و فاضلاب",
+          "title_en": "Water & Wastewater Requirements"
+        },
+        {
+          "code": "34.08",
+          "title_fa": "الزامات بیمارستانی",
+          "title_en": "Healthcare Facility Requirements"
+        },
+        {
+          "code": "34.09",
+          "title_fa": "الزامات ساختمانی",
+          "title_en": "Building Project Requirements"
+        },
+        {
+          "code": "34.10",
+          "title_fa": "الزامات زیرساختی",
+          "title_en": "Infrastructure Requirements"
+        },
+        {
+          "code": "34.11",
+          "title_fa": "الزامات پروژه‌های شهری",
+          "title_en": "Urban Development Requirements"
+        }
+      ]
+    },
+    {
+      "code": "35",
+      "title_fa": "اسناد امنیتی، دسترسی و حفاظت فیزیکی",
+      "title_en": "Security & Access Control",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "35.01",
+          "title_fa": "کنترل ورود و خروج",
+          "title_en": "Access Control"
+        },
+        {
+          "code": "35.02",
+          "title_fa": "مجوز ورود به سایت",
+          "title_en": "Site Access Permit"
+        },
+        {
+          "code": "35.03",
+          "title_fa": "کارت شناسایی",
+          "title_en": "Identification Card"
+        },
+        {
+          "code": "35.04",
+          "title_fa": "امنیت کارگاه",
+          "title_en": "Site Security"
+        },
+        {
+          "code": "35.05",
+          "title_fa": "حفاظت فیزیکی",
+          "title_en": "Physical Security"
+        },
+        {
+          "code": "35.06",
+          "title_fa": "کنترل تردد ماشین‌آلات",
+          "title_en": "Vehicle Access Control"
+        },
+        {
+          "code": "35.07",
+          "title_fa": "حفاظت از تجهیزات",
+          "title_en": "Equipment Security"
+        },
+        {
+          "code": "35.08",
+          "title_fa": "الزامات امنیتی کارفرما",
+          "title_en": "Employer Security Requirements"
+        }
+      ]
+    },
+    {
+      "code": "36",
+      "title_fa": "سایر اسناد و موارد متفرقه",
+      "title_en": "Miscellaneous & Other Documents",
+      "subcategories": [],
+      "topics": [
+        {
+          "code": "36.01",
+          "title_fa": "پیوست‌های پروژه",
+          "title_en": "Project Appendices"
+        },
+        {
+          "code": "36.02",
+          "title_fa": "جداول تکمیلی",
+          "title_en": "Supplementary Tables"
+        },
+        {
+          "code": "36.03",
+          "title_fa": "فرم‌های تکمیلی",
+          "title_en": "Supplementary Forms"
+        },
+        {
+          "code": "36.04",
+          "title_fa": "دستورالعمل‌های تکمیلی",
+          "title_en": "Supplementary Instructions"
+        },
+        {
+          "code": "36.05",
+          "title_fa": "اسناد مرجع",
+          "title_en": "Reference Documents"
+        },
+        {
+          "code": "36.06",
+          "title_fa": "اسناد تاریخی پروژه",
+          "title_en": "Historical Project Documents"
+        },
+        {
+          "code": "36.07",
+          "title_fa": "مدارک نامشخص",
+          "title_en": "Unclassified Documents"
+        },
+        {
+          "code": "36.08",
+          "title_fa": "اسناد ناقص",
+          "title_en": "Incomplete Documents"
+        },
+        {
+          "code": "36.09",
+          "title_fa": "اسناد تکراری",
+          "title_en": "Duplicate Documents"
+        },
+        {
+          "code": "36.10",
+          "title_fa": "اسناد نامرتبط",
+          "title_en": "Irrelevant Documents"
+        }
+      ]
+    }
+  ]
+}

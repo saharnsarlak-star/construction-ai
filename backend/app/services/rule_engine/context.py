@@ -78,6 +78,7 @@ class RuleContext:
     project_type: ProjectType
     documents: list[DocView]
     selected_standards: list[dict[str, Any]] = field(default_factory=list)
+    standard_requirements: list[dict[str, Any]] = field(default_factory=list)
     elements: list[ElementView] = field(default_factory=list)
     project_start: date | None = None
     # standard_code -> {edition, is_current, ...} optional library metadata

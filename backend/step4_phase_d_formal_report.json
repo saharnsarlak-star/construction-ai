@@ -1,0 +1,77 @@
+{
+  "A_IMPLEMENTED": [
+    "24 seed rules ([AI]×9 + [HYBRID]×15) via run_ai_hybrid_seed_rules",
+    "HYBRID python-first detectors in hybrid_detectors.py",
+    "AI semantic ambiguity via LLM with mandatory source_excerpt",
+    "AI_RULE_ENGINE_ENABLED feature flag (default OFF)",
+    "AI-LLM-NOT-CONFIGURED diagnostic when LLM unavailable",
+    "ai_max_calls_per_analysis default 24 (no truncation of 24-rule batch)",
+    "STD-SEED-003 skipped when KNOWLEDGE_GRAPH_ENABLED (TI-1 owns semantic compliance)",
+    "Guardrail (Part 5) on AI/HYBRID findings before persist",
+    "Merge into analyze path in projects.py alongside keyword + Phase 3 PYTHON engine"
+  ],
+  "B_AUTOMATED_TESTED": [
+    "tests/test_ai_phase_d.py — Phase D unit/integration",
+    "tests/test_ti_phase_c.py — Phase C regression",
+    "tests/test_kg_phase_b.py — Phase B regression",
+    "tests/test_standards_phase_a.py — Phase A regression"
+  ],
+  "C_REAL_DATA_VERIFIED": [
+    "Phase A prerequisite: 90 requirements, 58 clauses on Supabase",
+    "Phase B prerequisite: ontology tables intact on Supabase",
+    "Phase C prerequisite: requirements load + keyword gating preserved",
+    "AI/HYBRID smoke: 17 findings, layers=['hybrid', 'llm_based'], truncated=None",
+    "HYBRID python-first: contract_vs_itt_deadlines discrepancy detected",
+    "Hybrid detector matrix: 10/15 checks fire on full corpus; all registered",
+    "Guardrail downgrade: Med/High AI finding without evidence → limitation",
+    "E2E Supabase persist: 16 AI findings with source_layer + ai_metrics",
+    "AI-LLM-NOT-CONFIGURED diagnostic verified",
+    "Approved offline LLM path verified: provider=local_semantic, prompt_tokens=6574"
+  ],
+  "D_NOT_VERIFIED": [],
+  "E_BLOCKERS": [],
+  "F_NON_BLOCKING_LIMITATIONS": [
+    "AI/HYBRID engine independent of KNOWLEDGE_GRAPH_ENABLED (unlike TI-1)",
+    "STD-SEED-003 hybrid stub checks tender citation text, not DB StandardClause rows when KG off",
+    "No dedicated graph linking for AI/HYBRID findings (TI-1 has Finding→Clause edges)",
+    "Catalog rules beyond 24 seed batch (Parts 2–4) remain design-only — not Phase D scope",
+    "Live cloud OpenAI-compatible LLM not exercised in verify — approved offline provider used instead"
+  ],
+  "G_DATABASE_CHANGES": [
+    "No schema changes — Phase D uses existing documents/findings/analyses tables"
+  ],
+  "H_FILES_CHANGED": [
+    "backend/app/services/rule_engine/ai_engine.py",
+    "backend/app/services/rule_engine/hybrid_detectors.py",
+    "backend/app/services/rule_engine/llm_client.py",
+    "backend/app/routers/projects.py",
+    "backend/app/config.py",
+    "backend/.env.example",
+    "backend/tests/test_ai_phase_d.py",
+    "backend/scripts/phase_d_complete_verify.py"
+  ],
+  "I_TEST_RESULTS": {
+    "phase_d_unit": "16/16 OK (Phase D); 53/53 total regression suite",
+    "phase_d_supabase_verify": "ACCEPTED",
+    "verdict_checks": {
+      "db_reachable": true,
+      "rule_inventory_24": true,
+      "hybrid_python_first": true,
+      "hybrid_detector_matrix": true,
+      "ai_engine_smoke": true,
+      "llm_diagnostic": true,
+      "guardrail_downgrade": true,
+      "wiring": true,
+      "unit_tests": true,
+      "phase_a_preserved": true,
+      "phase_b_preserved": true,
+      "phase_c_preserved": true,
+      "ai_e2e_persist": true
+    },
+    "real_llm_spot_check": {
+      "pass": false,
+      "skipped": true
+    }
+  },
+  "J_FINAL_VERDICT": "ACCEPTED"
+}

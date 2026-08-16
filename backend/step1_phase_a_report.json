@@ -1,0 +1,98 @@
+{
+  "step": 1,
+  "phase": "A",
+  "generated_at": "2026-08-13T19:00:00+00:00",
+  "summary": "Code fixes and automated tests completed. Real Code 55 PDF ingest NOT VERIFIED — PDF file absent from repo, Supabase storage, and local disk. Supabase connection intermittent during this session.",
+  "changes_made": [
+    "app/standards_engine/ingestion/catalog_metadata.py — country-agnostic file header parsing (COUNTRY, VOLUME, EFFECTIVE_DATE, PUBLISHER, STANDARD_VERSION)",
+    "app/standards_engine/ingestion/modality_patterns.py — locale-aware obligation markers (fa, en, de, auto-detect)",
+    "app/standards_engine/ingestion/requirement_validate.py — uses modality_patterns; EN thickness/width split support",
+    "app/standards_engine/ingestion/pipeline.py — applies catalog metadata from file headers; --force on --save; removed hardcoded CODE55-only country/version defaults",
+    "scripts/step1_phase_a_audit.py — DB/storage audit helper",
+    "scripts/step1_list_catalog_storage.py — Supabase catalog folder listing",
+    "scripts/step1_phase_a_verify.py — Step 1 orchestrator (unit tests + ingest + QA)"
+  ],
+  "tests_run": [
+    {
+      "name": "unittest test_standards_phase_a.py",
+      "type": "automated",
+      "result": "PASS",
+      "count": "7/7"
+    },
+    {
+      "name": "catalog_metadata sample header parse (local)",
+      "type": "automated",
+      "result": "PASS",
+      "detail": "IR, effective_1404-04-01 from sample file"
+    },
+    {
+      "name": "step1_phase_a_verify.py full orchestrator",
+      "type": "automated",
+      "result": "FAIL",
+      "detail": "Supabase DNS getaddrinfo failed during DB snapshot after ingest subprocess"
+    },
+    {
+      "name": "pipeline --save --force (LLM ingest to Supabase)",
+      "type": "real-data",
+      "result": "NOT VERIFIED",
+      "detail": "Session ended with DB connection failure; prior state unchanged"
+    },
+    {
+      "name": "Real Code 55 PDF page-aware ingest",
+      "type": "real-data",
+      "result": "NOT VERIFIED",
+      "detail": "No PDF file available"
+    },
+    {
+      "name": "standards_qa_report.py on Supabase",
+      "type": "real-data",
+      "result": "NOT VERIFIED",
+      "detail": "DB connection failed this session"
+    }
+  ],
+  "supabase_state_last_successful_read": {
+    "when": "2026-08-13T18:37:53Z",
+    "note": "Earlier session when DNS succeeded",
+    "CODE55-VOL1-IR": {
+      "stored_path": "manual/CODE55-VOL1-IR",
+      "size_bytes": 0,
+      "extracted_text_len": 0,
+      "country_code": "IR",
+      "standard_version": null,
+      "effective_date": null,
+      "clause_count": 5,
+      "requirement_count": 14,
+      "clauses_with_source_page": 0,
+      "unique_clause_index": true
+    },
+    "supabase_storage_CODE55_folder": "empty (no PDF uploaded)"
+  },
+  "verification_matrix": {
+    "standard_classification_llm": { "implemented": true, "automated_tested": false, "real_data_verified": false },
+    "clause_extraction": { "implemented": true, "automated_tested": true, "real_data_verified": false, "note": "sample + numbered heuristic only" },
+    "requirement_extraction_llm": { "implemented": true, "automated_tested": false, "real_data_verified": false, "note": "14 reqs from prior sample ingest" },
+    "source_page_provenance": { "implemented": true, "automated_tested": true, "real_data_verified": false, "note": "0/5 clauses have source_page in DB" },
+    "duplicate_prevention": { "implemented": true, "automated_tested": false, "real_data_verified": true, "note": "unique index exists on Supabase" },
+    "post_llm_validation": { "implemented": true, "automated_tested": true, "real_data_verified": false },
+    "country_version_metadata": { "implemented": true, "automated_tested": true, "real_data_verified": false, "note": "DB metadata not yet refreshed" },
+    "qa_report_script": { "implemented": true, "automated_tested": false, "real_data_verified": false },
+    "real_pdf_pipeline": { "implemented": true, "automated_tested": false, "real_data_verified": false, "blocker": "PDF file missing" }
+  },
+  "acceptance": {
+    "unit_tests_pass": true,
+    "sample_llm_ingest_verified_this_session": false,
+    "duplicate_skip_verified_this_session": false,
+    "real_pdf_ingested": false,
+    "clauses_gte_20_from_real_pdf": false,
+    "source_page_gte_90pct": false,
+    "qa_report_generated": false,
+    "step1_fully_accepted": false
+  },
+  "blockers_before_step2": [
+    "Upload real Code 55 Vol 1 PDF to catalog (admin API or storage/catalog_standards/CODE55-VOL1-IR/)",
+    "Run: python -m app.standards_engine.ingestion.pipeline --save-catalog CODE55-VOL1-IR --section 2-2 --force",
+    "Run: python scripts/standards_qa_report.py CODE55-VOL1-IR",
+    "Confirm stable Supabase connectivity from dev environment",
+    "Target: >=20 clauses from section 2-2, >=90% source_page, catalog metadata populated"
+  ]
+}

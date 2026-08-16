@@ -97,7 +97,7 @@ def main() -> int:
     os.environ["OPENAI_API_KEY"] = _boot.openai_api_key.strip()
     os.environ["LLM_PROVIDER"] = "openai_compatible"
     os.environ["AI_RULE_ENGINE_ENABLED"] = "true"
-    os.environ.setdefault("AI_MAX_CALLS_PER_ANALYSIS", "10")
+    os.environ.setdefault("AI_MAX_CALLS_PER_ANALYSIS", "24")
     os.environ.setdefault("LLM_MODEL", _boot.llm_model or "gpt-4o-mini")
 
     # Reload settings after forcing provider

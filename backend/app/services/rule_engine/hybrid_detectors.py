@@ -257,33 +257,81 @@ def _drawing_scale_vs_dimensions(ctx: RuleContext) -> HybridDiscrepancy | None:
     text = ctx.text_blob(DocumentCategory.DRAWING)
     if not text:
         return None
+    issues: list[str] = []
+    plan_m = re.search(r"plan[^.\n]{0,60}?(\d+(?:\.\d+)?)\s*m\b", text, re.I)
+    sect_m = re.search(r"section[^.\n]{0,60}?(\d+(?:\.\d+)?)\s*m\b", text, re.I)
+    if plan_m and sect_m and plan_m.group(1) != sect_m.group(1):
+        issues.append(f"plan={plan_m.group(1)}m vs section={sect_m.group(1)}m")
     scale = re.search(r"scale\s*[:=]?\s*1\s*:\s*(\d+)", text, re.I)
-    # stated length with measured annotation conflict heuristic: "length 12.0m" vs scale bar
-    if not scale:
-        return None
-    s = int(scale.group(1))
-    # Flag unusual scales for plans
-    if s in {50, 100, 200, 500}:
+    dims = re.findall(r"\b(\d+(?:\.\d+)?)\s*(?:m|mm)\b", text, re.I)
+    if scale and len(dims) >= 2:
+        s = int(scale.group(1))
+        if s not in {50, 100, 200, 500} and max(float(d) for d in dims[:6]) > 50:
+            issues.append(f"scale 1:{s} with large annotated dims — verify consistency")
+    if not issues:
         return None
     return HybridDiscrepancy(
         check="drawing_scale_vs_dimensions",
-        summary=f"Unusual stated scale 1:{s} on drawing set — verify against annotated dimensions.",
-        evidence=f"scale=1:{s}",
-        excerpts=[{"document": "drawing", "text": scale.group(0)}],
-        metrics={"scale": s},
+        summary="Drawing scale/dimension issues: " + "; ".join(issues),
+        evidence="; ".join(issues),
+        excerpts=[{"document": "drawing", "text": issues[0]}],
+        metrics={"issues": issues},
     )
 
 
 def _standard_clause_semantic_compliance(ctx: RuleContext) -> HybridDiscrepancy | None:
     if not ctx.selected_standards:
         return None
-    # Python retrieves that standards are selected; AI checks semantic compliance
-    codes = [str(s.get("code")) for s in ctx.selected_standards if s.get("is_selected", True)]
+    codes = [str(s.get("code") or "") for s in ctx.selected_standards if s.get("is_selected", True)]
+    codes = [c for c in codes if c]
     if not codes:
         return None
     tender = ctx.text_blob(DocumentCategory.TENDER, DocumentCategory.STANDARD)
-    missing = [c for c in codes if c.lower() not in tender.lower()]
-    # Always a soft discrepancy if tender never cites the mandatory codes
+    tender_lower = tender.lower()
+
+    # Prefer DB-backed requirements when preloaded (analyze path).
+    req_rows = list(ctx.standard_requirements or [])
+    silent_codes: list[str] = []
+    weak_hits: list[str] = []
+    if req_rows:
+        from app.standards_engine.compliance.gap_checker import _overlap_score
+
+        by_code: dict[str, list[dict]] = {}
+        for row in req_rows:
+            sc = str(row.get("standard_code") or "")
+            by_code.setdefault(sc, []).append(row)
+        for code in codes:
+            rows = by_code.get(code) or []
+            if not rows:
+                if code.lower() not in tender_lower:
+                    silent_codes.append(code)
+                continue
+            scores = [
+                _overlap_score(str(r.get("text") or r.get("requirement_text") or ""), tender)
+                for r in rows[:12]
+            ]
+            avg = sum(scores) / len(scores) if scores else 0.0
+            if avg < 0.08:
+                silent_codes.append(code)
+            elif avg < 0.2:
+                weak_hits.append(f"{code}(avg_overlap={avg:.2f})")
+        if not silent_codes and not weak_hits:
+            return None
+        summary_parts = []
+        if silent_codes:
+            summary_parts.append(f"standards with silent tender coverage: {silent_codes[:6]}")
+        if weak_hits:
+            summary_parts.append(f"weak coverage: {weak_hits[:4]}")
+        return HybridDiscrepancy(
+            check="standard_clause_semantic_compliance",
+            summary="Standard requirement coverage gap (python pre-check): " + "; ".join(summary_parts),
+            evidence=f"silent={silent_codes[:8]}; weak={weak_hits[:6]}; req_rows={len(req_rows)}",
+            excerpts=[{"document": "standards", "text": ", ".join(silent_codes[:8]) or weak_hits[0]}],
+            metrics={"silent": silent_codes, "weak": weak_hits},
+        )
+
+    # Fallback: citation-only when requirements not preloaded
+    missing = [c for c in codes if c.lower() not in tender_lower]
     if not missing:
         return None
     return HybridDiscrepancy(
@@ -417,9 +465,18 @@ def _er_vs_standard_clause(ctx: RuleContext) -> HybridDiscrepancy | None:
     if not er:
         return None
     # Detect "may omit fire protection" vs mandatory fire standard selected
-    if re.search(r"may\s+omit\s+fire|fire\s+protection\s+not\s+required", er, re.I):
-        codes = [str(s.get("code")) for s in ctx.selected_standards]
-        if any("FIRE" in c.upper() or "4102" in c or "BRAND" in c.upper() for c in codes) or True:
+    if re.search(
+        r"may\s+(?:omit|waive|exclude)\s+(?:fire|fire\s+protection)"
+        r"|fire\s+protection\s+(?:may\s+be\s+)?omitted"
+        r"|fire\s+protection\s+not\s+required",
+        er,
+        re.I,
+    ):
+        codes = [str(s.get("code") or "") for s in ctx.selected_standards]
+        fire_related = any(
+            re.search(r"FIRE|4102|BRAND|NFPA|REI|CODE55", c.upper()) for c in codes if c
+        )
+        if fire_related:
             return HybridDiscrepancy(
                 check="er_vs_standard_clause",
                 summary="ER language appears to relax fire protection while fire standards typically apply.",

@@ -13,8 +13,9 @@ from app.services.extractor import extract_document_full
 
 logger = logging.getLogger(__name__)
 
-_MAX_CATALOG_TEXT = 80_000
-_MAX_CATALOG_PAGES = 20
+# Full-volume Word/PDF standards can exceed 300k chars — avoid analyze-time truncation.
+_MAX_CATALOG_TEXT = 500_000
+_MAX_CATALOG_PAGES = 200
 
 
 async def ensure_catalog_standard_text(
@@ -22,11 +23,14 @@ async def ensure_catalog_standard_text(
     asset: CatalogStandardAsset,
     *,
     max_chars: int = _MAX_CATALOG_TEXT,
+    force_refresh: bool = False,
 ) -> str:
     """Return cached extracted text for a catalog PDF, extracting once if needed."""
     existing = (getattr(asset, "extracted_text", None) or "").strip()
-    if len(existing) >= 40:
-        return existing[:max_chars]
+    if not force_refresh and len(existing) >= 40:
+        if max_chars and len(existing) > max_chars:
+            return existing[:max_chars]
+        return existing
 
     try:
         path = await file_storage.open_for_read(asset.stored_path)
@@ -65,3 +69,30 @@ async def ensure_catalog_standard_text(
     except Exception:  # noqa: BLE001
         await db.rollback()
     return text
+
+
+def catalog_asset_is_downloadable(asset: CatalogStandardAsset | None) -> bool:
+    """True when a real uploaded file exists (not ingest placeholders)."""
+    if asset is None:
+        return False
+    stored = (asset.stored_path or "").strip()
+    if not stored or stored.startswith("manual/"):
+        return False
+    return (asset.size_bytes or 0) >= 64
+
+
+async def extract_catalog_standard_text_background(asset_id: int) -> None:
+    """Run text extraction outside the upload HTTP request."""
+    from app.database import SessionLocal
+
+    async with SessionLocal() as db:
+        try:
+            asset = await db.get(CatalogStandardAsset, asset_id)
+            if asset is None:
+                return
+            await ensure_catalog_standard_text(db, asset)
+            from app.services.standard_sections import warm_standard_sections_cache
+
+            await warm_standard_sections_cache(db, standard_code=asset.standard_code)
+        except Exception:  # noqa: BLE001
+            logger.exception("background catalog extract failed asset_id=%s", asset_id)

@@ -1,0 +1,159 @@
+{
+  "timestamp": "2026-08-14T15:14:23.452114+00:00",
+  "phase": "D",
+  "title": "AI/HYBRID Seed Rule Engine (Phase 4)",
+  "db_reachable": true,
+  "db_error": null,
+  "rule_inventory": {
+    "total": 24,
+    "ai_count": 9,
+    "hybrid_count": 15,
+    "codes": [
+      "SCH-SEED-004",
+      "SCH-SEED-006",
+      "SCH-SEED-008",
+      "CON-SEED-001",
+      "CON-SEED-002",
+      "CON-SEED-003",
+      "CON-SEED-004",
+      "SPEC-SEED-001",
+      "SPEC-SEED-002",
+      "SPEC-SEED-003",
+      "BOQ-SEED-005",
+      "DRAW-SEED-002",
+      "DRAW-SEED-003",
+      "DRAW-SEED-004",
+      "TEN-SEED-002",
+      "STD-SEED-003",
+      "STD-SEED-004",
+      "GEO-SEED-002",
+      "GEO-SEED-003",
+      "GEO-SEED-005",
+      "REQ-SEED-001",
+      "REQ-SEED-003",
+      "REQ-SEED-004",
+      "ADD-SEED-001"
+    ],
+    "pass": true
+  },
+  "hybrid_python_first": {
+    "check": "contract_vs_itt_deadlines",
+    "discrepancy_detected": true,
+    "summary": "Contract vs Tender deadline mismatch: completion contract=2026-12-15 itt=2026-10-01 delta=75d",
+    "pass": true
+  },
+  "hybrid_detector_matrix": {
+    "registered_count": 15,
+    "expected_hybrid_checks": 15,
+    "all_registered": true,
+    "hits": {
+      "schedule_cp_outlier": true,
+      "schedule_lag_lead": true,
+      "schedule_overlap_duplicate": false,
+      "contract_vs_itt_deadlines": true,
+      "contract_vs_boq_scope": true,
+      "specs_standards_vs_project_type": false,
+      "specs_vs_drawings": true,
+      "boq_qty_vs_area": false,
+      "drawing_scale_vs_dimensions": true,
+      "standard_clause_semantic_compliance": true,
+      "standard_framework_conflict": true,
+      "geotech_vs_foundation_drawings": false,
+      "geotech_borehole_density": true,
+      "er_vs_technical_specs": false,
+      "er_vs_standard_clause": true
+    },
+    "hit_count": 10,
+    "pass": true
+  },
+  "ai_engine_smoke": {
+    "llm_provider": "local_semantic",
+    "llm_configured": true,
+    "calls": 19,
+    "truncated": null,
+    "hybrid_python_hits": 10,
+    "findings_count": 17,
+    "risk_findings": 17,
+    "source_layers": [
+      "hybrid",
+      "llm_based"
+    ],
+    "con_seed_001_fired": true,
+    "con_seed_has_excerpt": true,
+    "guardrail_events": 0,
+    "total_prompt_tokens": 6574,
+    "pass": true
+  },
+  "guardrail_downgrade_smoke": {
+    "events": 1,
+    "downgraded_to_limitation": true,
+    "pass": true
+  },
+  "llm_diagnostic_smoke": {
+    "finding_code": "AI-LLM-NOT-CONFIGURED",
+    "llm_configured_false": true,
+    "pass": true
+  },
+  "wiring": {
+    "ai_rule_engine_enabled_in_projects": true,
+    "run_ai_hybrid_seed_rules": true,
+    "diagnostic_excluded_from_count": true,
+    "std_seed_003_skip_when_kg": true,
+    "ai_max_calls_default_24": true,
+    "pass": true
+  },
+  "unit_tests": {
+    "command": "C:\\Users\\Aryan Digitai\\AppData\\Local\\Programs\\Python\\Python312\\python.exe -m unittest tests/test_ai_phase_d.py tests/test_ti_phase_c.py tests/test_kg_phase_b.py tests/test_standards_phase_a.py",
+    "exit_code": 0,
+    "stdout_tail": "",
+    "stderr_tail": "............................Executing <Task pending name='Task-7' coro=<TIGraphLinkTests.test_link_ti_finding_creates_clause_and_requirement_edges() running at C:\\Users\\Aryan Digitai\\Desktop\\standard\\backend\\tests\\test_ti_phase_c.py:201> wait_for=<Future pending cb=[Task.task_wakeup()] created at C:\\Users\\Aryan Digitai\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\base_events.py:448> cb=[_run_until_complete_cb() at C:\\Users\\Aryan Digitai\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\base_events.py:181] created at C:\\Users\\Aryan Digitai\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\asyncio\\runners.py:100> took 0.109 seconds\n.........................\n----------------------------------------------------------------------\nRan 53 tests in 2.683s\n\nOK\n",
+    "summary_line": "",
+    "pass": true
+  },
+  "phase_a_prerequisite": {
+    "requirement_count": 90,
+    "clause_count": 58,
+    "catalog_asset_present": true,
+    "pass": true
+  },
+  "phase_b_prerequisite": {
+    "parties_table": true,
+    "project_elements_table": true,
+    "ontology_edges_table": true,
+    "pass": true
+  },
+  "phase_c_prerequisite": {
+    "requirements_load_count": 90,
+    "keyword_path_gated": true,
+    "pass": true
+  },
+  "ai_e2e_smoke": {
+    "persisted_findings": 16,
+    "ai_metrics_calls": 18,
+    "result_json_ai_metrics": true,
+    "source_layers_ok": true,
+    "excerpts_ok": true,
+    "guardrail_events": 0,
+    "pass": true
+  },
+  "real_llm_spot_check": {
+    "pass": false,
+    "skipped": true
+  },
+  "verdict_checks": {
+    "db_reachable": true,
+    "rule_inventory_24": true,
+    "hybrid_python_first": true,
+    "hybrid_detector_matrix": true,
+    "ai_engine_smoke": true,
+    "llm_diagnostic": true,
+    "guardrail_downgrade": true,
+    "wiring": true,
+    "unit_tests": true,
+    "phase_a_preserved": true,
+    "phase_b_preserved": true,
+    "phase_c_preserved": true,
+    "ai_e2e_persist": true
+  },
+  "verdict": "ACCEPTED"
+}

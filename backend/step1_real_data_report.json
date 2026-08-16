@@ -1,0 +1,130 @@
+{
+  "step": 1,
+  "phase": "A",
+  "generated_at": "2026-08-14T07:15:00+00:00",
+  "input_document": {
+    "source": "Website upload/download round-trip (Supabase catalog storage)",
+    "primary_code": "CODE55-VOL1-IR",
+    "alternate_code": "CODE55-01-WWW.TECHNOBETAR.IR",
+    "local_copy": "step1_real_doc/Code55-01-www.technobetar.ir_8d77cf14b76f.docx",
+    "original_name": "Code55-01-www.technobetar.ir.docx",
+    "bytes": 7222341,
+    "sha256": "fdb79b0242b571d6262e6413f8e5d2b6728dba09dd774fef03553ec171c9f3ab",
+    "upload_download_integrity": "VERIFIED — three Supabase copies identical size, eTag, and SHA-256"
+  },
+  "document_inspection": {
+    "is_real_standard_55": true,
+    "evidence": [
+      "ضابطه شماره 1-55 / مشخصات فنی عمومی کارهای ساختمانی بازنگری سوم",
+      "فصل اول کلیات، فصل دوم سلامت ایمنی و محیط زیست، فصل سوم مستندسازی",
+      "بندهای 2-2-x شامل 2-2-3 جلوگیری از سقوط مواد و اشیا",
+      "35 جدول (2-2 تا 3-1) — e.g. جدول 2-2 محتویات جعبه کمک‌های اولیه",
+      "www.technobetar.ir / Nezamfanni.ir in header"
+    ],
+    "structure": {
+      "paragraphs": 2363,
+      "tables": 35,
+      "table_rows": 320,
+      "styles": { "Normal": 2344, "Heading 2": 19 },
+      "full_extract_chars": 390542,
+      "numbered_clause_lines_heuristic": 1047,
+      "clauses_parsed_full_doc": 821,
+      "clauses_parsed_after_80k_catalog_cap": 267,
+      "clauses_section_2_2_full": 80,
+      "clauses_section_2_2_with_body_ge_200_chars": 8,
+      "clauses_section_2_2_with_body_ge_200_after_80k_cap": 2
+    },
+    "upload_download_text_loss": "NOT DETECTED — binary identical after round-trip; text extraction from local copy matches full 390542 chars"
+  },
+  "verification_matrix": {
+    "unit_tests_phase_a": {
+      "status": "AUTOMATED TESTED",
+      "detail": "7/7 passed (test_standards_phase_a.py)"
+    },
+    "website_upload_storage": {
+      "status": "REAL-DATA VERIFIED",
+      "detail": "7.2 MB .docx stored in Supabase; catalog row CODE55-VOL1-IR size_bytes=7222341"
+    },
+    "website_download": {
+      "status": "REAL-DATA VERIFIED",
+      "detail": "Downloaded bytes match stored object (SHA-256 verified)"
+    },
+    "word_text_extraction": {
+      "status": "REAL-DATA VERIFIED",
+      "detail": "python-docx + table cells; 390542 chars from full document"
+    },
+    "catalog_text_cache_80k_cap": {
+      "status": "REAL-DATA VERIFIED (LIMITATION)",
+      "detail": "ensure_catalog_standard_text truncates to 80000 chars — only ~20% of document; extracted_text_len=80000 in DB"
+    },
+    "clause_extraction_heuristic": {
+      "status": "PARTIALLY REAL-DATA VERIFIED",
+      "detail": "821 clauses from full text but many are TOC/index lines with empty body; section 2-2 numbering correct"
+    },
+    "clause_numbering": {
+      "status": "REAL-DATA VERIFIED",
+      "detail": "2-2-1 … 2-2-17, 2-2-3-1 … detected; sample matches Standard 55 Vol 1 structure"
+    },
+    "source_page_provenance": {
+      "status": "NOT VERIFIED",
+      "detail": "Word path has no page-aware extraction; DB source_page_pct=0%; PDF-only page pipeline not used"
+    },
+    "catalog_metadata_country_version_date": {
+      "status": "NOT VERIFIED from document body",
+      "detail": "parse_catalog_file_metadata finds no KEY:value headers in Word; DB country_code=IR and standard_version=effective_1404-04-01 appear manually set in UI, not parsed from file"
+    },
+    "standard_classification_llm": {
+      "status": "REAL-DATA VERIFIED (sample clause)",
+      "detail": "Clause 2-2-7-1 → discipline=hse, topics=[site_safety, temporary_works, emergency_preparedness]"
+    },
+    "requirement_extraction_llm": {
+      "status": "REAL-DATA VERIFIED (sample clause)",
+      "detail": "Clause 2-2-7-1 → 14 semantic requirements (mandatory/prohibition/conditional), incl. min 1.5 m bridge width; validate_requirements warnings=0"
+    },
+    "requirement_validation_modality": {
+      "status": "AUTOMATED TESTED + REAL-DATA VERIFIED (sample)",
+      "detail": "Unit tests pass; real clause validation produced no modality warnings"
+    },
+    "full_catalog_pipeline_persist": {
+      "status": "NOT VERIFIED",
+      "detail": "DB still holds 5 clauses / 14 requirements from prior sample .txt ingest, not the real Word document; --save-catalog on full Word not executed to completion in this audit"
+    },
+    "duplicate_prevention": {
+      "status": "AUTOMATED TESTED",
+      "detail": "Unique index + skip-existing in pipeline; no duplicate clause numbers in full-doc parse"
+    },
+    "semantic_understanding_full_standard": {
+      "status": "NOT VERIFIED",
+      "detail": "LLM proven on one rich clause only; 80k cap + TOC noise prevent whole-document semantic structuring via current website path"
+    }
+  },
+  "db_snapshot_code55_vol1_ir": {
+    "clauses": 5,
+    "requirements": 14,
+    "source_page_pct": 0.0,
+    "note": "Legacy sample ingest — not representative of uploaded Word"
+  },
+  "acceptance_criteria": {
+    "real_word_uploaded": true,
+    "real_content_confirmed": true,
+    "min_20_clauses_from_real_doc_in_db": false,
+    "min_90pct_source_page": false,
+    "catalog_metadata_from_file": false,
+    "semantic_llm_on_real_clause": true,
+    "full_pipeline_end_to_end": false
+  },
+  "step1_verdict": "NOT ACCEPTED",
+  "blocking_gaps": [
+    "Catalog text extraction capped at 80k chars — most of the 390k-char Word document never reaches the ingestion pipeline after website upload",
+    "Heuristic clause parser treats TOC/index lines as clauses (many with empty raw_text)",
+    "No source_page provenance for Word documents",
+    "Metadata (country, version, effective date) not extracted from Word layout — relies on manual UI entry",
+    "Real Word document not persisted through full LLM ingest pipeline into standard_clauses/requirements tables (DB still on sample data)"
+  ],
+  "minimum_additive_fixes_required_before_acceptance": [
+    "Raise or bypass _MAX_CATALOG_TEXT for catalog Word/PDF originals used by persist_catalog_pipeline",
+    "Skip TOC-style lines (trailing page dots / empty body) before clause persistence",
+    "Optional: map Word section breaks or estimated pages for provenance",
+    "Run --save-catalog CODE55-VOL1-IR --force on full cached text after cap fix and verify ≥20 clauses with requirements in DB"
+  ]
+}

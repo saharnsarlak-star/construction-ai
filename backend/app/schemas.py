@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -28,6 +28,8 @@ class DocumentOut(BaseModel):
     id: int
     category: DocumentCategory
     original_name: str
+    taxonomy_code: str | None = None
+    taxonomy_title_fa: str | None = None
     content_type: str | None
     size_bytes: int
     has_text: bool
@@ -261,12 +263,22 @@ class AnalysisOut(BaseModel):
     readiness_score: int
     counts: dict[str, int]
     counts_risk: dict[str, int] | None = None
+    counts_experience: int | None = None
     aggregate_risk_score: int | None = None
     documents_with_limitations: int | None = None
     text_extraction_success_rate: float | None = None
     findings: list[FindingOut]
     # Phase 5 — additive cross-document risk chains (default empty when KG off)
     related_findings_chain: list[RelatedFindingsChain] = []
+    # Analysis engines — which layers contributed (keyword+python+ai+ti+…)
+    engine: str | None = None
+    python_rule_findings: int | None = None
+    ai_rule_findings: int | None = None
+    tender_intelligence_findings: int | None = None
+    experience_findings: int | None = None
+    vision_findings: int | None = None
+    ai_metrics: dict[str, Any] | None = None
+    tender_intelligence_metrics: dict[str, Any] | None = None
     created_at: datetime
 
 
@@ -406,3 +418,179 @@ class ExperienceSuggestOut(BaseModel):
     category: str
     match_keywords: list[str]
     title_suggestion: str | None = None
+
+
+class StandardClauseSectionOut(BaseModel):
+    clause_number: str
+    title: str | None = None
+    text_preview: str | None = None
+    source_page: int | None = None
+    taxonomy_code: str | None = None
+    taxonomy_confidence: float | None = None
+    slot_code: str
+    title_fa: str | None = None
+    title_en: str | None = None
+    path_fa: str | None = None
+
+
+class StandardChapterOut(BaseModel):
+    section: str
+    slot_code: str
+    clauses: list[StandardClauseSectionOut] = []
+
+
+class StandardTopicGroupOut(BaseModel):
+    code: str
+    kind: str = "topic"
+    title_fa: str | None = None
+    title_en: str | None = None
+    path_fa: str | None = None
+    slot_prefix: str | None = None
+    clause_count: int = 0
+    chapters: list[StandardChapterOut] = []
+
+
+class StandardSubcategoryGroupOut(BaseModel):
+    code: str
+    kind: str = "subcategory"
+    title_fa: str | None = None
+    title_en: str | None = None
+    path_fa: str | None = None
+    slot_prefix: str | None = None
+    clause_count: int = 0
+    topics: list[StandardTopicGroupOut] = []
+    chapters: list[StandardChapterOut] = []
+
+
+class StandardCategoryGroupOut(BaseModel):
+    code: str
+    kind: str = "category"
+    title_fa: str | None = None
+    title_en: str | None = None
+    path_fa: str | None = None
+    color_index: int = 0
+    clause_count: int = 0
+    subcategories: list[StandardSubcategoryGroupOut] = []
+    topics: list[StandardTopicGroupOut] = []
+
+
+class StandardSectionsOut(BaseModel):
+    family_code: str
+    standard_code: str
+    standard_version: str | None = None
+    title_fa: str | None = None
+    title_en: str | None = None
+    source: str = "database"
+    category_count: int = 0
+    topic_count: int = 0
+    clause_count: int = 0
+    categories: list[StandardCategoryGroupOut] = []
+
+
+class ImplementationStepOut(BaseModel):
+    id: int
+    step_code: str
+    phase: str
+    sort_order: int
+    title_fa: str
+    title_en: str | None = None
+    description_fa: str | None = None
+    description_en: str | None = None
+    status: str
+    category: str
+    notes: str | None = None
+    deliverables_fa: str | None = None
+    related_paths: str | None = None
+    is_verified: bool = False
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RegistryCategoryOut(BaseModel):
+    id: int
+    code: str
+    title_fa: str
+    title_en: str | None = None
+    description_fa: str | None = None
+    sort_order: int
+    color_index: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class RegistryCategoryPatch(BaseModel):
+    title_fa: str | None = None
+    title_en: str | None = None
+    description_fa: str | None = None
+    sort_order: int | None = None
+    color_index: int | None = None
+
+
+class RegistryCategoryReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+
+class RegistryCategoriesReorder(BaseModel):
+    items: list[RegistryCategoryReorderItem] = Field(min_length=1)
+
+
+class ImplementationStepReorderItem(BaseModel):
+    id: int
+    sort_order: int
+
+
+class RegistryItemsReorder(BaseModel):
+    category_code: str | None = None
+    items: list[ImplementationStepReorderItem] = Field(min_length=1)
+
+
+class ProjectRegistryGroupOut(BaseModel):
+    category: RegistryCategoryOut | None = None
+    category_code: str
+    items: list[ImplementationStepOut]
+
+
+class ProjectRegistryOut(BaseModel):
+    groups: list[ProjectRegistryGroupOut]
+    total_items: int
+
+
+class ImplementationStepCreate(BaseModel):
+    step_code: str = Field(min_length=1, max_length=64)
+    phase: str = Field(min_length=1, max_length=32)
+    sort_order: int | None = None
+    title_fa: str = Field(min_length=1, max_length=512)
+    title_en: str | None = None
+    description_fa: str | None = None
+    description_en: str | None = None
+    status: str = "pending"
+    category: str = "general"
+    notes: str | None = None
+    deliverables_fa: str | None = None
+    related_paths: str | None = None
+    is_verified: bool = False
+
+
+class ImplementationStepPatch(BaseModel):
+    step_code: str | None = None
+    phase: str | None = None
+    sort_order: int | None = None
+    title_fa: str | None = None
+    title_en: str | None = None
+    description_fa: str | None = None
+    description_en: str | None = None
+    status: str | None = None
+    category: str | None = None
+    notes: str | None = None
+    deliverables_fa: str | None = None
+    related_paths: str | None = None
+    is_verified: bool | None = None
+
+
+class ImplementationStepsReorder(BaseModel):
+    items: list[ImplementationStepReorderItem] = Field(min_length=1)

@@ -38,6 +38,8 @@ export interface DocumentOut {
   id: number;
   category: DocumentCategory;
   original_name: string;
+  taxonomy_code?: string | null;
+  taxonomy_title_fa?: string | null;
   content_type: string | null;
   size_bytes: number;
   has_text: boolean;
@@ -100,6 +102,14 @@ export interface AnalysisOut {
   documents_with_limitations?: number | null;
   text_extraction_success_rate?: number | null;
   findings: FindingOut[];
+  engine?: string | null;
+  python_rule_findings?: number | null;
+  ai_rule_findings?: number | null;
+  tender_intelligence_findings?: number | null;
+  experience_findings?: number | null;
+  vision_findings?: number | null;
+  ai_metrics?: Record<string, unknown> | null;
+  tender_intelligence_metrics?: Record<string, unknown> | null;
   created_at: string;
 }
 
@@ -113,6 +123,115 @@ export interface ProjectStandardOut {
   selected_by: string;
   check_target: string;
   has_pdf?: boolean;
+}
+
+export interface StandardClauseSectionOut {
+  clause_number: string;
+  title?: string | null;
+  text_preview?: string | null;
+  source_page?: number | null;
+  taxonomy_code?: string | null;
+  taxonomy_confidence?: number | null;
+  slot_code: string;
+  title_fa?: string | null;
+  title_en?: string | null;
+  path_fa?: string | null;
+}
+
+export interface StandardChapterOut {
+  section: string;
+  slot_code: string;
+  clauses: StandardClauseSectionOut[];
+}
+
+export interface StandardTopicGroupOut {
+  code: string;
+  kind?: string;
+  title_fa?: string | null;
+  title_en?: string | null;
+  path_fa?: string | null;
+  slot_prefix?: string | null;
+  clause_count?: number;
+  chapters: StandardChapterOut[];
+}
+
+export interface StandardSubcategoryGroupOut {
+  code: string;
+  kind?: string;
+  title_fa?: string | null;
+  title_en?: string | null;
+  path_fa?: string | null;
+  slot_prefix?: string | null;
+  clause_count?: number;
+  topics?: StandardTopicGroupOut[];
+  chapters?: StandardChapterOut[];
+}
+
+export interface StandardCategoryGroupOut {
+  code: string;
+  kind?: string;
+  title_fa?: string | null;
+  title_en?: string | null;
+  path_fa?: string | null;
+  color_index: number;
+  clause_count?: number;
+  subcategories: StandardSubcategoryGroupOut[];
+  topics?: StandardTopicGroupOut[];
+}
+
+export interface StandardSectionsOut {
+  family_code: string;
+  standard_code: string;
+  standard_version?: string | null;
+  title_fa?: string | null;
+  title_en?: string | null;
+  source: string;
+  category_count: number;
+  topic_count: number;
+  clause_count: number;
+  categories: StandardCategoryGroupOut[];
+}
+
+export interface ImplementationStepOut {
+  id: number;
+  step_code: string;
+  phase: string;
+  sort_order: number;
+  title_fa: string;
+  title_en?: string | null;
+  description_fa?: string | null;
+  description_en?: string | null;
+  status: string;
+  category: string;
+  notes?: string | null;
+  deliverables_fa?: string | null;
+  related_paths?: string | null;
+  is_verified?: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RegistryCategoryOut {
+  id: number;
+  code: string;
+  title_fa: string;
+  title_en?: string | null;
+  description_fa?: string | null;
+  sort_order: number;
+  color_index: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectRegistryGroupOut {
+  category: RegistryCategoryOut | null;
+  category_code: string;
+  items: ImplementationStepOut[];
+}
+
+export interface ProjectRegistryOut {
+  groups: ProjectRegistryGroupOut[];
+  total_items: number;
 }
 
 export interface ExperienceOut {
@@ -263,11 +382,65 @@ export interface UploadBatchOut {
   errors: UploadErrorOut[];
 }
 
+export interface TaxonomyTopicOut {
+  code: string;
+  title_fa: string;
+  title_en: string;
+  parent_code: string;
+  kind: string;
+  legacy_category: DocumentCategory;
+}
+
+export interface TaxonomyNodeOut {
+  code: string;
+  title_fa: string;
+  title_en: string;
+  kind: string;
+  items: string[];
+  topics: TaxonomyTopicOut[];
+  legacy_category: DocumentCategory;
+  subcategories: TaxonomyNodeOut[];
+}
+
+export interface TaxonomyTreeOut {
+  meta: {
+    schema_version: number;
+    taxonomy_id: string;
+    taxonomy_name: string;
+    language: string;
+    code_format: string;
+    category_count: number;
+    subcategory_count: number;
+    topic_count: number;
+    total_codes: number;
+  };
+  categories: TaxonomyNodeOut[];
+}
+
+export interface TaxonomySearchHitOut {
+  code: string;
+  title_fa: string;
+  title_en: string;
+  legacy_category: DocumentCategory;
+  parent_code: string | null;
+  kind?: string;
+  path_fa?: string;
+}
+
+export interface TaxonomySearchOut {
+  query: string;
+  results: TaxonomySearchHitOut[];
+}
+
 const API_BASE =
   import.meta.env.VITE_API_BASE || "https://construction-ai-production-1d78.up.railway.app/api";
 
 /** Keep each request small so Railway/proxy do not time out on bulk uploads. */
 export const UPLOAD_CHUNK_SIZE = 4;
+
+/** Catalog standard originals — PDF and Word (.docx preferred; legacy .doc accepted). */
+export const CATALOG_STANDARD_ACCEPT =
+  ".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document";
 
 const FILE_ACCEPT =
   ".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt,.png,.jpg,.jpeg,.tif,.tiff,.bmp,.webp,.dwg,.dxf,.rvt,.rfa,.rte,.rft,.ifc,.x81,.x82,.x83,.x84,.x85,.x86,.d81,.d82,.d83,.d84,.d85,.d86";
@@ -283,12 +456,52 @@ export const FILE_ACCEPT_BY_CATEGORY: Record<DocumentCategory, string> = {
 
 export { FILE_ACCEPT };
 
+function parseContentDispositionFilename(cd: string): string | null {
+  const utf8 = /filename\*=UTF-8''([^;\n]+)/i.exec(cd);
+  if (utf8?.[1]) {
+    try {
+      return decodeURIComponent(utf8[1].trim());
+    } catch {
+      return utf8[1].trim();
+    }
+  }
+  const plain = /filename="?([^";\n]+)"?/i.exec(cd);
+  return plain?.[1]?.trim() || null;
+}
+
+function extensionFromContentType(contentType: string): string {
+  const ct = contentType.toLowerCase();
+  if (ct.includes("wordprocessingml")) return ".docx";
+  if (ct.includes("msword")) return ".doc";
+  if (ct.includes("pdf")) return ".pdf";
+  return "";
+}
+
+function ensureDownloadFilename(base: string, contentType: string): string {
+  const trimmed = base.trim() || "standard";
+  if (/\.[a-z0-9]{2,5}$/i.test(trimmed)) return trimmed;
+  const ext = extensionFromContentType(contentType) || ".bin";
+  return `${trimmed}${ext}`;
+}
+
 export function parseApiError(err: unknown): string {
   if (!(err instanceof Error)) return String(err);
-  const msg = err.message;
+  const msg = err.message.trim();
+  if (!msg || msg === "Internal Server Error") {
+    return "Server error — please try again in a few seconds.";
+  }
+  if (/bad gateway|502|503|504/i.test(msg)) {
+    return "Backend unavailable (Bad Gateway) — wait a few seconds and retry.";
+  }
   try {
-    const parsed = JSON.parse(msg) as { detail?: string | { msg?: string }[] };
+    const parsed = JSON.parse(msg) as {
+      detail?: string | { msg?: string; message?: string }[] | { message?: string; errors?: unknown[] };
+    };
     if (typeof parsed.detail === "string") return parsed.detail;
+    if (parsed.detail && typeof parsed.detail === "object" && !Array.isArray(parsed.detail)) {
+      const nested = parsed.detail as { message?: string };
+      if (nested.message) return nested.message;
+    }
     if (Array.isArray(parsed.detail)) {
       return parsed.detail.map((d) => d.msg || String(d)).join(", ");
     }
@@ -311,8 +524,35 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.json() as Promise<T>;
 }
 
+/** Multipart uploads can be large — allow up to 3 minutes before aborting. */
+async function uploadRequest<T>(path: string, init: RequestInit, timeoutMs = 180_000): Promise<T> {
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const headers = authHeaders(init.headers);
+    const res = await fetch(`${API_BASE}${path}`, { ...init, headers, signal: controller.signal });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(text || res.statusText);
+    }
+    const ct = res.headers.get("content-type") || "";
+    if (!ct.includes("application/json")) return undefined as T;
+    return res.json() as Promise<T>;
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new Error("Upload timed out — try a smaller file or split the document.");
+    }
+    throw err;
+  } finally {
+    window.clearTimeout(timer);
+  }
+}
+
 export const api = {
   listProjects: () => request<ProjectOut[]>("/projects"),
+  getTaxonomy: () => uploadRequest<TaxonomyTreeOut>("/taxonomy", {}, 120_000),
+  searchTaxonomy: (q: string, limit = 20) =>
+    request<TaxonomySearchOut>(`/taxonomy/search?q=${encodeURIComponent(q)}&limit=${limit}`),
   createProject: (body: {
     name: string;
     country: CountryCode;
@@ -381,7 +621,7 @@ export const api = {
     const form = new FormData();
     form.append("category", category);
     Array.from(files).forEach((f) => form.append("files", f, f.name));
-    return request<UploadBatchOut>(`/projects/${projectId}/documents`, {
+    return uploadRequest<UploadBatchOut>(`/projects/${projectId}/documents`, {
       method: "POST",
       body: form,
     });
@@ -401,7 +641,7 @@ export const api = {
     form.append("standard_class", params.standard_class || "technical");
     if (params.publisher) form.append("publisher", params.publisher);
     if (params.project_id != null) form.append("project_id", String(params.project_id));
-    return request<CatalogStandardOut>("/standards/catalog", {
+    return uploadRequest<CatalogStandardOut>("/standards/catalog", {
       method: "POST",
       body: form,
     });
@@ -413,23 +653,40 @@ export const api = {
     );
     if (!res.ok) {
       const text = await res.text();
-      throw new Error(text || res.statusText);
+      throw new Error(parseApiError(new Error(text || res.statusText)));
     }
+    const contentType = res.headers.get("content-type") || "";
     const blob = await res.blob();
+    if (blob.size < 64) {
+      throw new Error("Downloaded file is empty or missing on the server.");
+    }
+    if (contentType.includes("application/json")) {
+      throw new Error("Server returned an error instead of a file.");
+    }
     const cd = res.headers.get("content-disposition") || "";
-    const match = /filename="?([^";]+)"?/i.exec(cd);
-    const filename = match?.[1] || `${standardCode}.pdf`;
+    const filename = ensureDownloadFilename(
+      parseContentDispositionFilename(cd) || standardCode,
+      blob.type || contentType,
+    );
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = filename;
+    a.rel = "noopener";
     document.body.appendChild(a);
     a.click();
     a.remove();
-    URL.revokeObjectURL(url);
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    return filename;
   },
   listProjectStandards: (projectId: number) =>
     request<ProjectStandardOut[]>(`/projects/${projectId}/standards`),
+  getProjectStandardSections: (projectId: number, standardCode: string) =>
+    uploadRequest<StandardSectionsOut>(
+      `/projects/${projectId}/standards/${encodeURIComponent(standardCode)}/sections`,
+      {},
+      180_000,
+    ),
   updateProjectStandards: (projectId: number, items: { standard_code: string; is_selected: boolean }[]) =>
     request<ProjectStandardOut[]>(`/projects/${projectId}/standards`, {
       method: "PUT",
@@ -517,4 +774,46 @@ export const api = {
     ),
   listExperienceCategories: () =>
     request<{ categories: { code: string; keywords_sample: string[] }[] }>("/experience/categories"),
+  listImplementationSteps: () => request<ImplementationStepOut[]>("/implementation-steps"),
+  patchImplementationStep: (
+    id: number,
+    body: Partial<
+      Pick<
+        ImplementationStepOut,
+        | "step_code"
+        | "phase"
+        | "sort_order"
+        | "title_fa"
+        | "title_en"
+        | "description_fa"
+        | "description_en"
+        | "status"
+        | "category"
+        | "notes"
+        | "deliverables_fa"
+        | "related_paths"
+        | "is_verified"
+      >
+    >,
+  ) =>
+    request<ImplementationStepOut>(`/implementation-steps/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  getProjectRegistry: () => request<ProjectRegistryOut>("/project-registry"),
+  reorderRegistryItems: (categoryCode: string, items: { id: number; sort_order: number }[]) =>
+    request<ImplementationStepOut[]>("/project-registry/items/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ category_code: categoryCode, items }),
+    }),
+  reorderImplementationSteps: (items: { id: number; sort_order: number }[]) =>
+    request<ImplementationStepOut[]>("/implementation-steps/reorder", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+    }),
+  deleteImplementationStep: (id: number) =>
+    request<void>(`/implementation-steps/${id}`, { method: "DELETE" }),
 };

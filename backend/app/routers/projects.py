@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 from pathlib import Path
 from typing import Annotated
@@ -11,6 +12,7 @@ from sqlalchemy.orm import selectinload
 from app.auth import Principal, get_principal
 from app.config import settings
 from app.database import get_db
+from app.db_connect import is_transient_db_error, run_with_db_retry
 from app.models import (
     Analysis,
     CatalogStandardAsset,
@@ -41,6 +43,7 @@ from app.schemas import (
     UploadErrorOut,
 )
 from app.services.analyzer import analyze_project_documents, enrich_findings_document_sources
+from app.services.catalog_standard_text import catalog_asset_is_downloadable
 from app.services.demo_limits import (
     assert_can_analyze,
     assert_can_create_project,
@@ -51,13 +54,18 @@ from app.services.extractor import SUPPORTED_EXTENSIONS, extract_text_from_file,
 from app.services.extraction_jobs import process_document_extraction, queued_meta
 from app.services.rule_engine import run_python_seed_rules
 from app.services.rule_engine.ai_engine import run_ai_hybrid_seed_rules
+from app.services.finding_guardrail import apply_guardrails_to_findings
 from app.services.knowledge_graph import build_chains_for_analysis
+from app.services.standards_kg_bridge import link_project_standards_to_graph
 from app.services import storage as file_storage
 from app.services.project_standards import (
     ensure_project_standards,
     list_or_seed_project_standards,
     toggle_one_standard,
 )
+
+logger = logging.getLogger(__name__)
+
 from app.knowledge.country_profiles import get_country_profile
 from app.knowledge.standards_catalog import get_standard
 
@@ -90,13 +98,24 @@ def _extraction_fields(doc: Document) -> dict:
     }
 
 
+def _guess_taxonomy_code(filename: str, search_fn) -> str | None:
+    stem = Path(filename).stem.replace("_", " ").replace("-", " ")
+    hits = search_fn(stem, limit=1)
+    return hits[0]["code"] if hits else None
+
+
 def _doc_out(doc: Document) -> DocumentOut:
+    from app.tender_taxonomy import get_entry
+
     text = doc.extracted_text or ""
     extra = _extraction_fields(doc)
+    entry = get_entry(doc.taxonomy_code) if doc.taxonomy_code else None
     return DocumentOut(
         id=doc.id,
         category=doc.category,
         original_name=doc.original_name,
+        taxonomy_code=doc.taxonomy_code,
+        taxonomy_title_fa=entry.title_fa if entry else None,
         content_type=doc.content_type,
         size_bytes=doc.size_bytes,
         has_text=has_usable_text(text),
@@ -272,8 +291,12 @@ def _standard_out(
 
 
 async def _catalog_pdf_codes(db: AsyncSession) -> set[str]:
-    result = await db.execute(select(CatalogStandardAsset.standard_code))
-    return set(result.scalars().all())
+    result = await db.execute(select(CatalogStandardAsset))
+    return {
+        asset.standard_code
+        for asset in result.scalars().all()
+        if catalog_asset_is_downloadable(asset)
+    }
 
 
 def _project_lang(project: Project) -> str:
@@ -347,6 +370,7 @@ async def upload_documents(
     category: Annotated[DocumentCategory, Form()],
     files: Annotated[list[UploadFile], File()],
     background_tasks: BackgroundTasks,
+    taxonomy_code: Annotated[str | None, Form()] = None,
     db: AsyncSession = Depends(get_db),
     principal: Principal = Depends(get_principal),
 ) -> UploadBatchOut:
@@ -361,12 +385,29 @@ async def upload_documents(
             status_code=403,
             detail="Admin role required to upload standards. Users may only view/select and download PDFs.",
         )
-    project = await _get_project(db, project_id)
+    project = await run_with_db_retry(lambda: _get_project_meta(db, project_id))
     if not files:
         raise HTTPException(status_code=400, detail="No files uploaded")
 
     from app.models import AppUser
     from app.services.demo_limits import is_demo_user
+    from app.tender_taxonomy import get_entry, legacy_document_category, search_taxonomy
+
+    resolved_taxonomy: str | None = None
+    if taxonomy_code:
+        code = taxonomy_code.strip()
+        if not get_entry(code):
+            raise HTTPException(status_code=400, detail=f"Unknown taxonomy code: {code}")
+        resolved_taxonomy = code
+        expected = legacy_document_category(code)
+        if category != expected and category != DocumentCategory.TENDER:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Taxonomy {code} belongs under '{expected.value}' upload, "
+                    f"not '{category.value}'."
+                ),
+            )
 
     owner = await db.get(AppUser, principal.id) if principal.id is not None else None
     if project.is_demo or is_demo_user(owner):
@@ -431,6 +472,7 @@ async def upload_documents(
                 project_id=project.id,
                 category=category,
                 original_name=name,
+                taxonomy_code=resolved_taxonomy or _guess_taxonomy_code(name, search_taxonomy),
                 stored_path=stored_path,
                 content_type=upload.content_type,
                 size_bytes=size,
@@ -439,10 +481,12 @@ async def upload_documents(
             )
             db.add(doc)
             saved.append(doc)
+        except HTTPException:
+            raise
         except file_storage.StorageError as exc:
             errors.append(UploadErrorOut(filename=name, detail=str(exc)))
         except Exception as exc:  # noqa: BLE001 — keep batch going
-            errors.append(UploadErrorOut(filename=name, detail=str(exc)))
+            errors.append(UploadErrorOut(filename=name, detail=str(exc) or exc.__class__.__name__))
 
     if not saved and errors:
         raise HTTPException(
@@ -453,9 +497,34 @@ async def upload_documents(
             },
         )
 
-    await db.commit()
+    async def _commit_batch() -> None:
+        await db.commit()
+        for doc in saved:
+            await db.refresh(doc)
+
+    try:
+        await run_with_db_retry(_commit_batch)
+    except Exception as exc:
+        await db.rollback()
+        for doc in saved:
+            try:
+                await file_storage.delete_stored(doc.stored_path)
+            except Exception:  # noqa: BLE001
+                pass
+        if is_transient_db_error(exc):
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    "Database connection failed while saving files. "
+                    "Please wait a few seconds and try again."
+                ),
+            ) from exc
+        raise HTTPException(
+            status_code=500,
+            detail=f"Could not save uploaded files: {exc}",
+        ) from exc
+
     for doc in saved:
-        await db.refresh(doc)
         if doc.meta_json and '"queued"' in doc.meta_json:
             extract_ids.append(doc.id)
 
@@ -835,6 +904,7 @@ async def analyze_project(
         documents=docs_payload,
         project_type=ptype,
         selected_standards=selected_standards,
+        skip_keyword_standards=settings.ti_semantic_active,
     )
 
     # Phase 3/4 rule engines (default OFF). Keyword analyzer always runs first unchanged.
@@ -896,17 +966,37 @@ async def analyze_project(
 
         # Phase 4: AI / HYBRID. HYBRID python-detects first inside ai_engine, then LLM explains.
         if settings.ai_rule_engine_enabled:
+            standard_req_payload: list[dict] = []
+            if selected_standards:
+                from app.standards_engine.ingestion.pipeline import load_requirements_for_standard
+
+                for s in selected_standards:
+                    code = str(s.get("code") or s.get("standard_code") or "").strip()
+                    if not code or s.get("is_selected") is False:
+                        continue
+                    _, reqs = await load_requirements_for_standard(db, standard_code=code)
+                    for r in reqs:
+                        standard_req_payload.append(
+                            {
+                                **r,
+                                "standard_code": code,
+                                "text": r.get("requirement_text") or "",
+                            }
+                        )
             ai_findings, ai_metrics = run_ai_hybrid_seed_rules(
                 country=project.country,
                 report_language=report_language,
                 documents=docs_payload,
                 project_type=ptype,
                 selected_standards=selected_standards,
+                standard_requirements=standard_req_payload,
                 elements=element_payload,
                 project_id=project.id,
                 rkb_catalog=rkb_catalog,
             )
-            ai_engine_count = len(ai_findings)
+            ai_engine_count = len(
+                [f for f in ai_findings if f.code != "AI-LLM-NOT-CONFIGURED"]
+            )
             for af in ai_findings:
                 by_code[af.code] = af
 
@@ -965,6 +1055,56 @@ async def analyze_project(
             }
             result["counts_experience"] = experience_count
 
+    # TI-1 — Semantic standards compliance / silence detection (Phase C)
+    ti_count = 0
+    ti_metrics: dict = {}
+    ti_findings_pending: list = []
+    if settings.ti_semantic_active:
+        from app.services.tender_intelligence import run_semantic_standards_compliance
+
+        ti_corpus_bits = [
+            str(d.get("extracted_text") or "")
+            for d in docs_payload
+            if (d.get("extracted_text") or "").strip()
+        ]
+        ti_std_codes = [
+            str(s.get("code") or s.get("standard_code") or "").strip()
+            for s in (selected_standards or [])
+            if str(s.get("code") or s.get("standard_code") or "").strip()
+        ]
+        ti_findings, ti_metrics = await run_semantic_standards_compliance(
+            db,
+            project_id=project.id,
+            selected_standard_codes=ti_std_codes,
+            document_corpus="\n".join(ti_corpus_bits)[:200_000],
+            lang=report_language,
+        )
+        ti_findings_pending = [
+            f for f in ti_findings if f.code != "TI-LLM-NOT-CONFIGURED"
+        ]
+        ti_count = len(
+            [f for f in ti_findings_pending if getattr(f, "finding_category", "risk") == "risk"]
+        )
+        if ti_findings:
+            by_code_ti = {f.code: f for f in (result.get("findings") or [])}
+            for tf in ti_findings:
+                by_code_ti[tf.code] = tf
+            merged_ti = list(by_code_ti.values())
+            merged_ti = enrich_findings_document_sources(merged_ti, docs_payload, lang=report_language)
+            result["findings"] = merged_ti
+            engines = [result.get("engine") or "keyword"]
+            engines.append("tender_intelligence")
+            result["engine"] = "+".join(dict.fromkeys(str(e) for e in engines))
+            risks_only = [
+                f for f in merged_ti if getattr(f, "finding_category", "risk") == "risk"
+            ]
+            result["counts_risk"] = {
+                "high": sum(1 for f in risks_only if f.severity.value == "high"),
+                "medium": sum(1 for f in risks_only if f.severity.value == "medium"),
+                "low": sum(1 for f in risks_only if f.severity.value == "low"),
+                "total": len(risks_only),
+            }
+
     # Phase 8 — Vision drawing checks (DRAW-SEED-002..004); default OFF
     vision_count = 0
     vision_metrics: dict = {}
@@ -1019,6 +1159,8 @@ async def analyze_project(
                 "python_rule_findings": rule_engine_count,
                 "ai_rule_findings": ai_engine_count,
                 "experience_findings": experience_count,
+                "tender_intelligence_findings": ti_count,
+                "tender_intelligence_metrics": ti_metrics,
                 "vision_findings": vision_count,
                 "vision_metrics": vision_metrics,
                 "ai_metrics": ai_metrics,
@@ -1033,6 +1175,23 @@ async def analyze_project(
     )
     db.add(analysis)
     await db.flush()
+
+    # Part 5 evidence guardrail — downgrade Med/High without evidence before persist.
+    guardrail_events: list = []
+    try:
+        findings_for_guardrail = list(result.get("findings") or [])
+        guarded, guardrail_events = apply_guardrails_to_findings(findings_for_guardrail)
+        result["findings"] = guarded
+        if guardrail_events:
+            risks_only = [f for f in guarded if getattr(f, "finding_category", "risk") == "risk"]
+            result["counts_risk"] = {
+                "high": sum(1 for f in risks_only if f.severity.value == "high"),
+                "medium": sum(1 for f in risks_only if f.severity.value == "medium"),
+                "low": sum(1 for f in risks_only if f.severity.value == "low"),
+                "total": len(risks_only),
+            }
+    except Exception:  # noqa: BLE001
+        logger.exception("Finding guardrail failed for project %s", project.id)
 
     seen_codes: set[str] = set()
     for item in result["findings"]:
@@ -1066,12 +1225,41 @@ async def analyze_project(
             )
         )
 
+    # TI-1 graph edges: Finding → StandardClause (gaps / conflicts_with)
+    if settings.knowledge_graph_enabled and ti_findings_pending:
+        try:
+            from app.services.tender_intelligence import link_ti_findings_to_graph
+
+            await db.flush()
+            persisted = (
+                await db.execute(select(Finding).where(Finding.analysis_id == analysis.id))
+            ).scalars().all()
+            ti_linked = await link_ti_findings_to_graph(
+                db,
+                project_id=project.id,
+                finding_rows=persisted,
+                ti_findings=ti_findings_pending,
+                document_id=next(
+                    (int(d["id"]) for d in docs_payload if d.get("id") is not None and str(d.get("category", "")).lower() == "tender"),
+                    None,
+                ),
+            )
+            if ti_metrics is not None:
+                ti_metrics["graph_edges_linked"] = ti_linked
+        except Exception:  # noqa: BLE001
+            logger.exception("TI-1 graph linking failed for analysis %s", analysis.id)
+
     # Phase 5: Knowledge Graph risk chains (additive; default OFF)
     related_chains: list = []
     kg_stats: dict = {}
     if settings.knowledge_graph_enabled:
         try:
             await db.flush()
+            if settings.ontology_enabled:
+                std_kg = await link_project_standards_to_graph(
+                    db, project_id=project.id
+                )
+                kg_stats["standards_bridge"] = std_kg
             kg_payload = await build_chains_for_analysis(
                 db,
                 project_id=project.id,
@@ -1087,6 +1275,7 @@ async def analyze_project(
                 "enabled": True,
                 "chain_count": len(related_chains),
                 "link_stats": kg_stats,
+                "guardrail_events": guardrail_events,
             }
             engines = str(payload.get("engine") or "keyword")
             if "knowledge_graph" not in engines:
@@ -1285,6 +1474,7 @@ def _to_analysis_out(analysis: Analysis, *, documents: list[dict] | None = None)
         "low": 0,
         "total": 0,
     }
+    counts_all = payload.get("counts") or counts
     raw_chains = payload.get("related_findings_chain") or []
     chains_out: list[RelatedFindingsChain] = []
     for c in raw_chains:
@@ -1324,12 +1514,21 @@ def _to_analysis_out(analysis: Analysis, *, documents: list[dict] | None = None)
         summary=analysis.summary,
         report_language=analysis.report_language,
         readiness_score=payload.get("readiness_score", 0),
-        counts=counts,
+        counts=counts_all,
         counts_risk=counts,
+        counts_experience=payload.get("counts_experience"),
         aggregate_risk_score=payload.get("aggregate_risk_score"),
         documents_with_limitations=payload.get("documents_with_limitations"),
         text_extraction_success_rate=payload.get("text_extraction_success_rate"),
         findings=findings_out,
         related_findings_chain=chains_out,
+        engine=payload.get("engine"),
+        python_rule_findings=payload.get("python_rule_findings"),
+        ai_rule_findings=payload.get("ai_rule_findings"),
+        tender_intelligence_findings=payload.get("tender_intelligence_findings"),
+        experience_findings=payload.get("experience_findings"),
+        vision_findings=payload.get("vision_findings"),
+        ai_metrics=payload.get("ai_metrics"),
+        tender_intelligence_metrics=payload.get("tender_intelligence_metrics"),
         created_at=analysis.created_at,
     )

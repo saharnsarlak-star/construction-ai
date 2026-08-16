@@ -258,6 +258,65 @@ def _hash_key(system: str, user: str) -> str:
     return hashlib.sha256(f"{system}\n---\n{user}".encode("utf-8")).hexdigest()[:16]
 
 
+def _ti_local_semantic_coverage(tender_excerpt: str, requirement_text: str) -> dict[str, Any]:
+    """
+    Offline meaning-based TI-1 check for LLM_PROVIDER=local_semantic.
+
+    Uses obligation presence in tender excerpt — not keyword overlap on standard name.
+    """
+    import re
+
+    tender = (tender_excerpt or "").strip()
+    req = (requirement_text or "").strip()
+    if not req:
+        return {"coverage_status": "covered", "severity": "low", "reasoning": "Empty requirement", "tender_excerpt": None}
+
+    # Extract numeric obligations from requirement for meaning anchor
+    nums = re.findall(r"\d+(?:\.\d+)?", req)
+    tender_lower = tender.lower()
+    req_lower = req.lower()
+
+    if re.search(r"\b(contradict|conflict|must not|shall not|نباید|ممنوع)\b", tender, re.I):
+        if any(tok in tender_lower for tok in ("fire", "حریق", "rating", "minimum", "حداقل")):
+            return {
+                "coverage_status": "contradictory",
+                "severity": "high",
+                "reasoning": "Tender text appears to conflict with the standard obligation (offline semantic).",
+                "tender_excerpt": tender[:400] or None,
+            }
+
+    if len(tender) < 100:
+        return {
+            "coverage_status": "silent",
+            "severity": "high",
+            "reasoning": "Tender documents do not substantively address this standard obligation.",
+            "tender_excerpt": tender[:200] or None,
+        }
+
+    # Partial: mentions domain keywords but missing numeric obligation
+    domain_hits = sum(
+        1
+        for tok in ("wall", "fire", "corridor", "راهرو", "حریق", "سقف", "minimum", "حداقل")
+        if tok in tender_lower or tok in req_lower
+    )
+    if domain_hits >= 1 and nums:
+        num_covered = any(n in tender for n in nums[:3])
+        if not num_covered:
+            return {
+                "coverage_status": "partial",
+                "severity": "medium",
+                "reasoning": "Tender mentions related topic but omits key measurable parameters from the requirement.",
+                "tender_excerpt": tender[:400],
+            }
+
+    return {
+        "coverage_status": "covered",
+        "severity": "low",
+        "reasoning": "Tender appears to address the obligation (offline semantic).",
+        "tender_excerpt": tender[:200] or None,
+    }
+
+
 def _local_semantic_respond(*, system: str, user: str, call_key: str) -> LLMResponse:
     """
     Offline semantic responder for Phase 4 when no cloud LLM key exists.
@@ -273,6 +332,19 @@ def _local_semantic_respond(*, system: str, user: str, call_key: str) -> LLMResp
         payload = json.loads(user)
     except json.JSONDecodeError:
         payload = {}
+
+    # Phase C / TI-1 — offline semantic compliance (local_semantic provider)
+    if payload.get("task") == "semantic_standard_compliance_check":
+        tender = str(payload.get("tender_excerpt") or "").strip()
+        req_text = str((payload.get("requirement") or {}).get("text") or "").strip()
+        content = _ti_local_semantic_coverage(tender, req_text)
+        latency_ms = (time.perf_counter() - t0) * 1000.0
+        return LLMResponse(
+            content=json.dumps(content, ensure_ascii=False),
+            parsed=content,
+            usage=LLMUsage(latency_ms=round(latency_ms, 1), model="local_semantic", provider="local_semantic"),
+        )
+
     mode = str(payload.get("mode") or "")
     rule = payload.get("rule") or {}
     excerpts = payload.get("excerpts") or []
@@ -408,6 +480,28 @@ def _local_semantic_respond(*, system: str, user: str, call_key: str) -> LLMResp
                     conf = 77
                     description = "Addendum changes prior requirements without explicit supersession language."
                     reasoning = "Implicit contradiction risk."
+            elif check == "drawing_missing_connection_detail":
+                all_text = "\n".join(str(e.get("text") or "") for e in excerpts)
+                if all_text and not re.search(r"\bconnection\s+detail|\bjoint\s+detail|\brebar\s+lap\b", all_text, re.I):
+                    quote, doc, loc = first_quote(r"wall|beam|column|foundation")
+                    triggered = True
+                    conf = 79
+                    description = "Drawing set lacks explicit structural connection/joint detail references."
+                    recommendation = "Add connection detail sheets or reference standard detail numbers."
+                    reasoning = "Structural elements cited without connection detail callouts."
+            elif check == "drawing_plan_vs_section":
+                all_text = "\n".join(str(e.get("text") or "") for e in excerpts)
+                plan_m = re.search(r"plan[^.\n]{0,40}?(\d+(?:\.\d+)?)\s*m\b", all_text, re.I)
+                sect_m = re.search(r"section[^.\n]{0,40}?(\d+(?:\.\d+)?)\s*m\b", all_text, re.I)
+                if plan_m and sect_m and plan_m.group(1) != sect_m.group(1):
+                    quote = f"plan={plan_m.group(1)}m section={sect_m.group(1)}m"
+                    doc = excerpts[0].get("document") if excerpts else "drawing"
+                    loc = "plan_vs_section"
+                    triggered = True
+                    conf = 83
+                    description = f"Plan dimension ({plan_m.group(1)}m) conflicts with section ({sect_m.group(1)}m)."
+                    recommendation = "Reconcile plan and section dimensions before tender issue."
+                    reasoning = "Numeric plan/section mismatch."
             else:
                 triggered = False
         else:

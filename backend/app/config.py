@@ -14,7 +14,7 @@ def _normalize_database_url(url: str) -> str:
     if url.startswith("postgresql://") and "+asyncpg" not in url:
         url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
     # Supabase requires SSL; asyncpg expects ssl=require in the query string.
-    if "supabase.co" in url and "ssl=" not in url:
+    if ("supabase.co" in url or "pooler.supabase.com" in url) and "ssl=" not in url:
         join = "&" if "?" in url else "?"
         url = f"{url}{join}ssl=require"
     return url
@@ -31,12 +31,14 @@ class Settings(BaseSettings):
     api_prefix: str = "/api"
     database_url: str = f"sqlite+aiosqlite:///{(_BASE_DIR / 'tenderrisk.db').as_posix()}"
     storage_dir: Path = _BASE_DIR / "storage"
-    # 0 = بدون سقف حجم (فقط محدودیت فضای دیسک سیستم)
-    max_upload_mb: int = 0
+    # 0 = unlimited (dev only); production should set e.g. 200
+    max_upload_mb: int = 200
     # Railway sets CORS_ORIGINS as comma-separated text — do not JSON-decode it.
     cors_origins: Annotated[list[str], NoDecode] = [
         "http://localhost:5173",
         "http://127.0.0.1:5173",
+        "http://localhost:5174",
+        "http://127.0.0.1:5174",
     ]
 
     # Supabase (optional — when set, files go to Storage)
@@ -71,10 +73,16 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4o-mini"
     llm_provider: str = "openai_compatible"  # openai_compatible | replay
     llm_replay_path: str | None = None
-    ai_max_calls_per_analysis: int = 12
+    ai_max_calls_per_analysis: int = 24
 
     # Phase 5 — Knowledge Graph risk chains (default OFF)
     knowledge_graph_enabled: bool = False
+
+    # Phase C / TI-1 — semantic standards compliance (can run without full KG graph)
+    ti_semantic_standards_enabled: bool = False
+
+    # Phase C / TI-1 — max requirements checked per standard per analysis (0 = no cap)
+    ti_max_checks_per_standard: int = 0
 
     # Phase 6 — Risk Knowledge Base in DB (default OFF; fallback to Python seed dicts)
     rkb_db_enabled: bool = False
@@ -94,6 +102,7 @@ class Settings(BaseSettings):
         "new_rule_engine_enabled",
         "ai_rule_engine_enabled",
         "knowledge_graph_enabled",
+        "ti_semantic_standards_enabled",
         "rkb_db_enabled",
         "experience_layer_enabled",
         "vision_drawing_checks_enabled",
@@ -144,6 +153,15 @@ class Settings(BaseSettings):
         if self.force_local_storage:
             return False
         return bool(self.supabase_url and self.supabase_service_role_key)
+
+    @property
+    def ti_semantic_active(self) -> bool:
+        """TI-1 semantic compliance runs when KG or dedicated TI flag is on."""
+        return self.knowledge_graph_enabled or self.ti_semantic_standards_enabled
+
+    @property
+    def is_production_database(self) -> bool:
+        return "postgresql" in (self.database_url or "")
 
 
 settings = Settings()

@@ -1,0 +1,128 @@
+{
+  "step": 2,
+  "phase": "B",
+  "generated_at": "2026-08-14T10:02:09.489517+00:00",
+  "database_url_is_postgres": true,
+  "db_reachable": true,
+  "db_error": null,
+  "tables": {
+    "parties": true,
+    "project_elements": true,
+    "element_document_refs": true,
+    "ontology_edges": true
+  },
+  "indexes": {
+    "uq_ontology_edge_tuple": true,
+    "idx_parties_project": true,
+    "idx_project_elements_project": true,
+    "idx_project_elements_ifc": true,
+    "idx_element_doc_refs_project": true,
+    "idx_element_doc_refs_element": true,
+    "idx_ontology_edges_project": true,
+    "idx_ontology_edges_predicate": true,
+    "idx_ontology_edges_from": true,
+    "idx_ontology_edges_to": true
+  },
+  "row_counts_before": {
+    "parties": 3,
+    "project_elements": 1,
+    "element_document_refs": 4,
+    "ontology_edges": 10
+  },
+  "phase_a_preserved": {
+    "catalog_asset_exists": true,
+    "clause_count": 58,
+    "extracted_text_len": 390542
+  },
+  "standards_bridge_smoke": {
+    "bridge_result": {
+      "standards_linked": 1,
+      "clauses_linked": 58,
+      "standard_codes": [
+        "CODE55-VOL1-IR"
+      ],
+      "edges_added": 117
+    },
+    "governed_by_edges": 59,
+    "pass": true
+  },
+  "wall_a_golden_path": {
+    "pass": true,
+    "project_id": 10,
+    "element_count": 1,
+    "wall_match_key": "wall:wall-a",
+    "ifc_global_id": "0JzgZ_oqLBV94C6pXvZLo5",
+    "doc_ref_count": 4,
+    "party_count": 3,
+    "party_roles": [
+      "consultant",
+      "contractor",
+      "employer"
+    ],
+    "edge_count": 10,
+    "checks": {
+      "single_wall_a_element": true,
+      "ifc_global_id_set": true,
+      "doc_refs_gte_3": true,
+      "employer_party": true,
+      "contractor_party": true,
+      "references_predicate": true,
+      "element_linked_in_edges": true
+    }
+  },
+  "e2e_analysis": {
+    "pass": true,
+    "project_id": 10,
+    "own_project": false,
+    "guardrail_events": 1,
+    "bridge_result": {
+      "standards_linked": 1,
+      "clauses_linked": 58,
+      "standard_codes": [
+        "CODE55-VOL1-IR"
+      ],
+      "edges_added": 117
+    },
+    "governed_by_edges": 59,
+    "finding_clause_edge": true,
+    "checks": {
+      "analyzer_ran": true,
+      "guardrail_event": true,
+      "guardrail_downgrade": true,
+      "standards_bridge": true,
+      "governed_by_edges": true,
+      "finding_clause_edge": true
+    }
+  },
+  "feature_flags": {
+    "checks": {
+      "defaults_off": true,
+      "ontology_only": true,
+      "kg_only": true,
+      "both_on": true,
+      "projects_wiring": true,
+      "env_example_documented": true
+    },
+    "pass": true
+  },
+  "cleanup_removed_project_ids": [
+    9,
+    10,
+    6
+  ],
+  "row_counts_after_cleanup": {
+    "parties": 0,
+    "project_elements": 0,
+    "ontology_edges": 0
+  },
+  "verdict": "ACCEPTED",
+  "verdict_checks": {
+    "tables": true,
+    "indexes": true,
+    "phase_a": true,
+    "standards_bridge": true,
+    "wall_a_golden_path": true,
+    "e2e_analysis": true,
+    "feature_flags": true
+  }
+}

@@ -1,0 +1,109 @@
+{
+  "step": 3,
+  "phase": "C",
+  "generated_at": "2026-08-14T11:09:52.214518+00:00",
+  "database_url_is_postgres": true,
+  "db_reachable": true,
+  "db_error": null,
+  "phase_a_prerequisite": {
+    "catalog_asset_exists": true,
+    "clause_count": 58,
+    "requirement_count": 90,
+    "extracted_text_len": 390542
+  },
+  "phase_b_prerequisite": {
+    "parties_table": true,
+    "project_elements_table": true,
+    "ontology_edges_table": true,
+    "pass": true
+  },
+  "requirements_load": {
+    "count": 90,
+    "has_source_page": true,
+    "pass": true
+  },
+  "llm_status": {
+    "openai_api_key_set": true,
+    "llm_provider": "openai_compatible",
+    "is_configured": true
+  },
+  "keyword_path_gated": true,
+  "ti_smoke": {
+    "ti_findings_count": 5,
+    "graph_edges_linked": 5,
+    "finding_ontology_edges": 10,
+    "requirement_ontology_edges": 5,
+    "edges_with_document_id": 10,
+    "ti_metrics": {
+      "enabled": true,
+      "checks_run": 5,
+      "gaps_found": 5,
+      "standards_checked": [
+        "CODE55-VOL1-IR"
+      ],
+      "llm_configured": true,
+      "llm_provider": "mock_verify",
+      "max_checks_per_standard": 5
+    },
+    "risk_id_valid": true,
+    "source_layer_llm_based": true,
+    "guardrail_events_on_ti": false,
+    "llm_used": "mock_verify",
+    "checks": {
+      "findings_gte_1": true,
+      "graph_linked_gte_1": true,
+      "risk_id": true,
+      "source_layer": true,
+      "requirements_loaded": true,
+      "document_id_on_edges": true,
+      "guardrail_clean": true
+    },
+    "pass": true
+  },
+  "coverage_status_smoke": {
+    "partial_detected": true,
+    "contradictory_detected": true,
+    "partial_meta_configured": true,
+    "pass": true
+  },
+  "keyword_gating_smoke": {
+    "direct_keyword_path_fires": true,
+    "std_topic_with_skip": false,
+    "wiring_in_projects_py": true,
+    "pass": true
+  },
+  "std_seed_003_skip": {
+    "implemented": true,
+    "pass": true
+  },
+  "e2e_analyze_smoke": {
+    "analyzer_no_std_topic": true,
+    "ti_findings": 3,
+    "ti_metrics_enabled": true,
+    "guardrail_events": 0,
+    "pass": true
+  },
+  "llm_diagnostic_smoke": {
+    "finding_code": "TI-LLM-NOT-CONFIGURED",
+    "llm_configured_false": true,
+    "pass": true
+  },
+  "real_llm_spot_check": {
+    "skipped": false,
+    "coverage_status": "silent",
+    "pass": true
+  },
+  "verdict": "ACCEPTED",
+  "verdict_checks": {
+    "phase_a_requirements": true,
+    "phase_b_prerequisite": true,
+    "requirements_load": true,
+    "ti_smoke": true,
+    "keyword_gating": true,
+    "llm_diagnostic": true,
+    "wiring": true,
+    "coverage_status_matrix": true,
+    "e2e_analyze": true,
+    "std_seed_003_skip": true
+  }
+}

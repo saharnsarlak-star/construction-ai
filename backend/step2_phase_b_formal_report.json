@@ -1,0 +1,69 @@
+{
+  "step": 2,
+  "phase": "B",
+  "title": "KG-1 Infrastructure — Final Verification Report",
+  "generated_at": "2026-08-14T10:02:09.489517+00:00",
+  "A_IMPLEMENTED": [
+    "Ontology tables: parties, project_elements, element_document_refs, ontology_edges",
+    "ProjectElement golden path: resolve_or_create_element, attach_document_ref, build_match_key",
+    "Party upsert + OntologyEdge idempotent upsert",
+    "Standards → KG bridge: link_project_standards_to_graph, link_finding_to_standard_clause",
+    "Finding evidence guardrail: apply_finding_guardrail / apply_guardrails_to_findings",
+    "Feature flags ONTOLOGY_ENABLED + KNOWLEDGE_GRAPH_ENABLED with documented interaction",
+    "Secondary ontology indexes (all 10 from schema_additive_ontology.sql)",
+    "Verification scripts: phase_b_verify.py, phase_b_complete_verify.py"
+  ],
+  "B_AUTOMATED_TESTED": [
+    "tests/test_kg_phase_b.py — 14 tests: guardrail (4), match_key (2), flags (3), golden path (2), bridge (2), models (1)",
+    "tests/test_standards_phase_a.py — 10 tests (Phase A regression)",
+    "Total automated: 24/24 pass",
+    "Feature-flag matrix: defaults off, ontology-only, kg-only, both on (phase_b_complete_verify.py)"
+  ],
+  "C_REAL_DATA_VERIFIED": [
+    "Supabase: all 4 ontology tables exist",
+    "Supabase: all 10 ontology indexes exist",
+    "Phase A preserved: CODE55-VOL1-IR — 58 clauses, 390542 extracted_text_len",
+    "Standards bridge on Supabase: {'standards_linked': 1, 'clauses_linked': 58, 'standard_codes': ['CODE55-VOL1-IR'], 'edges_added': 117}",
+    "Wall-A golden path on Supabase: 1 element, ≥3 doc refs, parties, references edges",
+    "E2E analyze path: guardrail downgrade + governed_by + Finding→StandardClause gaps edge",
+    "Feature-flag matrix: defaults off, ontology-only, kg-only, both on"
+  ],
+  "D_NOT_VERIFIED": [],
+  "E_BLOCKERS": [],
+  "F_NON_BLOCKING_LIMITATIONS": [
+    "Ontology ingest requires ONTOLOGY_ENABLED=true at extraction time",
+    "Standards bridge during analysis requires BOTH flags ON",
+    "Finding guardrail runs on every analysis (not flag-gated)",
+    "CatalogStandard node uses standard_code as to_id",
+    "No Alembic migrations — schema via init_db + supabase SQL",
+    "REST API for direct ontology CRUD not in Phase B scope (graph via analysis payload)",
+    "Live browser UI E2E not automated — backend analyze path verified via script"
+  ],
+  "G_DATABASE_CHANGES": [
+    "init_db secondary indexes (additive IF NOT EXISTS)",
+    "Ephemeral verify projects cleaned up after run",
+    "Phase A CODE55-VOL1-IR data preserved"
+  ],
+  "H_FILES_CHANGED": [
+    "backend/scripts/phase_b_complete_verify.py",
+    "backend/scripts/phase_b_verify.py",
+    "backend/tests/test_kg_phase_b.py"
+  ],
+  "I_TEST_RESULTS": {
+    "phase_a_unit": "10/10 OK",
+    "phase_b_unit": "14/14 OK",
+    "total_automated": "24/24 OK",
+    "scripts_phase2_ontology": "PASS (re-run on Supabase)",
+    "phase_b_supabase_complete_verify": "ACCEPTED",
+    "verdict_checks": {
+      "tables": true,
+      "indexes": true,
+      "phase_a": true,
+      "standards_bridge": true,
+      "wall_a_golden_path": true,
+      "e2e_analysis": true,
+      "feature_flags": true
+    }
+  },
+  "J_FINAL_VERDICT": "ACCEPTED"
+}

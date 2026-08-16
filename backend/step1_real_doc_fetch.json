@@ -1,0 +1,20 @@
+[
+  {
+    "key": "catalog_standards/CODE55-01-WWW.TECHNOBETAR.IR/Code55-01-www.technobetar.ir_1458cc450b5a.docx",
+    "dest": "step1_real_doc\\Code55-01-www.technobetar.ir_1458cc450b5a.docx",
+    "bytes": 7222341,
+    "sha256": "fdb79b0242b571d6262e6413f8e5d2b6728dba09dd774fef03553ec171c9f3ab"
+  },
+  {
+    "key": "catalog_standards/CODE55-VOL1-IR/Code55-01-www.technobetar.ir_8d77cf14b76f.docx",
+    "dest": "step1_real_doc\\Code55-01-www.technobetar.ir_8d77cf14b76f.docx",
+    "bytes": 7222341,
+    "sha256": "fdb79b0242b571d6262e6413f8e5d2b6728dba09dd774fef03553ec171c9f3ab"
+  },
+  {
+    "key": "catalog_standards/CODE55-VOL1-IR/Code55-01-www.technobetar.ir_bcb1dbebf955.docx",
+    "dest": "step1_real_doc\\Code55-01-www.technobetar.ir_bcb1dbebf955.docx",
+    "bytes": 7222341,
+    "sha256": "fdb79b0242b571d6262e6413f8e5d2b6728dba09dd774fef03553ec171c9f3ab"
+  }
+]

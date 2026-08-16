@@ -1,19 +1,21 @@
-"""Standards Engine — SQLAlchemy models for ingested standards, clauses, and requirements.
+"""Standards Engine — SQLAlchemy models for ingested clauses and requirements.
 
-Postgres-oriented (Supabase): taxonomy arrays use ``postgresql.ARRAY``.
-Table names follow MVP ``schema.sql`` conventions (``bigserial`` ids, ``timestamptz``).
+Uses the existing ``catalog_standard_assets`` table as the standards catalog
+(see ``CatalogStandardAsset`` in ``app.models``). Postgres-oriented: taxonomy
+arrays use ``postgresql.ARRAY``.
 """
 
 from __future__ import annotations
 
 import enum
-from datetime import date, datetime
+from datetime import datetime
 
-from sqlalchemy import Date, DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String, Text, func
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
+from app.models import CatalogStandardAsset
 from app.standards_engine.taxonomy import Discipline, enum_values
 
 
@@ -26,45 +28,32 @@ class RequirementType(str, enum.Enum):
     RECOMMENDATION = "recommendation"
 
 
-class Standard(Base):
-    """Country-scoped engineering standard metadata (Standards Engine catalog row)."""
-
-    __tablename__ = "standards"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    country_code: Mapped[str] = mapped_column(String(8), nullable=False)
-    standard_code: Mapped[str] = mapped_column(String(64), nullable=False)
-    title_fa: Mapped[str] = mapped_column(String(512), nullable=False)
-    title_en: Mapped[str | None] = mapped_column(String(512), nullable=True)
-    version: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    clauses: Mapped[list["StandardClause"]] = relationship(
-        back_populates="standard",
-        cascade="all, delete-orphan",
-    )
-
-
 class StandardClause(Base):
-    """One clause/paragraph extracted from a standard document."""
+    """One clause/paragraph extracted from a catalog standard document."""
 
     __tablename__ = "standard_clauses"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     standard_id: Mapped[int] = mapped_column(
-        ForeignKey("standards.id", ondelete="CASCADE"),
+        ForeignKey("catalog_standard_assets.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     clause_number: Mapped[str] = mapped_column(String(64), nullable=False)
     chapter: Mapped[str | None] = mapped_column(String(128), nullable=True)
     section: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    section_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    slot_code: Mapped[str | None] = mapped_column(String(160), nullable=True, index=True)
+    taxonomy_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    taxonomy_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
     raw_text: Mapped[str] = mapped_column(Text, nullable=False)
     source_page: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
-    standard: Mapped["Standard"] = relationship(back_populates="clauses")
+    catalog_standard: Mapped[CatalogStandardAsset] = relationship(
+        "CatalogStandardAsset",
+        foreign_keys=[standard_id],
+    )
     requirements: Mapped[list["Requirement"]] = relationship(
         back_populates="clause",
         cascade="all, delete-orphan",
@@ -100,6 +89,12 @@ class Requirement(Base):
     material: Mapped[list[str]] = mapped_column(
         ARRAY(String(64)),
         nullable=False,
+        server_default="{}",
+    )
+    # Finer-grained topic codes — free-form strings (see taxonomy.subtopics).
+    subtopic: Mapped[list[str] | None] = mapped_column(
+        ARRAY(String(64)),
+        nullable=True,
         server_default="{}",
     )
     requirement_type: Mapped[RequirementType] = mapped_column(

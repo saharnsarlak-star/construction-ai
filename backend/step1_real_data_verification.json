@@ -1,0 +1,76 @@
+{
+  "generated_at": "2026-08-14T07:10:48.318980+00:00",
+  "standard_code": "CODE55-VOL1-IR",
+  "catalog_db": {
+    "size_bytes": 7222341,
+    "original_name": "Code55-01-www.technobetar.ir.docx",
+    "stored_path": "supabase://project-documents/catalog_standards/CODE55-VOL1-IR/Code55-01-www.technobetar.ir_bcb1dbebf955.docx",
+    "country_code": "IR",
+    "standard_version": "effective_1404-04-01",
+    "effective_date": null,
+    "extracted_text_len": 80000,
+    "extraction_status": "done"
+  },
+  "db_counts": {
+    "clauses": 5,
+    "requirements": 14,
+    "source_page_pct": 0.0
+  },
+  "text_lens": {
+    "full": 390542,
+    "catalog_cap_80k": 80000
+  },
+  "metadata_from_word": {
+    "standard_code": null,
+    "country_code": null,
+    "title_fa": null,
+    "title_en": null,
+    "publisher": null,
+    "standard_version": null,
+    "effective_date": null,
+    "volume": null
+  },
+  "metadata_from_cached": {
+    "standard_code": null,
+    "country_code": null,
+    "title_fa": null,
+    "title_en": null,
+    "publisher": null,
+    "standard_version": null,
+    "effective_date": null,
+    "volume": null
+  },
+  "clause_parse": {
+    "full_document": 821,
+    "after_80k_cap": 267,
+    "section_2_2": 80,
+    "sample_numbers_2_2": [
+      "2-2",
+      "2-2-1",
+      "2-2-2",
+      "2-2-3",
+      "2-2-3-1",
+      "2-2-3-2",
+      "2-2-3-3",
+      "2-2-3-4",
+      "2-2-4",
+      "2-2-5",
+      "2-2-6",
+      "2-2-7",
+      "2-2-8",
+      "2-2-9",
+      "2-2-10"
+    ]
+  },
+  "sample_clause_2_2_3": {
+    "title": "جلوگیري از سقوط مواد و اشیا ............................................................................................",
+    "raw_text_len": 0,
+    "raw_text_preview": ""
+  },
+  "llm_sample": {
+    "classification": null,
+    "requirements": [],
+    "llm_error": null
+  },
+  "duplicate_clause_numbers": {}
+}

@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   api,
+  CATALOG_STANDARD_ACCEPT,
   FILE_ACCEPT,
   FILE_ACCEPT_BY_CATEGORY,
   UPLOAD_CHUNK_SIZE,
@@ -21,7 +22,10 @@ import {
 import { countryOptions, displayImpact, languageOptions, projectTypeOptions, t } from "./i18n";
 import { BulkFileList } from "./BulkFileList";
 import { ExperiencePanel } from "./ExperiencePanel";
+import { ProjectRegistryPanel } from "./ProjectRegistryPanel";
 import { ReportDashboard } from "./ReportDashboard";
+import { TaxonomyBrowser } from "./TaxonomyBrowser";
+import { StandardSectionBrowser } from "./StandardSectionBrowser";
 import "./App.css";
 
 function codeFromStandardFileName(fileName: string): string {
@@ -317,6 +321,53 @@ function analysisReferenceLabel(
   return t(lang, "refRules");
 }
 
+function formatEngineChip(engine: string, lang: LanguageCode): string {
+  const labels: Record<string, string> = {
+    keyword: t(lang, "engineKeyword"),
+    python_seed_rules: t(lang, "enginePython"),
+    ai_hybrid_seed_rules: t(lang, "engineAi"),
+    tender_intelligence: t(lang, "engineTi"),
+    experience_layer: t(lang, "engineExperience"),
+    vision_drawing: t(lang, "engineVision"),
+  };
+  return labels[engine] || engine;
+}
+
+function AnalysisEngineSummary({
+  analysis,
+  uiLang,
+}: {
+  analysis: AnalysisOut;
+  uiLang: LanguageCode;
+}) {
+  const engines = (analysis.engine || "keyword").split("+").filter(Boolean);
+  const aiCalls =
+    typeof analysis.ai_metrics?.calls === "number" ? analysis.ai_metrics.calls : null;
+  const tiChecks =
+    typeof analysis.tender_intelligence_metrics?.checks_run === "number"
+      ? analysis.tender_intelligence_metrics.checks_run
+      : null;
+  const counts = [
+    analysis.python_rule_findings
+      ? `${t(uiLang, "enginePython")}: ${analysis.python_rule_findings}`
+      : null,
+    analysis.ai_rule_findings ? `${t(uiLang, "engineAi")}: ${analysis.ai_rule_findings}` : null,
+    analysis.tender_intelligence_findings
+      ? `${t(uiLang, "engineTi")}: ${analysis.tender_intelligence_findings}`
+      : null,
+    aiCalls != null ? `${t(uiLang, "engineCalls")}: ${aiCalls}` : null,
+    tiChecks != null ? `${t(uiLang, "engineTiChecks")}: ${tiChecks}` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="engine-summary">
+      <strong>{t(uiLang, "engineLabel")}:</strong>{" "}
+      {engines.map((e) => formatEngineChip(e, uiLang)).join(" · ")}
+      {counts.length > 0 && <span className="muted engine-summary-metrics"> — {counts.join(" · ")}</span>}
+    </div>
+  );
+}
+
 type StagingItem = { key: string; file: File; selected: boolean };
 type StagingQueue = { category: DocumentCategory; items: StagingItem[] };
 
@@ -339,9 +390,11 @@ function App() {
   } | null>(null);
   const [staging, setStaging] = useState<StagingQueue | null>(null);
   const [standardsOpen, setStandardsOpen] = useState(false);
+  const [expandedStandardCode, setExpandedStandardCode] = useState<string | null>(null);
   const [analysisStale, setAnalysisStale] = useState(false);
   const [notice, setNotice] = useState<{ text: string; kind: "success" | "error" } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [projectLoading, setProjectLoading] = useState(false);
   const [apiRole, setApiRole] = useState<UserRole>("user");
   const [isAdmin, setIsAdmin] = useState(false);
   /** Landing gate: create-project / list only after explicit login. */
@@ -370,11 +423,13 @@ function App() {
   const [demoProjectId, setDemoProjectId] = useState<number | null>(null);
   const [catalogCode, setCatalogCode] = useState("");
   const [catalogTitle, setCatalogTitle] = useState("");
+  const catalogSingleInputRef = useRef<HTMLInputElement>(null);
   const [workspaceTab, setWorkspaceTab] = useState<"docs" | "standards" | "report" | "admin">(
     "docs",
   );
   /** Full-page file browser for one document category (null = overview cards). */
   const [docsDetailCat, setDocsDetailCat] = useState<DocumentCategory | null>(null);
+  const [docsPanelMode, setDocsPanelMode] = useState<"upload" | "taxonomy">("upload");
 
   const [name, setName] = useState("");
   const [country, setCountry] = useState<CountryCode>("IR");
@@ -592,7 +647,10 @@ function App() {
 
   useEffect(() => {
     if (workspaceTab === "standards") setStandardsOpen(true);
-    if (workspaceTab !== "docs") setDocsDetailCat(null);
+    if (workspaceTab !== "docs") {
+      setDocsDetailCat(null);
+      setDocsPanelMode("upload");
+    }
   }, [workspaceTab]);
 
   function setAppLang(lang: LanguageCode) {
@@ -682,6 +740,7 @@ function App() {
   async function loadProject(id: number, opts?: { includeAnalysis?: boolean }) {
     const includeAnalysis = opts?.includeAnalysis !== false;
     setError(null);
+    setProjectLoading(true);
     try {
       const p = await api.getProject(id);
       setProject(p);
@@ -699,7 +758,10 @@ function App() {
         }
       }
     } catch (e) {
-      setError(String(e));
+      setProject(null);
+      setError(parseApiError(e) || t(uiLang, "projectLoadError"));
+    } finally {
+      setProjectLoading(false);
     }
   }
 
@@ -785,6 +847,10 @@ function App() {
 
     setBusy(true);
     setError(null);
+    setNotice({
+      text: t(uiLang, "catalogUploadStarted").replace("{name}", list[0]?.name || ""),
+      kind: "success",
+    });
     setUploadProgress({ done: 0, total: list.length, category: "standard" });
     const failed: string[] = [];
     let ok = 0;
@@ -830,10 +896,16 @@ function App() {
         });
       }
 
-      setCatalogCode("");
-      setCatalogTitle("");
+      if (singleCode) setCatalogCode(singleCode);
+      else setCatalogCode("");
+      if (singleTitle) setCatalogTitle(singleTitle);
+      else setCatalogTitle("");
       setStandardsOpen(true);
-      await loadStandards(project.id);
+      try {
+        await loadStandards(project.id);
+      } catch (err) {
+        failed.push(parseApiError(err));
+      }
 
       if (ok && !failed.length) {
         setNotice({
@@ -858,11 +930,22 @@ function App() {
         } else {
           setError(failed.slice(0, 5).join("\n"));
         }
+        setNotice(null);
       }
+    } catch (err) {
+      setError(parseApiError(err) || t(uiLang, "catalogUploadFailed"));
+      setNotice(null);
     } finally {
       setBusy(false);
       setUploadProgress(null);
     }
+  }
+
+  function openCatalogUploadForStandard(code: string, title: string) {
+    if (!project || busy) return;
+    setCatalogCode(code);
+    setCatalogTitle(title);
+    window.setTimeout(() => catalogSingleInputRef.current?.click(), 0);
   }
 
   async function onUpload(category: DocumentCategory, files: FileList | File[] | null) {
@@ -879,13 +962,22 @@ function App() {
     try {
       for (let i = 0; i < list.length; i += UPLOAD_CHUNK_SIZE) {
         const chunk = list.slice(i, i + UPLOAD_CHUNK_SIZE);
-        try {
-          const result = await api.uploadDocuments(project.id, category, chunk);
+        const uploadChunk = async (files: File[]) => {
+          const result = await api.uploadDocuments(project.id, category, files);
           for (const err of result.errors) {
             failed.push(`${err.filename}: ${err.detail}`);
           }
-        } catch (e) {
-          failed.push(...chunk.map((f) => `${f.name}: ${String(e)}`));
+        };
+        try {
+          await uploadChunk(chunk);
+        } catch {
+          for (const file of chunk) {
+            try {
+              await uploadChunk([file]);
+            } catch (e) {
+              failed.push(`${file.name}: ${parseApiError(e)}`);
+            }
+          }
         }
         setUploadProgress({
           done: Math.min(i + chunk.length, list.length),
@@ -1711,6 +1803,32 @@ function App() {
           </section>
         ) : null}
 
+        {selectedId && !project && projectLoading ? (
+          <section className="panel home-panel">
+            <p className="muted" role="status">
+              {t(uiLang, "projectLoading")}
+            </p>
+          </section>
+        ) : null}
+
+        {selectedId && !project && !projectLoading ? (
+          <section className="panel home-panel">
+            <p className="home-login-error" role="alert">
+              {error || t(uiLang, "projectLoadError")}
+            </p>
+            <button
+              type="button"
+              className="primary soft"
+              onClick={() => {
+                setSelectedId(null);
+                setError(null);
+              }}
+            >
+              {t(uiLang, "back")}
+            </button>
+          </section>
+        ) : null}
+
         {selectedId && project && (
           <section className="workspace">
             <div className="workspace-bar">
@@ -1783,6 +1901,25 @@ function App() {
               </p>
             ) : null}
 
+            {workspaceTab === "docs" && !docsDetailCat ? (
+              <nav className="docs-subtabs" aria-label={t(uiLang, "docsSubNavLabel")}>
+                <button
+                  type="button"
+                  className={docsPanelMode === "upload" ? "docs-subtab on" : "docs-subtab"}
+                  onClick={() => setDocsPanelMode("upload")}
+                >
+                  {t(uiLang, "docsSubUpload")}
+                </button>
+                <button
+                  type="button"
+                  className={docsPanelMode === "taxonomy" ? "docs-subtab on" : "docs-subtab"}
+                  onClick={() => setDocsPanelMode("taxonomy")}
+                >
+                  {t(uiLang, "docsSubTaxonomy")}
+                </button>
+              </nav>
+            ) : null}
+
             {workspaceTab === "docs" && docsDetailCat ? (
               <section className={`docs-files-page doc-cat-${docsDetailCat}`}>
                 <div className="docs-files-page-bar">
@@ -1843,7 +1980,11 @@ function App() {
               </section>
             ) : null}
 
-            {workspaceTab === "docs" && !docsDetailCat ? (
+            {workspaceTab === "docs" && !docsDetailCat && docsPanelMode === "taxonomy" ? (
+              <TaxonomyBrowser uiLang={uiLang} />
+            ) : null}
+
+            {workspaceTab === "docs" && !docsDetailCat && docsPanelMode === "upload" ? (
             <div className="upload-grid docs-row">
               {uploadCategories.map((cat) => {
                 const files = docsByCategory[cat.key];
@@ -2072,25 +2213,69 @@ function App() {
                           disabled={busy}
                           onClick={() => {
                             if (!project) return;
+                            setNotice({ text: t(uiLang, "downloadPdfStarting"), kind: "success" });
                             void api
                               .downloadProjectStandardPdf(project.id, s.standard_code)
-                              .then(() =>
-                                setNotice({ text: t(uiLang, "downloadPdfOk"), kind: "success" }),
+                              .then((name) =>
+                                setNotice({
+                                  text: t(uiLang, "downloadPdfOk").replace("{name}", name),
+                                  kind: "success",
+                                }),
                               )
-                              .catch((err: Error) => setError(err.message || String(err)));
+                              .catch((err: Error) => {
+                                const msg = parseApiError(err) || t(uiLang, "downloadPdfFailed");
+                                setError(msg);
+                                setNotice({ text: msg, kind: "error" });
+                              });
                           }}
                         >
                           {t(uiLang, "downloadPdf")}
                         </button>
+                      ) : isAdmin ? (
+                        <button
+                          type="button"
+                          className="linkish std-upload"
+                          disabled={busy}
+                          onClick={() => openCatalogUploadForStandard(s.standard_code, s.title)}
+                        >
+                          {t(uiLang, "uploadStandardFile")}
+                        </button>
                       ) : (
                         <span className="muted">{t(uiLang, "downloadUnavailable")}</span>
                       )}
+                      <button
+                        type="button"
+                        className="linkish std-sections-btn"
+                        disabled={busy}
+                        onClick={() =>
+                          setExpandedStandardCode((prev) =>
+                            prev === s.standard_code ? null : s.standard_code,
+                          )
+                        }
+                      >
+                        {expandedStandardCode === s.standard_code
+                          ? t(uiLang, "stdSectionsHide")
+                          : t(uiLang, "stdSectionsShow")}
+                      </button>
                     </li>
                   ))}
                 </ul>
               )}
+              {expandedStandardCode && project ? (
+                <StandardSectionBrowser
+                  projectId={project.id}
+                  standardCode={expandedStandardCode}
+                  standardTitle={
+                    projectStandards.find((x) => x.standard_code === expandedStandardCode)?.title ||
+                    expandedStandardCode
+                  }
+                  uiLang={uiLang}
+                  onClose={() => setExpandedStandardCode(null)}
+                />
+              ) : null}
               {isAdmin ? (
                 <>
+                  <h4 className="standards-admin-title">{t(uiLang, "standardsAdminUploadTitle")}</h4>
                   <p className="muted upload-hint">{t(uiLang, "standardsCustomHint")}</p>
                   <div className="standards-admin-form">
                     <label>
@@ -2118,9 +2303,11 @@ function App() {
                   <p className="format-line">{t(uiLang, "formatsStandard")}</p>
                   {busy && uploadProgress?.category === "standard" ? (
                     <p className="upload-progress" role="status">
-                      {t(uiLang, "uploadingProgress")
-                        .replace("{done}", String(uploadProgress.done))
-                        .replace("{total}", String(uploadProgress.total))}
+                      {uploadProgress.done === 0
+                        ? t(uiLang, "catalogUploadSending")
+                        : t(uiLang, "uploadingProgress")
+                            .replace("{done}", String(uploadProgress.done))
+                            .replace("{total}", String(uploadProgress.total))}
                     </p>
                   ) : null}
                   <div className="standards-upload-actions">
@@ -2129,13 +2316,14 @@ function App() {
                         ? t(uiLang, "uploading")
                         : t(uiLang, "uploadCatalogStandard")}
                       <input
+                        ref={catalogSingleInputRef}
                         type="file"
-                        accept=".pdf,.docx,application/pdf"
+                        accept={CATALOG_STANDARD_ACCEPT}
                         disabled={busy || !project}
                         onChange={(e) => {
-                          const files = e.target.files;
+                          const picked = e.target.files ? Array.from(e.target.files) : [];
                           e.target.value = "";
-                          void uploadCatalogStandards(files);
+                          if (picked.length) void uploadCatalogStandards(picked);
                         }}
                       />
                     </label>
@@ -2145,13 +2333,13 @@ function App() {
                         : t(uiLang, "uploadCatalogStandardBulk")}
                       <input
                         type="file"
-                        accept=".pdf,.docx,application/pdf"
+                        accept={CATALOG_STANDARD_ACCEPT}
                         multiple
                         disabled={busy || !project}
                         onChange={(e) => {
-                          const files = e.target.files;
+                          const picked = e.target.files ? Array.from(e.target.files) : [];
                           e.target.value = "";
-                          void uploadCatalogStandards(files);
+                          if (picked.length) void uploadCatalogStandards(picked);
                         }}
                       />
                     </label>
@@ -2180,6 +2368,7 @@ function App() {
             ) : null}
 
             {workspaceTab === "admin" && isAdmin ? (
+              <>
               <ExperiencePanel
                 uiLang={uiLang}
                 busy={busy}
@@ -2190,6 +2379,17 @@ function App() {
                 }}
                 onError={(text) => setError(text)}
               />
+              <ProjectRegistryPanel
+                uiLang={uiLang}
+                busy={busy}
+                setBusy={setBusy}
+                onNotify={(text, kind) => {
+                  setNotice({ text, kind });
+                  if (kind === "error") setError(text);
+                }}
+                onError={(text) => setError(text)}
+              />
+              </>
             ) : null}
 
             {workspaceTab === "report" ? (
@@ -2217,6 +2417,8 @@ function App() {
                         summary={analysis.summary || ""}
                         blocked={analysis.status === "blocked"}
                       />
+
+                      <AnalysisEngineSummary analysis={analysis} uiLang={uiLang} />
 
                       {limitations.length > 0 && (
                         <div className="limitation-banners">

@@ -1,0 +1,34 @@
+{
+  "bucket": "project-documents",
+  "lists": {
+    "catalog_standards": {
+      "status": 200,
+      "objects": [
+        {
+          "name": "PHASE0_NETCHECK",
+          "id": null,
+          "updated_at": null,
+          "created_at": null,
+          "last_accessed_at": null,
+          "metadata": null
+        },
+        {
+          "name": "PHASE0_TEST_STD",
+          "id": null,
+          "updated_at": null,
+          "created_at": null,
+          "last_accessed_at": null,
+          "metadata": null
+        }
+      ]
+    },
+    "catalog_standards/CODE55-VOL1-IR": {
+      "status": 200,
+      "objects": []
+    },
+    "catalog_standards/CODE55": {
+      "status": 200,
+      "objects": []
+    }
+  }
+}

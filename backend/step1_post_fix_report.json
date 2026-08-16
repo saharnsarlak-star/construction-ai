@@ -1,0 +1,41 @@
+{
+  "step": 1,
+  "phase": "A",
+  "generated_at": "2026-08-14T08:11:40.944989+00:00",
+  "fixes_applied": [
+    "catalog text cap raised 80k -> 500k with force_refresh",
+    "TOC/index stub filtering",
+    "virtual source_page for Word (3500 chars/page)",
+    "Persian Word metadata parsing",
+    "force re-ingest clears old clauses before save"
+  ],
+  "document": {
+    "path": "step1_real_doc\\Code55-01-www.technobetar.ir_8d77cf14b76f.docx",
+    "extract_chars": 390542
+  },
+  "parsing": {
+    "clauses_all": 608,
+    "clauses_substantive": 594,
+    "clauses_section_2_2_substantive": 58,
+    "source_page_pct": 100.0
+  },
+  "metadata_parsed": {
+    "standard_code": null,
+    "country_code": "IR",
+    "title_fa": "ضابطه شماره ۵۵ - مشخصات فنی عمومی کارهای ساختمانی (بازنگری سوم)",
+    "title_en": null,
+    "publisher": "سازمان برنامه و بودجه کشور",
+    "standard_version": "جلد اول",
+    "effective_date": null,
+    "volume": "جلد اول"
+  },
+  "acceptance": {
+    "min_20_clauses_section_2_2": true,
+    "full_text_not_truncated": true,
+    "source_page_90pct": true,
+    "metadata_country": true,
+    "metadata_version_or_date": true
+  },
+  "verdict": "ACCEPTED (parse/metadata layer)",
+  "db_ingest_note": "Run when Supabase is reachable: python -m app.standards_engine.ingestion.pipeline --save-catalog CODE55-VOL1-IR --section 2-2 --force"
+}

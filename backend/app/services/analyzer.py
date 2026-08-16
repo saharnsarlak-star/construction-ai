@@ -1594,6 +1594,7 @@ def analyze_project_documents(
     documents: list[dict],
     project_type: ProjectType | None = None,
     selected_standards: list[dict] | None = None,
+    skip_keyword_standards: bool = False,
 ) -> dict:
     lang = report_language
     ptype = project_type or ProjectType.INFRASTRUCTURE
@@ -1781,17 +1782,18 @@ def analyze_project_documents(
             )
         )
 
-    # FIX 2 — semantic standards (consolidated)
-    findings.extend(
-        _analyze_selected_standards_semantic(
-            lang=lang,
-            selected_standards=selected_standards,
-            tender_text=tender_text,
-            standard_text=standard_text,
-            drawing_text=drawing_text,
-            caveat=caveat,
+    # FIX 2 — keyword topic/citation standards path (skipped when TI-1 semantic path active)
+    if not skip_keyword_standards:
+        findings.extend(
+            _analyze_selected_standards_semantic(
+                lang=lang,
+                selected_standards=selected_standards,
+                tender_text=tender_text,
+                standard_text=standard_text,
+                drawing_text=drawing_text,
+                caveat=caveat,
+            )
         )
-    )
 
     for rule in rules:
         if rule.code == "STD-001" and selected_standards:

@@ -1,7 +1,7 @@
 import enum
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database import Base
@@ -121,6 +121,10 @@ class CatalogStandardAsset(Base):
     title_fa: Mapped[str | None] = mapped_column(String(512), nullable=True)
     title_en: Mapped[str | None] = mapped_column(String(512), nullable=True)
     title_de: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    country_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    standard_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    effective_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    family_code: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     publisher: Mapped[str | None] = mapped_column(String(255), nullable=True)
     standard_class: Mapped[str] = mapped_column(String(32), default="technical")
     original_name: Mapped[str] = mapped_column(String(512), nullable=False)
@@ -205,6 +209,7 @@ class Document(Base):
         nullable=False,
     )
     original_name: Mapped[str] = mapped_column(String(512), nullable=False)
+    taxonomy_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
     stored_path: Mapped[str] = mapped_column(String(1024), nullable=False)
     content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
     size_bytes: Mapped[int] = mapped_column(Integer, default=0)
@@ -439,6 +444,50 @@ class ExperienceKnowledgeItem(Base):
     match_keywords_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class RegistryCategory(Base):
+    """Top-level grouping for project registry items (editable in Supabase)."""
+
+    __tablename__ = "registry_categories"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    title_fa: Mapped[str] = mapped_column(String(255), nullable=False)
+    title_en: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    description_fa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
+    color_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class ImplementationStep(Base):
+    """Editable roadmap of implementation phases (stored in Supabase)."""
+
+    __tablename__ = "implementation_steps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    step_code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    phase: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, index=True)
+    title_fa: Mapped[str] = mapped_column(String(512), nullable=False)
+    title_en: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    description_fa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    description_en: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="pending")
+    category: Mapped[str] = mapped_column(String(64), nullable=False, default="general", index=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deliverables_fa: Mapped[str | None] = mapped_column(Text, nullable=True)
+    related_paths: Mapped[str | None] = mapped_column(Text, nullable=True)
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

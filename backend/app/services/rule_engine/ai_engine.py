@@ -42,6 +42,39 @@ Keep source_excerpt as an exact quote from the excerpts (do not translate quotes
 """
 
 
+def _llm_not_configured_finding(lang: LanguageCode) -> RiskFinding:
+    title = {
+        LanguageCode.FA: "موتور قوانین AI/HYBRID فعال نیست — LLM پیکربندی نشده",
+        LanguageCode.EN: "AI/HYBRID rule engine unavailable — LLM not configured",
+        LanguageCode.DE: "AI/HYBRID-Regelengine nicht verfügbar — LLM nicht konfiguriert",
+        LanguageCode.FR: "Moteur de règles AI/HYBRID indisponible — LLM non configuré",
+    }[lang]
+    description = {
+        LanguageCode.FA: (
+            "AI_RULE_ENGINE_ENABLED=true است اما OPENAI_API_KEY یا "
+            "LLM_PROVIDER=replay/local_semantic تنظیم نشده است."
+        ),
+        LanguageCode.EN: (
+            "AI_RULE_ENGINE_ENABLED is true but OPENAI_API_KEY or "
+            "LLM_PROVIDER=replay/local_semantic is not configured."
+        ),
+        LanguageCode.DE: "AI_RULE_ENGINE_ENABLED ist true, aber kein LLM konfiguriert.",
+        LanguageCode.FR: "AI_RULE_ENGINE_ENABLED est true mais aucun LLM configuré.",
+    }[lang]
+    return RiskFinding(
+        code="AI-LLM-NOT-CONFIGURED",
+        category="process",
+        severity=RiskSeverity.LOW,
+        title=title,
+        description=description,
+        recommendation="Set OPENAI_API_KEY or LLM_PROVIDER=local_semantic for offline tests.",
+        evidence="AI_RULE_ENGINE_ENABLED=true without LLM provider",
+        finding_category="limitation",
+        source_layer="python",
+        cause_effect_chain=["source_layer=python", "ai_diagnostic=llm_not_configured"],
+    )
+
+
 def list_ai_hybrid_seed_rules() -> list[RuleDef]:
     rules = build_seed_batch1_rules() + build_seed_batch2_rules()
     return [
@@ -58,6 +91,7 @@ def run_ai_hybrid_seed_rules(
     documents: list[dict[str, Any]],
     project_type: ProjectType | str | None = None,
     selected_standards: list[dict[str, Any]] | None = None,
+    standard_requirements: list[dict[str, Any]] | None = None,
     elements: list[dict[str, Any]] | list[ElementView] | None = None,
     project_id: int | None = None,
     llm: LLMClient | None = None,
@@ -83,6 +117,7 @@ def run_ai_hybrid_seed_rules(
             documents=documents,
             project_type=project_type,
             selected_standards=selected_standards,
+            standard_requirements=standard_requirements,
             elements=elements,
             project_id=project_id,
             llm=llm,
@@ -98,6 +133,7 @@ def _run_ai_hybrid_seed_rules_inner(
     documents: list[dict[str, Any]],
     project_type: ProjectType | str | None = None,
     selected_standards: list[dict[str, Any]] | None = None,
+    standard_requirements: list[dict[str, Any]] | None = None,
     elements: list[dict[str, Any]] | list[ElementView] | None = None,
     project_id: int | None = None,
     llm: LLMClient | None = None,
@@ -134,6 +170,7 @@ def _run_ai_hybrid_seed_rules_inner(
         project_type=ptype,
         documents=[build_doc_view(d) for d in documents],
         selected_standards=selected_standards or [],
+        standard_requirements=list(standard_requirements or []),
         elements=element_views,
     )
     client = llm or LLMClient()
@@ -153,23 +190,30 @@ def _run_ai_hybrid_seed_rules_inner(
         "per_call": [],
     }
     if not client.is_configured:
-        metrics["error"] = "LLM not configured (set OPENAI_API_KEY or LLM_PROVIDER=replay)"
-        return [], metrics
+        metrics["error"] = "LLM not configured (set OPENAI_API_KEY or LLM_PROVIDER=replay/local_semantic)"
+        metrics["llm_configured"] = False
+        return [_llm_not_configured_finding(report_language)], metrics
 
+    metrics["llm_configured"] = True
     findings: list[RiskFinding] = []
-    max_calls = max(1, int(settings.ai_max_calls_per_analysis or 12))
+    cap = int(settings.ai_max_calls_per_analysis or 0)
+    max_calls = cap if cap > 0 else len(list_ai_hybrid_seed_rules()) + 1
 
     for rule in list_ai_hybrid_seed_rules():
         if metrics["calls"] >= max_calls:
             metrics["truncated"] = True
             break
         req = rule.requires_category
+        check = str((rule.logic_config or {}).get("check") or "")
+        # TI-1 owns semantic standard compliance when TI is active (Phase C)
+        if settings.ti_semantic_active and check == "standard_clause_semantic_compliance":
+            metrics["skipped_ti1_active"] = int(metrics.get("skipped_ti1_active") or 0) + 1
+            continue
         if req is not None and not ctx.docs(req):
             if not (req == DocumentCategory.STANDARD and ctx.selected_standards):
                 metrics["skipped_missing_category"] = int(metrics.get("skipped_missing_category") or 0) + 1
                 continue
         tag = str((rule.logic_config or {}).get("ownership_tag") or "")
-        check = str((rule.logic_config or {}).get("check") or "")
         try:
             if tag == "HYBRID":
                 disc = detect_hybrid_discrepancy(check, ctx)

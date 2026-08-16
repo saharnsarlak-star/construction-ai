@@ -1,0 +1,138 @@
+{
+  "rich_count": 8,
+  "total_2_2": 80,
+  "target": {
+    "clause_number": "2-2-7-1",
+    "raw_text_len": 1425,
+    "preview": "الف- اخذ مجوز لازم از مرجع صاحب صلاحیت.\nعدم بروز مخاطره براي عابران، خودروها، تأسیسات عمومی، بناها و درختان مجاور کارگاه ساختمانی در انتخاب مکان و نحوه قرار دادن، چیدن یا ریختن وسایل و مصالح در معابر.\nپ- فراهم بودن دسترسی سریع به تاسیسات و تجهیزات شهري از قبیل آب و برق و گاز، فاضلاب، شیرهاي آتشنشانی براي امداد گران.\nکور نکردن میدان دید و فراهم بودن امکان رویت علائم راهنمایی و رانندگی براي رانندگان.\nگماردن یک یا چند نگهبان با پرچم اعلام خطر در فواصل مناسب.\nقرار دادن نردههاي حفاظتی متحرك در فاصله مناسب از محوطه خطر و نصب چراغهاي چشمکزن یا سایر علائم هشداردهنده.\nچ- نصب وسایل کنترل مسیر و همچنین ت"
+  },
+  "llm": {
+    "taxonomy": {
+      "discipline": "hse",
+      "topic": [
+        "site_safety",
+        "temporary_works",
+        "emergency_preparedness"
+      ],
+      "element": [],
+      "material": []
+    },
+    "requirements": [
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "اخذ مجوز لازم از مرجع صاحب صلاحیت.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "prohibition",
+        "requirement_text": "مسدود یا محدود نمودن موقعیت پیادهروها و سایر معابر و فضاهاي عمومی از طریق قرار دادن و انبار کردن وسایل کار، مصالح ساختمانی و نخالههاي ساختمانی مجاز نیست.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "عدم بروز مخاطره براي عابران، خودروها، تأسیسات عمومی، بناها و درختان مجاور کارگاه ساختمانی در انتخاب مکان و نحوه قرار دادن، چیدن یا ریختن وسایل و مصالح در معابر.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "فراهم بودن دسترسی سریع به تاسیسات و تجهیزات شهري از قبیل آب و برق و گاز، فاضلاب، شیرهاي آتشنشانی براي امداد گران.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "کور نکردن میدان دید و فراهم بودن امکان رویت علائم راهنمایی و رانندگی براي رانندگان.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "گماردن یک یا چند نگهبان با پرچم اعلام خطر در فواصل مناسب.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "قرار دادن نردههاي حفاظتی متحرك در فاصله مناسب از محوطه خطر و نصب چراغهاي چشمکزن یا سایر علائم هشداردهنده.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "نصب وسایل کنترل مسیر و همچنین تابلوها و علایم هشدار دهنده با قابلیت رویت در شب و روز از فاصله مناسب.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "مراقبت کافی به منظور جلوگیري از لغزش، فرو ریختن یا ریزش احتمالی مصالح.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "انجام اقدامات مقتضی براي جلوگیري از انتشار آلایندههاي محیطی از قبیل گرد و غبار، پخش شدن مصالح و نخالههاي انباشته شده.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "انجام تدابیر حفاظتی براي جلوگیري از پرتاب اشیاء و ابزار و نخالهها بر روي معابر یا کارگران شاغل در کارگاه مطابق بند 3-3-2-2.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "تامین راه عبور موقت در محل مناسب در صورت محدود یا مسدود شدن راه عبور عمومی و نصب علائم هشداردهنده با تأیید مرجع صاحب صلاحیت.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "conditional",
+        "requirement_text": "قراردادن پل موقت عبور عابر پیاده با مقاومت و ایستایی لازم، با عرض حداقل 5/1 متر یا عرض پیادهرو و با نردهحفاظتی مناسب بر روي محلهاي حفاري شده در معابر عمومی با اخذ تاییدیه مرجع صاحب صلاحیت.",
+        "min_value": 1.5,
+        "max_value": null,
+        "unit": "m",
+        "conditions_text": null
+      },
+      {
+        "requirement_type": "mandatory",
+        "requirement_text": "تعبیه پل موقت با مقاومت کافی و عرض مناسب براي عبور خودروها با تایید شخص صاحب صلاحیت بر روي محلهاي حفاري شده در مسیر تردد خودروها.",
+        "min_value": null,
+        "max_value": null,
+        "unit": null,
+        "conditions_text": null
+      }
+    ],
+    "warnings": [],
+    "req_count": 14
+  },
+  "rich_in_80k_cap": 2
+}
