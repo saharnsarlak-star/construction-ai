@@ -1,6 +1,17 @@
-# TenderRisk Analyzer
+# Tender Risk-MSA
+
+[![Status](https://img.shields.io/badge/Status-In%20Development-yellow)](https://github.com/saharnsarlak-star/construction-ai)
+[![Phase](https://img.shields.io/badge/Phase%202-Upcoming-lightgrey)](https://github.com/saharnsarlak-star/construction-ai)
 
 ابزار وب برای بررسی ریسک اسناد مناقصه از نگاه **کارفرما**.
+
+## Project Status
+
+**Phase 2 — In Development / Upcoming**
+
+This repository is the **next planned phase** of the MSA platform. It is under active development and is **not** a complete, production-ready module.
+
+Tender Risk-MSA represents the next planned phase of the MSA platform, focused on automated tender-document validation and readiness scoring.
 
 ## معماری پیشنهادی (ساده و عملی)
 
